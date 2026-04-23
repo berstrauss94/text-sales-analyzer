@@ -373,6 +373,75 @@ HTML = """
             color: #c0c0c0;
             line-height: 1.5;
         }
+
+        /* Expandable indicator cards */
+        .indicator-item {
+            background: #0f1117;
+            border: 1px solid #2a2d3a;
+            border-radius: 8px;
+            padding: 10px 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            position: relative;
+        }
+
+        .indicator-item:hover {
+            border-color: #4a6cf7;
+            background: #141720;
+        }
+
+        .indicator-item.has-detail::after {
+            content: '▼';
+            position: absolute;
+            bottom: 4px;
+            right: 6px;
+            font-size: 0.55rem;
+            color: #444;
+        }
+
+        .indicator-item.expanded::after { content: '▲'; }
+
+        .indicator-detail {
+            display: none;
+            background: #0a0c14;
+            border: 1px solid #2a2d3a;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            padding: 8px 12px;
+            margin-top: -4px;
+            text-align: left;
+        }
+
+        .indicator-detail.open { display: block; }
+
+        .detail-word-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 3px 0;
+            border-bottom: 1px solid #1a1d27;
+            font-size: 0.8rem;
+        }
+
+        .detail-word-row:last-child { border-bottom: none; }
+
+        .detail-word { color: #c0c0c0; }
+
+        .detail-count {
+            background: #1a2a3a;
+            color: #5bd4f5;
+            padding: 1px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .detail-empty {
+            color: #444;
+            font-size: 0.75rem;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -581,21 +650,45 @@ function renderCommercial(c) {
     const fillClass = pct > 70 ? 'prob-fill-hot' : pct > 40 ? 'prob-fill-warm' : 'prob-fill-cold';
 
     const indicators = [
-        { label: 'Palabras Positivas', value: c.palabras_positivas, cls: c.palabras_positivas > 0 ? 'positive' : '' },
-        { label: 'Respuestas Afirmativas', value: c.respuestas_afirmativas, cls: c.respuestas_afirmativas > 0 ? 'positive' : '' },
-        { label: 'Indicios de Cierre', value: c.indicios_cierre, cls: c.indicios_cierre > 0 ? 'positive' : '' },
-        { label: 'Escasez Comercial', value: c.escasez_comercial, cls: '' },
-        { label: 'Pedidos de Referidos', value: c.pedidos_referidos, cls: '' },
-        { label: 'Objeciones', value: c.objeciones, cls: c.objeciones > 2 ? 'highlight' : '' },
-        { label: 'Prospeccion', value: c.indicios_prospeccion, cls: '' },
+        { key: 'palabras_positivas',    label: 'Palabras Positivas',     value: c.palabras_positivas,    cls: c.palabras_positivas > 0 ? 'positive' : '' },
+        { key: 'respuestas_afirmativas',label: 'Respuestas Afirmativas', value: c.respuestas_afirmativas, cls: c.respuestas_afirmativas > 0 ? 'positive' : '' },
+        { key: 'indicios_cierre',       label: 'Indicios de Cierre',     value: c.indicios_cierre,       cls: c.indicios_cierre > 0 ? 'positive' : '' },
+        { key: 'escasez_comercial',     label: 'Escasez Comercial',      value: c.escasez_comercial,     cls: '' },
+        { key: 'pedidos_referidos',     label: 'Pedidos de Referidos',   value: c.pedidos_referidos,     cls: '' },
+        { key: 'objeciones',            label: 'Objeciones',             value: c.objeciones,            cls: c.objeciones > 2 ? 'highlight' : '' },
+        { key: 'indicios_prospeccion',  label: 'Prospeccion',            value: c.indicios_prospeccion,  cls: '' },
     ];
 
-    const indicatorsHtml = indicators.map(i =>
-        `<div class="indicator-item">
-            <div class="indicator-label">${i.label}</div>
-            <div class="indicator-value ${i.cls}">${i.value}</div>
-        </div>`
-    ).join('');
+    const indicatorsHtml = indicators.map((ind, idx) => {
+        const detail = c.detalle ? c.detalle[ind.key] : {};
+        const hasDetail = detail && Object.keys(detail).length > 0;
+        const detailId = 'detail-' + idx;
+
+        let detailHtml = '';
+        if (hasDetail) {
+            const rows = Object.entries(detail)
+                .sort((a, b) => b[1] - a[1])
+                .map(([word, count]) =>
+                    `<div class="detail-word-row">
+                        <span class="detail-word">${word}</span>
+                        <span class="detail-count">${count}x</span>
+                    </div>`
+                ).join('');
+            detailHtml = `<div class="indicator-detail" id="${detailId}">${rows}</div>`;
+        } else {
+            detailHtml = `<div class="indicator-detail" id="${detailId}"><span class="detail-empty">Ninguna detectada</span></div>`;
+        }
+
+        return `
+        <div>
+            <div class="indicator-item ${hasDetail ? 'has-detail' : ''}"
+                 onclick="toggleDetail('${detailId}', this)">
+                <div class="indicator-label">${ind.label}</div>
+                <div class="indicator-value ${ind.cls}">${ind.value}</div>
+            </div>
+            ${detailHtml}
+        </div>`;
+    }).join('');
 
     return `
     <div class="commercial-section">
@@ -619,6 +712,10 @@ function renderCommercial(c) {
             </div>
         </div>
 
+        <div style="font-size:0.7rem; color:#555; margin-bottom:8px;">
+            Haz clic en cada indicador para ver el detalle de palabras detectadas.
+        </div>
+
         <div class="indicators-grid">${indicatorsHtml}</div>
 
         <div style="font-size:0.75rem; color:#555; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.06em;">Recomendacion</div>
@@ -628,6 +725,14 @@ function renderCommercial(c) {
             Densidad comercial: ${c.densidad_comercial.toFixed(4)} &nbsp;|&nbsp; Total palabras: ${c.total_palabras}
         </div>
     </div>`;
+}
+
+function toggleDetail(detailId, cardEl) {
+    const panel = document.getElementById(detailId);
+    if (!panel) return;
+    const isOpen = panel.classList.contains('open');
+    panel.classList.toggle('open', !isOpen);
+    cardEl.classList.toggle('expanded', !isOpen);
 }
 
 // Allow Ctrl+Enter to submit
@@ -702,6 +807,7 @@ def analyze():
             "nivel_interes": ca.nivel_interes,
             "tendencia_cierre": ca.tendencia_cierre,
             "recomendacion": ca.recomendacion,
+            "detalle": ca.detalle,
         }
     })
 

@@ -32,6 +32,9 @@ class CommercialAnalysis:
     objeciones: int = 0
     indicios_prospeccion: int = 0
 
+    # Detailed word counts per group: {group: {word: count}}
+    detalle: dict = field(default_factory=dict)
+
     # Derived metrics
     total_palabras: int = 0
     total_indicadores: int = 0
@@ -39,9 +42,9 @@ class CommercialAnalysis:
     probabilidad_cierre: float = 0.0
 
     # Classification
-    tipo_lead: str = "FRIO"          # CALIENTE / TIBIO / FRIO
-    nivel_interes: str = "MEDIO"     # ALTO / MEDIO / BAJO
-    tendencia_cierre: str = "MODERADA"  # FUERTE / MODERADA / DEBIL
+    tipo_lead: str = "FRIO"
+    nivel_interes: str = "MEDIO"
+    tendencia_cierre: str = "MODERADA"
     recomendacion: str = ""
 
 
@@ -135,15 +138,23 @@ class CommercialAnalyzer:
             text: Any sales or real estate conversation text.
 
         Returns:
-            CommercialAnalysis with all indicators and recommendations.
+            CommercialAnalysis with all indicators, word details and recommendations.
         """
         normalized = _normalize(text)
         ca = CommercialAnalysis()
+        ca.detalle = {}
 
-        # Count each indicator group
+        # Count each indicator group and collect word-level detail
         for group, keywords in _KEYWORDS.items():
-            count = sum(_count_keyword(normalized, kw) for kw in keywords)
-            setattr(ca, group, count)
+            word_counts: dict[str, int] = {}
+            total = 0
+            for kw in keywords:
+                count = _count_keyword(normalized, kw)
+                if count > 0:
+                    word_counts[kw] = count
+                    total += count
+            setattr(ca, group, total)
+            ca.detalle[group] = word_counts
 
         # Total words and indicators
         ca.total_palabras = _count_total_words(normalized)
