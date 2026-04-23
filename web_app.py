@@ -276,7 +276,7 @@ HTML = """
             <button class="btn-primary" onclick="analyze()">Analizar</button>
             <button class="btn-secondary" onclick="clearAll()">Limpiar</button>
         </div>
-        <div class="loading" id="loading">Analizando...</div>
+        <div class="loading" id="loading">Analizando texto...</div>
     </div>
 
     <div class="results" id="results"></div>
@@ -318,23 +318,83 @@ function confBar(value) {
             <div class="conf-bar"><div class="conf-fill" style="width:${pct}%"></div></div>`;
 }
 
+// Translations for concept names
+const SALES_CONCEPTS_ES = {
+    'offer': 'Oferta',
+    'discount': 'Descuento / Rebaja',
+    'commission': 'Comision',
+    'closing': 'Cierre de Venta',
+    'prospect': 'Prospecto / Cliente',
+    'objection': 'Objecion',
+    'follow_up': 'Seguimiento',
+    'negotiation': 'Negociacion'
+};
+
+const RE_CONCEPTS_ES = {
+    'property_type': 'Tipo de Propiedad',
+    'price': 'Precio',
+    'area_sqm': 'Metraje / Area',
+    'bedrooms': 'Habitaciones',
+    'bathrooms': 'Banos',
+    'location': 'Ubicacion',
+    'amenities': 'Amenidades',
+    'zoning': 'Zonificacion',
+    'condition': 'Estado / Condicion'
+};
+
+const INTENT_ES = {
+    'OFFER': 'OFERTA',
+    'INQUIRY': 'CONSULTA',
+    'NEGOTIATION': 'NEGOCIACION',
+    'CLOSING': 'CIERRE',
+    'DESCRIPTION': 'DESCRIPCION',
+    'UNKNOWN': 'DESCONOCIDO'
+};
+
+const SENTIMENT_ES = {
+    'POSITIVE': 'POSITIVO',
+    'NEUTRAL': 'NEUTRAL',
+    'NEGATIVE': 'NEGATIVO'
+};
+
+const ENTITY_ES = {
+    'price': 'Precio',
+    'area_sqm': 'Metraje',
+    'bedrooms': 'Habitaciones',
+    'bathrooms': 'Banos',
+    'location': 'Ubicacion'
+};
+
+function translateConcept(key, map) {
+    return map[key] || key;
+}
+
 function renderResults(data, inputText) {
     const el = document.getElementById('results');
 
     if (data.error) {
-        el.innerHTML = `<div class="error-card"><strong>${data.error_code}</strong>: ${data.error_message}</div>`;
+        const errorMessages = {
+            'INPUT_TOO_SHORT': 'El texto es demasiado corto para analizar.',
+            'INPUT_TOO_LONG': 'El texto supera el limite maximo permitido.',
+            'INPUT_EMPTY': 'El texto no contiene contenido analizable.',
+            'ANALYSIS_ERROR': 'Ocurrio un error durante el analisis.'
+        };
+        const msg = errorMessages[data.error_code] || data.error_message;
+        el.innerHTML = `<div class="error-card"><strong>Error:</strong> ${msg}</div>`;
         el.style.display = 'block';
         return;
     }
 
     const preview = inputText.length > 100 ? inputText.substring(0, 100) + '...' : inputText;
+    const intentEs = INTENT_ES[data.intent] || data.intent;
+    const sentimentEs = SENTIMENT_ES[data.sentiment] || data.sentiment;
 
     let salesHtml = '';
     if (data.sales_concepts && data.sales_concepts.length > 0) {
         salesHtml = '<ul class="concept-list">' +
             data.sales_concepts.map(c =>
                 `<li class="concept-item">
-                    <span class="concept-name">${c.concept}</span>
+                    <span class="concept-name">${translateConcept(c.concept, SALES_CONCEPTS_ES)}</span>
                     <span class="concept-conf">${Math.round(c.confidence*100)}%</span>
                 </li>`
             ).join('') + '</ul>';
@@ -347,7 +407,7 @@ function renderResults(data, inputText) {
         reHtml = '<ul class="concept-list">' +
             data.real_estate_concepts.map(c =>
                 `<li class="concept-item">
-                    <span class="concept-name">${c.concept}</span>
+                    <span class="concept-name">${translateConcept(c.concept, RE_CONCEPTS_ES)}</span>
                     <span class="concept-conf">${Math.round(c.confidence*100)}%</span>
                 </li>`
             ).join('') + '</ul>';
@@ -363,7 +423,7 @@ function renderResults(data, inputText) {
                 numStr = ` &rarr; <span class="entity-numeric">${e.numeric_value.toLocaleString()}${e.unit ? ' ' + e.unit : ''}</span>`;
             }
             return `<div class="entity-item">
-                <div class="entity-concept">${e.concept}</div>
+                <div class="entity-concept">${translateConcept(e.concept, ENTITY_ES)}</div>
                 <div class="entity-value">"${e.raw_value}"${numStr}</div>
             </div>`;
         }).join('');
@@ -375,29 +435,29 @@ function renderResults(data, inputText) {
         <div class="input-preview">"${preview}"</div>
         <div class="result-grid">
             <div class="card">
-                <div class="card-title">Intencion</div>
-                <span class="badge badge-${data.intent}">${data.intent}</span>
+                <div class="card-title">Intencion del Texto</div>
+                <span class="badge badge-${data.intent}">${intentEs}</span>
                 ${confBar(data.intent_confidence)}
             </div>
             <div class="card">
                 <div class="card-title">Sentimiento</div>
-                <span class="badge badge-${data.sentiment}">${data.sentiment}</span>
+                <span class="badge badge-${data.sentiment}">${sentimentEs}</span>
                 ${confBar(data.sentiment_confidence)}
             </div>
             <div class="card">
-                <div class="card-title">Conceptos de Ventas</div>
+                <div class="card-title">Conceptos de Ventas Detectados</div>
                 ${salesHtml}
             </div>
             <div class="card">
-                <div class="card-title">Conceptos de Bienes Raices</div>
+                <div class="card-title">Conceptos de Bienes Raices Detectados</div>
                 ${reHtml}
             </div>
             <div class="card full-width">
-                <div class="card-title">Entidades Extraidas</div>
+                <div class="card-title">Datos Extraidos del Texto</div>
                 ${entitiesHtml}
             </div>
         </div>
-        <div class="timestamp">Analizado: ${data.analyzed_at}</div>
+        <div class="timestamp">Analizado el: ${data.analyzed_at}</div>
     `;
     el.style.display = 'block';
 }
