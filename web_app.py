@@ -19,9 +19,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from flask import Flask, request, jsonify, render_template_string
 from src.factory import create_analyzer
+from src.components.commercial_analyzer import CommercialAnalyzer
 from src.models.data_models import AnalysisReport, AnalysisError
 
 app = Flask(__name__)
+commercial_analyzer = CommercialAnalyzer()
 
 # Load analyzer once at startup
 print("Loading models...")
@@ -262,6 +264,115 @@ HTML = """
             margin-bottom: 14px;
             word-break: break-word;
         }
+
+        /* Commercial analysis section */
+        .commercial-section {
+            background: #1a1d27;
+            border: 1px solid #2a2d3a;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 14px;
+        }
+
+        .commercial-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #666;
+            margin-bottom: 16px;
+        }
+
+        .lead-badge {
+            display: inline-block;
+            padding: 6px 18px;
+            border-radius: 20px;
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .lead-CALIENTE { background: #3a1a1a; color: #f55b5b; border: 1px solid #f55b5b; }
+        .lead-TIBIO    { background: #3a2a1a; color: #f5a35b; border: 1px solid #f5a35b; }
+        .lead-FRIO     { background: #1a2a3a; color: #5bd4f5; border: 1px solid #5bd4f5; }
+
+        .prob-bar-container {
+            margin-bottom: 16px;
+        }
+
+        .prob-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 4px;
+        }
+
+        .prob-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .prob-bar {
+            height: 8px;
+            background: #2a2d3a;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+
+        .prob-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.6s ease;
+        }
+
+        .prob-fill-hot  { background: linear-gradient(90deg, #f55b5b, #ff8c00); }
+        .prob-fill-warm { background: linear-gradient(90deg, #f5a35b, #f5d05b); }
+        .prob-fill-cold { background: linear-gradient(90deg, #5bd4f5, #4a6cf7); }
+
+        .indicators-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .indicator-item {
+            background: #0f1117;
+            border: 1px solid #2a2d3a;
+            border-radius: 8px;
+            padding: 10px 12px;
+            text-align: center;
+        }
+
+        .indicator-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            color: #555;
+            letter-spacing: 0.06em;
+            margin-bottom: 4px;
+        }
+
+        .indicator-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #e0e0e0;
+        }
+
+        .indicator-value.highlight { color: #f55b5b; }
+        .indicator-value.positive  { color: #5bf5a3; }
+
+        .recomendacion-box {
+            background: #0f1117;
+            border-left: 3px solid #4a6cf7;
+            padding: 10px 14px;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.85rem;
+            color: #c0c0c0;
+            line-height: 1.5;
+        }
     </style>
 </head>
 <body>
@@ -457,9 +568,66 @@ function renderResults(data, inputText) {
                 ${entitiesHtml}
             </div>
         </div>
+        ${renderCommercial(data.commercial)}
         <div class="timestamp">Analizado el: ${data.analyzed_at}</div>
     `;
     el.style.display = 'block';
+}
+
+function renderCommercial(c) {
+    if (!c) return '';
+
+    const pct = c.probabilidad_cierre;
+    const fillClass = pct > 70 ? 'prob-fill-hot' : pct > 40 ? 'prob-fill-warm' : 'prob-fill-cold';
+
+    const indicators = [
+        { label: 'Palabras Positivas', value: c.palabras_positivas, cls: c.palabras_positivas > 0 ? 'positive' : '' },
+        { label: 'Respuestas Afirmativas', value: c.respuestas_afirmativas, cls: c.respuestas_afirmativas > 0 ? 'positive' : '' },
+        { label: 'Indicios de Cierre', value: c.indicios_cierre, cls: c.indicios_cierre > 0 ? 'positive' : '' },
+        { label: 'Escasez Comercial', value: c.escasez_comercial, cls: '' },
+        { label: 'Pedidos de Referidos', value: c.pedidos_referidos, cls: '' },
+        { label: 'Objeciones', value: c.objeciones, cls: c.objeciones > 2 ? 'highlight' : '' },
+        { label: 'Prospeccion', value: c.indicios_prospeccion, cls: '' },
+    ];
+
+    const indicatorsHtml = indicators.map(i =>
+        `<div class="indicator-item">
+            <div class="indicator-label">${i.label}</div>
+            <div class="indicator-value ${i.cls}">${i.value}</div>
+        </div>`
+    ).join('');
+
+    return `
+    <div class="commercial-section">
+        <div class="commercial-title">Analisis Comercial Inmobiliario</div>
+
+        <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px; flex-wrap:wrap;">
+            <span class="lead-badge lead-${c.tipo_lead}">LEAD ${c.tipo_lead}</span>
+            <div>
+                <div style="font-size:0.75rem; color:#666; margin-bottom:2px;">Nivel de interes: <strong style="color:#aaa">${c.nivel_interes}</strong></div>
+                <div style="font-size:0.75rem; color:#666;">Tendencia de cierre: <strong style="color:#aaa">${c.tendencia_cierre}</strong></div>
+            </div>
+        </div>
+
+        <div class="prob-bar-container">
+            <div class="prob-label">
+                <span>Probabilidad de Cierre</span>
+                <span class="prob-value">${pct.toFixed(1)}%</span>
+            </div>
+            <div class="prob-bar">
+                <div class="prob-fill ${fillClass}" style="width:${pct}%"></div>
+            </div>
+        </div>
+
+        <div class="indicators-grid">${indicatorsHtml}</div>
+
+        <div style="font-size:0.75rem; color:#555; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.06em;">Recomendacion</div>
+        <div class="recomendacion-box">${c.recomendacion}</div>
+
+        <div style="font-size:0.7rem; color:#444; margin-top:10px; text-align:right;">
+            Densidad comercial: ${c.densidad_comercial.toFixed(4)} &nbsp;|&nbsp; Total palabras: ${c.total_palabras}
+        </div>
+    </div>`;
 }
 
 // Allow Ctrl+Enter to submit
@@ -495,6 +663,9 @@ def analyze():
             "error_message": result.error_message
         })
 
+    # Run commercial analysis in parallel
+    ca = commercial_analyzer.analyze(data["text"])
+
     return jsonify({
         "error": False,
         "input_text": result.input_text,
@@ -516,6 +687,22 @@ def analyze():
             for e in result.entities
         ],
         "analyzed_at": result.analyzed_at,
+        "commercial": {
+            "palabras_positivas": ca.palabras_positivas,
+            "respuestas_afirmativas": ca.respuestas_afirmativas,
+            "indicios_cierre": ca.indicios_cierre,
+            "escasez_comercial": ca.escasez_comercial,
+            "pedidos_referidos": ca.pedidos_referidos,
+            "objeciones": ca.objeciones,
+            "indicios_prospeccion": ca.indicios_prospeccion,
+            "total_palabras": ca.total_palabras,
+            "densidad_comercial": ca.densidad_comercial,
+            "probabilidad_cierre": ca.probabilidad_cierre,
+            "tipo_lead": ca.tipo_lead,
+            "nivel_interes": ca.nivel_interes,
+            "tendencia_cierre": ca.tendencia_cierre,
+            "recomendacion": ca.recomendacion,
+        }
     })
 
 
