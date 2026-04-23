@@ -442,6 +442,68 @@ HTML = """
             font-size: 0.75rem;
             font-style: italic;
         }
+
+        /* Lead detail panel */
+        .lead-detail-panel {
+            display: none;
+            background: #0a0c14;
+            border: 1px solid #2a2d3a;
+            border-radius: 0 0 10px 10px;
+            padding: 16px;
+            margin-top: -2px;
+        }
+
+        .lead-detail-panel.open { display: block; }
+
+        .formula-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+            margin-bottom: 14px;
+        }
+
+        .formula-table td {
+            padding: 5px 8px;
+            border-bottom: 1px solid #1a1d27;
+            color: #c0c0c0;
+        }
+
+        .formula-table td:last-child {
+            text-align: right;
+            font-weight: 600;
+        }
+
+        .formula-table .positive-row td:last-child { color: #5bf5a3; }
+        .formula-table .negative-row td:last-child { color: #f55b5b; }
+        .formula-table .total-row td {
+            border-top: 2px solid #2a2d3a;
+            border-bottom: none;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .formula-result {
+            background: #0f1117;
+            border: 1px solid #2a2d3a;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 0.82rem;
+            color: #888;
+            margin-bottom: 10px;
+        }
+
+        .formula-result strong { color: #e0e0e0; }
+
+        .lead-gap {
+            font-size: 0.8rem;
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-top: 8px;
+        }
+
+        .lead-gap-caliente { background: #1a3a1a; color: #5bf5a3; }
+        .lead-gap-tibio    { background: #3a2a1a; color: #f5a35b; }
+        .lead-gap-frio     { background: #1a2a3a; color: #5bd4f5; }
     </style>
 </head>
 <body>
@@ -694,8 +756,18 @@ function renderCommercial(c) {
     <div class="commercial-section">
         <div class="commercial-title">Analisis Comercial Inmobiliario</div>
 
-        <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px; flex-wrap:wrap;">
-            <span class="lead-badge lead-${c.tipo_lead}">LEAD ${c.tipo_lead}</span>
+        <div style="margin-bottom:4px;">
+            <span class="lead-badge lead-${c.tipo_lead}" style="cursor:pointer;"
+                  onclick="toggleLeadDetail('lead-detail-panel')">
+                LEAD ${c.tipo_lead} &nbsp;&#9660;
+            </span>
+        </div>
+
+        <div class="lead-detail-panel" id="lead-detail-panel">
+            ${renderLeadDetail(c)}
+        </div>
+
+        <div style="display:flex; align-items:center; gap:16px; margin:12px 0; flex-wrap:wrap;">
             <div>
                 <div style="font-size:0.75rem; color:#666; margin-bottom:2px;">Nivel de interes: <strong style="color:#aaa">${c.nivel_interes}</strong></div>
                 <div style="font-size:0.75rem; color:#666;">Tendencia de cierre: <strong style="color:#aaa">${c.tendencia_cierre}</strong></div>
@@ -725,6 +797,73 @@ function renderCommercial(c) {
             Densidad comercial: ${c.densidad_comercial.toFixed(4)} &nbsp;|&nbsp; Total palabras: ${c.total_palabras}
         </div>
     </div>`;
+}
+
+function renderLeadDetail(c) {
+    if (!c.formula) return '';
+    const f = c.formula;
+    const pct = c.probabilidad_cierre;
+
+    let gapHtml = '';
+    if (c.tipo_lead === 'CALIENTE') {
+        gapHtml = `<div class="lead-gap lead-gap-caliente">
+            Este lead ya es CALIENTE. Proceder al cierre inmediatamente.
+        </div>`;
+    } else if (c.tipo_lead === 'TIBIO') {
+        gapHtml = `<div class="lead-gap lead-gap-tibio">
+            Para ser CALIENTE necesita superar 70%. Le faltan <strong>${f.para_caliente} puntos</strong>.
+            Reforzar indicios de cierre y respuestas afirmativas.
+        </div>`;
+    } else {
+        const gapTibio = f.para_tibio > 0
+            ? `Para ser TIBIO necesita superar 40%. Le faltan <strong>${f.para_tibio} puntos</strong>.`
+            : `Ya esta cerca del nivel TIBIO.`;
+        gapHtml = `<div class="lead-gap lead-gap-frio">
+            ${gapTibio} Nutrir con informacion y seguimiento activo.
+        </div>`;
+    }
+
+    return `
+        <div style="font-size:0.75rem; color:#666; margin-bottom:10px;">
+            La probabilidad de cierre se calcula con esta formula:
+            <br><code style="color:#4a6cf7; font-size:0.8rem;">(Indicios_Cierre x 5 + Respuestas_Afirm x 2 - Objeciones x 3) / Total_Palabras x 100</code>
+        </div>
+        <table class="formula-table">
+            <tr class="positive-row">
+                <td>Indicios de Cierre</td>
+                <td>${c.indicios_cierre} x 5</td>
+                <td>+${f.indicios_cierre_pts}</td>
+            </tr>
+            <tr class="positive-row">
+                <td>Respuestas Afirmativas</td>
+                <td>${c.respuestas_afirmativas} x 2</td>
+                <td>+${f.respuestas_afirmativas_pts}</td>
+            </tr>
+            <tr class="negative-row">
+                <td>Objeciones</td>
+                <td>${c.objeciones} x 3</td>
+                <td>-${f.objeciones_pts}</td>
+            </tr>
+            <tr class="total-row">
+                <td colspan="2">Puntaje neto</td>
+                <td>${f.puntaje_neto}</td>
+            </tr>
+        </table>
+        <div class="formula-result">
+            <strong>(${f.puntaje_neto} / ${f.total_palabras} palabras) x 100 = ${pct.toFixed(2)}%</strong>
+            <br>
+            <span style="font-size:0.75rem;">
+                Umbral CALIENTE: &gt;70% &nbsp;|&nbsp; Umbral TIBIO: &gt;40% &nbsp;|&nbsp; FRIO: &lt;40%
+            </span>
+        </div>
+        ${gapHtml}
+    `;
+}
+
+function toggleLeadDetail(panelId) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    panel.classList.toggle('open');
 }
 
 function toggleDetail(detailId, cardEl) {
@@ -808,6 +947,15 @@ def analyze():
             "tendencia_cierre": ca.tendencia_cierre,
             "recomendacion": ca.recomendacion,
             "detalle": ca.detalle,
+            "formula": {
+                "indicios_cierre_pts": ca.indicios_cierre * 5,
+                "respuestas_afirmativas_pts": ca.respuestas_afirmativas * 2,
+                "objeciones_pts": ca.objeciones * 3,
+                "puntaje_neto": (ca.indicios_cierre * 5) + (ca.respuestas_afirmativas * 2) - (ca.objeciones * 3),
+                "total_palabras": ca.total_palabras,
+                "para_caliente": max(0, round(70 - ca.probabilidad_cierre, 1)),
+                "para_tibio": max(0, round(40 - ca.probabilidad_cierre, 1)),
+            }
         }
     })
 
