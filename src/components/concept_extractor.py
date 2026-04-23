@@ -24,7 +24,7 @@ from src.models.data_models import (
 _PRICE_PATTERNS = [
     re.compile(r'(USD\s*[\d,\.]+\d)', re.IGNORECASE),
     re.compile(r'(\$\s*[\d,\.]+\d)', re.IGNORECASE),
-    re.compile(r'([\d,\.]+\d\s*(?:dólares|dolares|dollars|usd))', re.IGNORECASE),
+    re.compile(r'([\d,\.]+\d\s*(?:dolares|dollars|usd))', re.IGNORECASE),
     re.compile(r'(\d+k)\b', re.IGNORECASE),
 ]
 
@@ -44,24 +44,39 @@ _BEDROOM_PATTERNS = [
 
 # Bathroom patterns: 2 banos / 3 bathrooms
 _BATHROOM_PATTERNS = [
-    re.compile(r'(\d+\s*(?:baños?|banos?|bathrooms?|baths?))', re.IGNORECASE),
+    re.compile(r'(\d+\s*(?:banos?|bathrooms?|baths?))', re.IGNORECASE),
     re.compile(r'(\d+-?bath)', re.IGNORECASE),
 ]
 
-# Geographic location terms (Spanish and English)
+# Geographic location terms - only match when preceded by a location keyword
+# Avoids false positives like "este" (this) being detected as "east"
 _LOCATION_TERMS = [
-    re.compile(r'\b(zona\s+\w+)', re.IGNORECASE),
-    re.compile(r'\b(sector\s+\w+)', re.IGNORECASE),
-    re.compile(r'\b(urbanización\s+\w+)', re.IGNORECASE),
+    # "zona norte", "zona residencial", etc.
+    re.compile(r'\b(zona\s+[a-zA-Z]{3,})', re.IGNORECASE),
+    # "sector las mercedes", etc.
+    re.compile(r'\b(sector\s+[a-zA-Z]{3,})', re.IGNORECASE),
+    # "urbanizacion xyz"
+    re.compile(r'\b(urbanizacion\s+[a-zA-Z]{3,})', re.IGNORECASE),
+    # English location keywords
     re.compile(r'\b(downtown|city\s+center|uptown|midtown)\b', re.IGNORECASE),
-    re.compile(r'\b(norte|sur|este|oeste|centro)\b', re.IGNORECASE),
-    re.compile(r'\b(?:en|in|at|near)\s+([A-Z][a-záéíóúñ]+(?:\s+[A-Z][a-záéíóúñ]+)*)', re.UNICODE),
+    # Only match compass directions when followed by another word (e.g. "zona norte" already caught above)
+    # or when part of a proper location phrase like "Zona Norte", "Sector Este"
+    re.compile(r'\b(Zona\s+(?:Norte|Sur|Este|Oeste|Centro))\b', re.UNICODE),
+    re.compile(r'\b(Sector\s+(?:Norte|Sur|Este|Oeste|Centro))\b', re.UNICODE),
+    # City names and proper nouns after "en", "in", "at", "near" - only if capitalized
+    re.compile(r'\b(?:en|in|at|near)\s+([A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})*)', re.UNICODE),
 ]
+
+# Words to exclude from location detection (common Spanish words that look like directions)
+_LOCATION_STOPWORDS = {
+    'este', 'esta', 'estos', 'estas',  # "this/these" in Spanish
+    'norte', 'sur', 'oeste', 'centro',  # standalone compass words without context
+    'bien', 'mal', 'mas', 'menos',
+}
 
 
 def _extract_numeric(raw: str) -> float | None:
     """Extract the first numeric value from a raw string."""
-    # Find the first standalone number (digits with optional commas/dots)
     match = re.search(r'[\d]+(?:[,\.][\d]+)*', raw)
     if not match:
         return None
@@ -74,7 +89,7 @@ def _extract_numeric(raw: str) -> float | None:
 def _extract_unit(raw: str) -> str | None:
     """Extract the unit from a raw value string."""
     raw_lower = raw.lower()
-    if 'usd' in raw_lower or 'dollar' in raw_lower or 'dólar' in raw_lower or '$' in raw:
+    if 'usd' in raw_lower or 'dollar' in raw_lower or 'dolar' in raw_lower or '$' in raw:
         return 'USD'
     if 'm2' in raw_lower or 'metro' in raw_lower or 'sqm' in raw_lower:
         return 'm2'
@@ -110,14 +125,20 @@ def _find_entities(original_text: str) -> list[Entity]:
     add_entity('bedrooms', _BEDROOM_PATTERNS)
     add_entity('bathrooms', _BATHROOM_PATTERNS)
 
-    # Location extraction
+    # Location extraction with stopword filtering
     for pattern in _LOCATION_TERMS:
         for match in pattern.finditer(original_text):
             span = match.span()
             if span in seen_spans:
                 continue
-            seen_spans.add(span)
             raw = match.group(0).strip()
+            # Skip if the raw value is a common stopword
+            if raw.lower() in _LOCATION_STOPWORDS:
+                continue
+            # Skip very short matches (less than 4 chars) to avoid false positives
+            if len(raw) < 4:
+                continue
+            seen_spans.add(span)
             entities.append(Entity(
                 concept='location',
                 raw_value=raw,
@@ -154,11 +175,6 @@ class ConceptExtractor:
     ) -> ConceptResult:
         """
         Extract concepts and entities from the feature vector and parsed text.
-
-        Returns ConceptResult with:
-        - sales_concepts: list of detected sales concepts with confidence
-        - real_estate_concepts: list of detected real estate concepts with confidence
-        - entities: list of structured entities (prices, areas, locations, etc.)
         """
         sales_concepts = self._extract_concepts(
             feature_vector,
@@ -187,18 +203,12 @@ class ConceptExtractor:
         mlb,
         original_text: str,
     ) -> list[ConceptMatch]:
-        """Run the multi-label classifier and return concept matches.
-
-        OneVsRestClassifier.predict_proba() returns an array of shape
-        (n_samples, n_classes) where each value is the probability of
-        the positive class for that label.
-        """
+        """Run the multi-label classifier and return concept matches."""
         try:
-            # Shape: (1, n_classes) — one sample, n_classes probabilities
             proba_matrix = model.predict_proba(feature_vector)
 
             concepts: list[ConceptMatch] = []
-            threshold = 0.2  # minimum confidence to report a concept
+            threshold = 0.2
 
             for i, class_label in enumerate(mlb.classes_):
                 prob = float(proba_matrix[0, i])
@@ -216,28 +226,24 @@ class ConceptExtractor:
             return []
 
     def _find_source(self, concept: str, text: str) -> str:
-        """
-        Find a representative text fragment for a concept.
-        Returns the first matching keyword or the first 50 chars of text.
-        """
-        # Keyword map for common concepts
+        """Find a representative text fragment for a concept."""
         keyword_map: dict[str, list[str]] = {
             'offer': ['ofrezco', 'oferta', 'offer', 'offering', 'vendo', 'selling'],
-            'discount': ['descuento', 'rebaja', 'discount', 'reduction', 'reducción'],
-            'commission': ['comisión', 'commission', 'fee', 'honorario'],
+            'discount': ['descuento', 'rebaja', 'discount', 'reduction'],
+            'commission': ['comision', 'commission', 'fee', 'honorario'],
             'closing': ['cierre', 'closing', 'firmamos', 'precio final', 'final price'],
             'prospect': ['prospecto', 'prospect', 'buyer', 'comprador', 'cliente'],
-            'objection': ['objeta', 'objection', 'concern', 'preocupación', 'duda'],
+            'objection': ['objeta', 'objection', 'concern', 'duda'],
             'follow_up': ['seguimiento', 'follow up', 'follow-up', 'contactar'],
-            'negotiation': ['negociación', 'negotiation', 'negociar', 'negotiate'],
+            'negotiation': ['negociacion', 'negotiation', 'negociar', 'negotiate'],
             'property_type': ['apartamento', 'casa', 'house', 'condo', 'terreno', 'local'],
-            'price': ['precio', 'price', 'usd', 'dólares', 'dollars', '$'],
+            'price': ['precio', 'price', 'usd', 'dolares', 'dollars'],
             'area_sqm': ['m2', 'metros', 'sqm', 'square', 'metraje'],
             'bedrooms': ['habitaciones', 'cuartos', 'bedrooms', 'dormitorios'],
-            'bathrooms': ['baños', 'bathrooms', 'baths'],
+            'bathrooms': ['banos', 'bathrooms', 'baths'],
             'location': ['zona', 'ubicado', 'located', 'sector', 'ciudad'],
             'amenities': ['piscina', 'gimnasio', 'pool', 'gym', 'amenidades', 'amenities'],
-            'zoning': ['zonificación', 'zoning', 'zona comercial', 'residencial'],
+            'zoning': ['zonificacion', 'zoning', 'zona comercial', 'residencial'],
             'condition': ['estado', 'condition', 'remodelado', 'renovated', 'nuevo'],
         }
 
