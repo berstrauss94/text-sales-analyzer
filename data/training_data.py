@@ -598,3 +598,128 @@ REAL_ESTATE_CONCEPT_DATA: list[tuple[str, str]] = [
     ("Propiedad ubicada en zona norte, cerca de colegios y centros comerciales.", "location"),
     ("Edificio con piscina, gimnasio, seguridad 24 horas y salon de fiestas.", "amenities"),
 ]
+
+
+# ---------------------------------------------------------------------------
+# Additional conversation-style training data
+# Covers informal sales dialogues, follow-ups, and mixed contexts
+# ---------------------------------------------------------------------------
+
+INTENT_DATA += [
+    # OFFER - conversational
+    ("Le ofrezco este inmueble a un precio muy conveniente.", "OFFER"),
+    ("Tengo disponible una propiedad que podria interesarle.", "OFFER"),
+    ("Estoy vendiendo mi apartamento, si le interesa le cuento los detalles.", "OFFER"),
+    ("I have a great property available, would you like to hear more?", "OFFER"),
+    ("Ponemos a su disposicion esta residencia a precio de mercado.", "OFFER"),
+
+    # INQUIRY - conversational
+    ("Me podria dar mas informacion sobre la propiedad?", "INQUIRY"),
+    ("Quisiera saber si el precio es negociable.", "INQUIRY"),
+    ("Podemos coordinar una visita para ver el inmueble?", "INQUIRY"),
+    ("What can you tell me about the property condition?", "INQUIRY"),
+    ("Hay alguna deuda o hipoteca sobre la propiedad?", "INQUIRY"),
+
+    # NEGOTIATION - conversational
+    ("Estoy interesado pero el precio me parece un poco elevado.", "NEGOTIATION"),
+    ("Si bajamos un poco el precio podemos cerrar rapidamente.", "NEGOTIATION"),
+    ("What if we agree on a price and close before the end of the month?", "NEGOTIATION"),
+    ("Podria considerar incluir los muebles en el precio?", "NEGOTIATION"),
+    ("I think we can work something out if you're flexible on the price.", "NEGOTIATION"),
+
+    # CLOSING - conversational
+    ("Perfecto, quedamos de acuerdo entonces.", "CLOSING"),
+    ("Vamos a proceder con la firma del contrato.", "CLOSING"),
+    ("Great, we have a deal. Let's move forward with the paperwork.", "CLOSING"),
+    ("Confirmamos el precio y procedemos con la escritura.", "CLOSING"),
+    ("Everything is agreed, we close on Friday.", "CLOSING"),
+
+    # DESCRIPTION - conversational
+    ("Es un apartamento muy luminoso con excelente distribucion.", "DESCRIPTION"),
+    ("La propiedad cuenta con todos los servicios y muy buena ubicacion.", "DESCRIPTION"),
+    ("It's a spacious home with a large backyard and modern kitchen.", "DESCRIPTION"),
+    ("El inmueble tiene acabados de primera y esta en perfectas condiciones.", "DESCRIPTION"),
+    ("A beautiful property with stunning views and premium finishes.", "DESCRIPTION"),
+]
+
+SENTIMENT_DATA += [
+    ("Excelente atencion del vendedor, muy satisfecho con el proceso.", "POSITIVE"),
+    ("La propiedad supero mis expectativas, muy recomendada.", "POSITIVE"),
+    ("Great experience, smooth transaction, very happy with the purchase.", "POSITIVE"),
+    ("Muy buena inversion, la zona esta creciendo mucho.", "POSITIVE"),
+    ("Outstanding service and a beautiful property.", "POSITIVE"),
+    ("La propiedad tiene algunos detalles menores pero en general esta bien.", "NEUTRAL"),
+    ("The property meets our basic requirements.", "NEUTRAL"),
+    ("Es una opcion razonable para el precio que tiene.", "NEUTRAL"),
+    ("The listing is accurate and the property is as described.", "NEUTRAL"),
+    ("Propiedad estandar, nada fuera de lo comun.", "NEUTRAL"),
+    ("El proceso fue muy complicado y el vendedor poco colaborador.", "NEGATIVE"),
+    ("La propiedad tiene problemas que no fueron mencionados.", "NEGATIVE"),
+    ("Very disappointed with the condition of the property.", "NEGATIVE"),
+    ("El precio no justifica el estado en que se encuentra.", "NEGATIVE"),
+    ("Terrible experience, would not recommend this agent.", "NEGATIVE"),
+]
+
+SALES_CONCEPT_DATA += [
+    # offer - conversational
+    ("Le hago una propuesta formal por la propiedad.", "offer"),
+    ("Quiero presentar una oferta por este inmueble.", "offer"),
+    ("I'd like to put in an offer on this property.", "offer"),
+    ("Estamos listos para hacer una oferta en firme.", "offer"),
+
+    # negotiation - conversational
+    ("Podemos discutir el precio con calma.", "negotiation"),
+    ("Hay margen para negociar las condiciones?", "negotiation"),
+    ("We're open to discussing the terms further.", "negotiation"),
+    ("Quisiera negociar algunos aspectos del contrato.", "negotiation"),
+
+    # follow_up - conversational
+    ("Solo queria hacer un seguimiento de nuestra conversacion.", "follow_up"),
+    ("Checking in to see if you've had a chance to consider our offer.", "follow_up"),
+    ("Le escribo para dar seguimiento a la visita de ayer.", "follow_up"),
+    ("Just following up on the proposal we sent last week.", "follow_up"),
+
+    # prospect - conversational
+    ("Tengo un cliente muy interesado en ver la propiedad.", "prospect"),
+    ("There's a serious buyer who wants to schedule a visit.", "prospect"),
+    ("El prospecto ya tiene el financiamiento aprobado.", "prospect"),
+    ("A qualified buyer is ready to make an offer.", "prospect"),
+
+    # closing - conversational
+    ("Estamos listos para firmar cuando usted quiera.", "closing"),
+    ("We're ready to close as soon as the paperwork is ready.", "closing"),
+    ("El comprador acepto las condiciones, procedemos al cierre.", "closing"),
+    ("Both parties are ready to sign the agreement.", "closing"),
+]
+
+REAL_ESTATE_CONCEPT_DATA += [
+    # property_type - conversational
+    ("Tengo un apartamento disponible que podria interesarle.", "property_type"),
+    ("Es una casa muy bien ubicada en zona residencial.", "property_type"),
+    ("We have a commercial space available in the business district.", "property_type"),
+    ("El terreno tiene excelente potencial de desarrollo.", "property_type"),
+
+    # price - conversational
+    ("El precio que manejamos es muy competitivo.", "price"),
+    ("Estamos pidiendo un precio justo por la propiedad.", "price"),
+    ("The asking price reflects the current market value.", "price"),
+    ("Podemos ajustar el precio segun las condiciones del mercado.", "price"),
+
+    # location - conversational
+    ("La propiedad esta en una zona muy cotizada de la ciudad.", "location"),
+    ("Excelente ubicacion, cerca de todo lo necesario.", "location"),
+    ("It's located in one of the best neighborhoods in the area.", "location"),
+    ("La zona tiene muy buena plusvalia y sigue creciendo.", "location"),
+
+    # condition - conversational
+    ("La propiedad esta en excelentes condiciones, lista para mudarse.", "condition"),
+    ("El inmueble fue completamente renovado el ano pasado.", "condition"),
+    ("It's move-in ready with all recent upgrades.", "condition"),
+    ("La propiedad necesita algunos arreglos menores.", "condition"),
+
+    # amenities - conversational
+    ("El edificio tiene todas las comodidades que uno necesita.", "amenities"),
+    ("Cuenta con piscina, gimnasio y areas verdes.", "amenities"),
+    ("The complex has great amenities including a pool and gym.", "amenities"),
+    ("Urbanizacion con seguridad privada y areas recreativas.", "amenities"),
+]
