@@ -13,5 +13,7 @@
   "then": {
     "type": "runCommand",
     "command": "python -m pytest tests/ -q --tb=short 2>&1"
-  }
+  },
+  "workspaceFolderName": "Proyecto 1",
+  "shortName": "auto-test-on-save"
 }

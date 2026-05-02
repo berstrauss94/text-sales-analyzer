@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import os
 import tempfile
-from typing import Optional
 
 
 class AudioTranscriber:
@@ -27,6 +26,17 @@ class AudioTranscriber:
     def __init__(self, model_name: str = "base") -> None:
         self.model_name = model_name
         self._model = None   # lazy load
+        self._whisper_available: bool | None = None  # None = not checked yet
+
+    def _check_whisper(self) -> bool:
+        """Return True if openai-whisper is importable."""
+        if self._whisper_available is None:
+            try:
+                import whisper  # noqa: F401
+                self._whisper_available = True
+            except ImportError:
+                self._whisper_available = False
+        return self._whisper_available
 
     def _load_model(self):
         if self._model is None:
@@ -39,18 +49,19 @@ class AudioTranscriber:
         Transcribe an audio file.
 
         Returns:
-            {
-                "ok": True,
-                "text": "full transcription...",
-                "language": "es",
-                "segments": [...],   # word-level timestamps
-            }
+            {"ok": True, "text": "...", "language": "es", "segments": [...]}
             or
-            {
-                "ok": False,
-                "error": "error message"
-            }
+            {"ok": False, "error": "error message"}
         """
+        if not self._check_whisper():
+            return {
+                "ok": False,
+                "error": (
+                    "Whisper no esta instalado en este servidor. "
+                    "Instala openai-whisper y ffmpeg para habilitar la transcripcion de audio."
+                ),
+            }
+
         if not os.path.exists(audio_path):
             return {"ok": False, "error": f"Archivo no encontrado: {audio_path}"}
 
@@ -75,6 +86,15 @@ class AudioTranscriber:
         Transcribe audio from raw bytes (e.g. from a Flask file upload).
         Writes to a temp file, transcribes, then cleans up.
         """
+        if not self._check_whisper():
+            return {
+                "ok": False,
+                "error": (
+                    "Whisper no esta instalado en este servidor. "
+                    "Instala openai-whisper y ffmpeg para habilitar la transcripcion de audio."
+                ),
+            }
+
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
             tmp.write(audio_bytes)
             tmp_path = tmp.name
@@ -86,3 +106,8 @@ class AudioTranscriber:
                 os.unlink(tmp_path)
             except OSError:
                 pass
+
+    @property
+    def is_available(self) -> bool:
+        """True if Whisper is installed and usable."""
+        return self._check_whisper()

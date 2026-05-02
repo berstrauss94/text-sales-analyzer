@@ -898,6 +898,10 @@ HTML = """
     <div class="input-section">
         <textarea id="textInput"
             placeholder="O escribe / pega aqui el texto que quieres analizar...&#10;&#10;Ejemplo: Ofrezco apartamento de 3 habitaciones en USD 180,000 negociable, zona norte, 95 m2."></textarea>
+        <div class="btn-row">
+            <button class="btn-primary" onclick="analyze()">&#128269; Analizar</button>
+            <button class="btn-secondary" onclick="clearAll()">Limpiar</button>
+        </div>
         <div class="loading" id="loading" style="margin-top:10px;">Analizando texto...</div>
     </div>
 
@@ -2258,6 +2262,17 @@ def history_flat():
         return jsonify({"error": True, "error_code": "UNAUTHORIZED"}), 401
     limit = int(request.args.get("limit", 100))
     return jsonify(get_flat_entries(session["username"], limit=limit))
+
+
+@app.route("/status")
+def status():
+    """Health check — returns component availability."""
+    return jsonify({
+        "ok": True,
+        "whisper_available": audio_transcriber.is_available,
+        "whisper_model": audio_transcriber.model_name,
+        "analyzer_loaded": analyzer is not None,
+    })
 
 
 if __name__ == "__main__":
