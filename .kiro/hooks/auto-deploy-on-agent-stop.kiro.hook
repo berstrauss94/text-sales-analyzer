@@ -1,14 +1,14 @@
 {
   "enabled": true,
   "name": "Auto Deploy on Agent Stop",
-  "description": "Notifica cuando Kiro termina cambios y pregunta si se debe ejecutar el deploy",
-  "version": "1.0.0",
+  "description": "Notifies wheInstala openai-whisper y ffmpeg para habilitar la transcripcion de audio.n Kiro finishes changes and asks if deploy should run",
+  "version": "1",
   "when": {
     "type": "agentStop"
   },
   "then": {
     "type": "askAgent",
-    "prompt": "Kiro ha terminado de realizar cambios. Notifica al usuario que los cambios están listos y pregúntale si desea ejecutar el deploy ahora. Si responde que sí, ejecuta el script de deploy del proyecto (deploy.py o el comando correspondiente)."
+    "prompt": "El agente acaba de terminar sus cambios. Ejecuta 'python deploy.py --status' para mostrar el estado actual del repositorio (rama, cambios pendientes, últimos commits). Muestra el resultado de forma resumida y pregunta al usuario si desea hacer deploy."
   },
   "workspaceFolderName": "Proyecto 1",
   "shortName": "auto-deploy-on-agent-stop"
