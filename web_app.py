@@ -115,6 +115,43 @@ else:
     print("Info: MPC_USERNAME/MPC_PASSWORD no configurados — scheduler de sync desactivado.")
 
 # ---------------------------------------------------------------------------
+# Historical sync on startup (triggered by RUN_HISTORICAL_SYNC_ON_START=true)
+# ---------------------------------------------------------------------------
+# Set this env var in Railway to process all recordings from 01/01/2026 to today.
+# It runs once in a background thread and self-disables after completion
+# (Railway will not re-trigger it on subsequent restarts unless the var is set again).
+if _mpc_configured and os.environ.get("RUN_HISTORICAL_SYNC_ON_START", "").lower() == "true":
+    import threading
+
+    def _run_historical_sync():
+        print("=" * 60)
+        print("  SYNC HISTÓRICO: iniciando procesamiento desde 01/01/2026...")
+        print("=" * 60)
+        try:
+            summary = sync_pipeline.run(historical=True)
+            print("=" * 60)
+            print(f"  SYNC HISTÓRICO COMPLETADO:")
+            print(f"    Procesados:          {summary.get('processed', 0)}")
+            print(f"    Omitidos (dedup):    {summary.get('skipped_dedup', 0)}")
+            print(f"    Sin mapeo:           {summary.get('skipped_no_mapping', 0)}")
+            print(f"    Sin transcripción:   {summary.get('skipped_no_transcription', 0)}")
+            print(f"    Errores:             {summary.get('errors', 0)}")
+            if summary.get("unmapped_vendors"):
+                print(f"    Vendedores sin mapeo: {summary['unmapped_vendors']}")
+            print("=" * 60)
+            print("  Tip: desactivá RUN_HISTORICAL_SYNC_ON_START en Railway para")
+            print("  evitar que se repita en el próximo restart.")
+            print("=" * 60)
+        except Exception as _exc:
+            print(f"ERROR en sync histórico: {_exc}")
+
+    _hist_thread = threading.Thread(target=_run_historical_sync, daemon=True, name="historical-sync")
+    _hist_thread.start()
+    print("Info: Sync histórico iniciado en background thread.")
+elif not _mpc_configured and os.environ.get("RUN_HISTORICAL_SYNC_ON_START", "").lower() == "true":
+    print("Warning: RUN_HISTORICAL_SYNC_ON_START=true pero MPC_USERNAME/MPC_PASSWORD no configurados — sync omitido.")
+
+# ---------------------------------------------------------------------------
 # HTML Template
 # ---------------------------------------------------------------------------
 
