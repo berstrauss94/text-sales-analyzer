@@ -32,7 +32,7 @@ app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 app.config["MAX_CONTENT_LENGTH"] = None
 commercial_analyzer = CommercialAnalyzer()
 user_manager = UserManager()
-audio_transcriber = AudioTranscriber(model_name="tiny")
+audio_transcriber = AudioTranscriber(model_name="base")
 
 # Load analyzer once at startup
 print("Loading models...")

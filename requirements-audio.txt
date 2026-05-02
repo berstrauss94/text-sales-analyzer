@@ -1,5 +1,6 @@
-# Dependencias opcionales para transcripcion de audio con faster-whisper
+# Dependencias opcionales para transcripcion de audio con Whisper
 # Requiere ffmpeg instalado en el sistema: https://ffmpeg.org/download.html
 # Uso: pip install -r requirements-audio.txt
 -r requirements.txt
-faster-whisper==1.0.3
+openai-whisper==20231117
+ffmpeg-python==0.2.0
