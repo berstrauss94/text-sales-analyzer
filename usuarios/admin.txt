@@ -1,0 +1,19 @@
+=== FICHA DE USUARIO ===
+Fecha de registro : 2026-05-02 13:10:34 UTC
+
+--- DATOS DE ACCESO ---
+Usuario           : admin
+Contrasena (hash) : 240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9
+
+--- DATOS PERSONALES ---
+Nombre            : Administrador
+Apellido          : Sistema
+DNI               : 00000000
+Email             : admin@sistema.com
+Telefono          : 
+
+--- DATOS PROFESIONALES ---
+Empresa           : 
+Cargo             : Admin
+
+========================

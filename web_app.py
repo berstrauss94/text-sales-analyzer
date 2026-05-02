@@ -17,13 +17,17 @@ os.environ["PYTHONIOENCODING"] = "utf-8"
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from flask import Flask, request, jsonify, render_template_string
+import secrets
+from flask import Flask, request, jsonify, render_template_string, session, redirect, url_for
 from src.factory import create_analyzer
 from src.components.commercial_analyzer import CommercialAnalyzer
 from src.models.data_models import AnalysisReport, AnalysisError
+from src.users.user_manager import UserManager
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 commercial_analyzer = CommercialAnalyzer()
+user_manager = UserManager()
 
 # Load analyzer once at startup
 print("Loading models...")
@@ -253,6 +257,34 @@ HTML = """
         }
 
         .timestamp { color: #444; font-size: 0.75rem; margin-top: 14px; text-align: right; }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .user-info {
+            font-size: 0.8rem;
+            color: #555;
+        }
+
+        .user-info strong { color: #888; }
+
+        .btn-logout {
+            font-size: 0.75rem;
+            padding: 4px 12px;
+            background: #2a2d3a;
+            color: #888;
+            border: 1px solid #3a3d4a;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+
+        .btn-logout:hover { opacity: 0.75; }
 
         .input-preview {
             background: #0f1117;
@@ -508,8 +540,16 @@ HTML = """
 </head>
 <body>
 <div class="container">
-    <h1>Analizador de Textos</h1>
-    <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning</p>
+    <div class="top-bar">
+        <div>
+            <h1>Analizador de Textos</h1>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning</p>
+        </div>
+        <div style="text-align:right;">
+            <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
+            <a href="/logout" class="btn-logout">Cerrar sesion</a>
+        </div>
+    </div>
 
     <div class="input-section">
         <textarea id="textInput"
@@ -886,13 +926,432 @@ document.addEventListener('DOMContentLoaded', () => {
 """
 
 
+LOGIN_HTML = """
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analizador de Textos - Acceso</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f1117;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .auth-container {
+            width: 100%;
+            max-width: 420px;
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .auth-header h1 {
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 6px;
+        }
+
+        .auth-header p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .auth-card {
+            background: #1a1d27;
+            border: 1px solid #2a2d3a;
+            border-radius: 12px;
+            padding: 28px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            background: #0f1117;
+            border-radius: 8px;
+            padding: 4px;
+            margin-bottom: 24px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: transparent;
+            color: #666;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background: #4a6cf7;
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 6px;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        input[type="email"] {
+            width: 100%;
+            background: #0f1117;
+            border: 1px solid #2a2d3a;
+            border-radius: 7px;
+            color: #e0e0e0;
+            font-size: 0.9rem;
+            padding: 10px 12px;
+            outline: none;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        input:focus { border-color: #4a6cf7; }
+
+        .remember-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .remember-row input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #4a6cf7;
+            cursor: pointer;
+        }
+
+        .remember-row label {
+            font-size: 0.82rem;
+            color: #888;
+            text-transform: none;
+            letter-spacing: 0;
+            margin-bottom: 0;
+            cursor: pointer;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 12px;
+            background: #4a6cf7;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .btn-submit:hover { opacity: 0.85; }
+
+        .error-msg {
+            background: #2a1a1a;
+            border: 1px solid #5a2a2a;
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: #f55b5b;
+            font-size: 0.85rem;
+            margin-bottom: 16px;
+        }
+
+        .success-msg {
+            background: #1a2a1a;
+            border: 1px solid #2a5a2a;
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: #5bf5a3;
+            font-size: 0.85rem;
+            margin-bottom: 16px;
+        }
+
+        .section-divider {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: #444;
+            letter-spacing: 0.08em;
+            margin: 16px 0 12px;
+            border-top: 1px solid #2a2d3a;
+            padding-top: 16px;
+        }
+
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+    </style>
+</head>
+<body>
+<div class="auth-container">
+    <div class="auth-header">
+        <h1>Analizador de Textos</h1>
+        <p>Ventas y Bienes Raices &mdash; Analisis con Machine Learning</p>
+    </div>
+
+    <div class="auth-card">
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('login')">Iniciar Sesion</button>
+            <button class="tab-btn" onclick="switchTab('register')">Registrarse</button>
+        </div>
+
+        {% if error %}
+        <div class="error-msg">{{ error }}</div>
+        {% endif %}
+        {% if success %}
+        <div class="success-msg">{{ success }}</div>
+        {% endif %}
+
+        <!-- LOGIN PANEL -->
+        <div class="tab-panel active" id="panel-login">
+            <form method="POST" action="/login" id="login-form">
+                <input type="hidden" name="action" value="login">
+                <div class="form-group">
+                    <label for="login-user">Usuario</label>
+                    <input type="text" id="login-user" name="username"
+                           autocomplete="username"
+                           value="{{ saved_username }}"
+                           placeholder="Tu nombre de usuario" required>
+                </div>
+                <div class="form-group">
+                    <label for="login-pass">Contrasena</label>
+                    <input type="password" id="login-pass" name="password"
+                           autocomplete="current-password"
+                           placeholder="Tu contrasena" required>
+                </div>
+                <div class="remember-row">
+                    <input type="checkbox" id="remember" name="remember" value="1"
+                           {% if saved_username %}checked{% endif %}>
+                    <label for="remember">Recordar usuario y contrasena</label>
+                </div>
+                <button type="submit" class="btn-submit">Ingresar</button>
+            </form>
+        </div>
+
+        <!-- REGISTER PANEL -->
+        <div class="tab-panel" id="panel-register">
+            <form method="POST" action="/login" id="register-form">
+                <input type="hidden" name="action" value="register">
+
+                <div class="section-divider">Datos de acceso</div>
+                <div class="form-group">
+                    <label for="reg-user">Usuario</label>
+                    <input type="text" id="reg-user" name="username"
+                           autocomplete="username"
+                           placeholder="Minimo 3 caracteres">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="reg-pass">Contrasena</label>
+                        <input type="password" id="reg-pass" name="password"
+                               autocomplete="new-password"
+                               placeholder="Minimo 6 caracteres">
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-pass2">Confirmar</label>
+                        <input type="password" id="reg-pass2" name="password2"
+                               autocomplete="new-password"
+                               placeholder="Repetir contrasena">
+                    </div>
+                </div>
+
+                <div class="section-divider">Datos personales</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="reg-nombre">Nombre</label>
+                        <input type="text" id="reg-nombre" name="nombre" placeholder="Nombre">
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-apellido">Apellido</label>
+                        <input type="text" id="reg-apellido" name="apellido" placeholder="Apellido">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="reg-dni">DNI</label>
+                        <input type="text" id="reg-dni" name="dni" placeholder="Numero de DNI">
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-email">Email</label>
+                        <input type="email" id="reg-email" name="email" placeholder="correo@ejemplo.com">
+                    </div>
+                </div>
+
+                <div class="section-divider">Datos profesionales (opcional)</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="reg-empresa">Empresa</label>
+                        <input type="text" id="reg-empresa" name="empresa" placeholder="Nombre empresa">
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-cargo">Cargo</label>
+                        <input type="text" id="reg-cargo" name="cargo" placeholder="Tu cargo">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="reg-tel">Telefono</label>
+                    <input type="text" id="reg-tel" name="telefono" placeholder="Numero de telefono">
+                </div>
+
+                <button type="submit" class="btn-submit" style="margin-top:8px;">Crear Cuenta</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', (i === 0 && tab === 'login') || (i === 1 && tab === 'register'));
+    });
+    document.getElementById('panel-login').classList.toggle('active', tab === 'login');
+    document.getElementById('panel-register').classList.toggle('active', tab === 'register');
+}
+
+// If arriving after a register error, show register tab
+{% if active_tab == 'register' %}
+switchTab('register');
+{% endif %}
+
+// Autoguardado: save username to localStorage on login submit
+document.getElementById('login-form').addEventListener('submit', function() {
+    const remember = document.getElementById('remember').checked;
+    const username = document.getElementById('login-user').value;
+    if (remember) {
+        localStorage.setItem('saved_username', username);
+    } else {
+        localStorage.removeItem('saved_username');
+    }
+});
+
+// On load: prefill from localStorage if not already prefilled from server
+window.addEventListener('DOMContentLoaded', function() {
+    const loginInput = document.getElementById('login-user');
+    if (!loginInput.value) {
+        const saved = localStorage.getItem('saved_username');
+        if (saved) {
+            loginInput.value = saved;
+            document.getElementById('remember').checked = true;
+        }
+    }
+});
+</script>
+</body>
+</html>
+"""
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login_page():
+    # Already logged in
+    if session.get("username"):
+        return redirect(url_for("index"))
+
+    error = None
+    success = None
+    active_tab = "login"
+    saved_username = ""
+
+    if request.method == "POST":
+        action = request.form.get("action", "login")
+
+        if action == "login":
+            username = request.form.get("username", "").strip()
+            password = request.form.get("password", "")
+            result = user_manager.login(username, password)
+            if result["ok"]:
+                session["username"] = username
+                return redirect(url_for("index"))
+            else:
+                error = result["error"]
+                saved_username = username
+
+        elif action == "register":
+            active_tab = "register"
+            username  = request.form.get("username", "").strip()
+            password  = request.form.get("password", "")
+            password2 = request.form.get("password2", "")
+            nombre    = request.form.get("nombre", "").strip()
+            apellido  = request.form.get("apellido", "").strip()
+            dni       = request.form.get("dni", "").strip()
+            email     = request.form.get("email", "").strip()
+            telefono  = request.form.get("telefono", "").strip()
+            empresa   = request.form.get("empresa", "").strip()
+            cargo     = request.form.get("cargo", "").strip()
+
+            if password != password2:
+                error = "Las contrasenas no coinciden."
+            else:
+                result = user_manager.register(
+                    username=username, password=password,
+                    nombre=nombre, apellido=apellido,
+                    dni=dni, email=email,
+                    telefono=telefono, empresa=empresa, cargo=cargo
+                )
+                if result["ok"]:
+                    success = f"Cuenta creada exitosamente. Ya puedes iniciar sesion, {nombre}."
+                    active_tab = "login"
+                else:
+                    error = result["error"]
+
+    return render_template_string(
+        LOGIN_HTML,
+        error=error,
+        success=success,
+        active_tab=active_tab,
+        saved_username=saved_username
+    )
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login_page"))
+
+
 @app.route("/")
 def index():
-    return render_template_string(HTML)
+    if not session.get("username"):
+        return redirect(url_for("login_page"))
+    return render_template_string(HTML, username=session["username"])
 
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
+    if not session.get("username"):
+        return jsonify({"error": True, "error_code": "UNAUTHORIZED",
+                        "error_message": "Sesion no iniciada"}), 401
+
     data = request.get_json()
     if not data or "text" not in data:
         return jsonify({"error": True, "error_code": "BAD_REQUEST",
