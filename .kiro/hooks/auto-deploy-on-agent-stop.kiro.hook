@@ -10,5 +10,7 @@
     "type": "runCommand",
     "command": "python deploy.py \"Auto-deploy desde Kiro\" 2>&1",
     "timeout": 120
-  }
+  },
+  "workspaceFolderName": "Proyecto 1",
+  "shortName": "auto-deploy-on-agent-stop"
 }
