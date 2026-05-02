@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Audio transcription component using OpenAI Whisper (local, no API key needed).
+Audio transcription component using faster-whisper (local, no API key needed).
+
+faster-whisper uses CTranslate2 instead of PyTorch — much lighter (~200MB)
+and faster on CPU. Compatible with all Whisper model sizes.
 
 Supports any audio/video format that ffmpeg can decode.
 No time limit — Whisper processes the full file.
@@ -13,26 +16,35 @@ import tempfile
 
 class AudioTranscriber:
     """
-    Wraps OpenAI Whisper for local audio transcription.
+    Wraps faster-whisper for local audio transcription.
 
-    The model is loaded lazily on first use to avoid slowing down
-    the web app startup.
+    The model is loaded eagerly at construction time when faster-whisper is
+    available, so the first transcription request does not block waiting
+    for a model download. If faster-whisper is not installed the instance
+    degrades gracefully and returns a structured error on every call.
 
     Supported models (trade-off speed vs accuracy):
-        tiny, base, small, medium, large
-    Default: "base" — good balance for Spanish/English on CPU.
+        tiny, base, small, medium, large-v2, large-v3
+    Default: "tiny" — fastest on CPU, good enough for Spanish/English.
     """
 
-    def __init__(self, model_name: str = "base") -> None:
+    def __init__(self, model_name: str = "tiny") -> None:
         self.model_name = model_name
-        self._model = None   # lazy load
-        self._whisper_available: bool | None = None  # None = not checked yet
+        self._model = None
+        self._whisper_available: bool | None = None
+        # Eagerly load the model at startup so the first request is fast
+        if self._check_whisper():
+            try:
+                self._load_model()
+                print(f"faster-whisper model '{model_name}' loaded successfully.")
+            except Exception as exc:
+                print(f"Warning: could not pre-load faster-whisper model: {exc}")
 
     def _check_whisper(self) -> bool:
-        """Return True if openai-whisper is importable."""
+        """Return True if faster-whisper is importable."""
         if self._whisper_available is None:
             try:
-                import whisper  # noqa: F401
+                from faster_whisper import WhisperModel  # noqa: F401
                 self._whisper_available = True
             except ImportError:
                 self._whisper_available = False
@@ -40,8 +52,13 @@ class AudioTranscriber:
 
     def _load_model(self):
         if self._model is None:
-            import whisper  # type: ignore
-            self._model = whisper.load_model(self.model_name)
+            from faster_whisper import WhisperModel
+            # device="cpu", compute_type="int8" — optimal for Railway (no GPU)
+            self._model = WhisperModel(
+                self.model_name,
+                device="cpu",
+                compute_type="int8",
+            )
         return self._model
 
     def transcribe(self, audio_path: str) -> dict:
@@ -57,8 +74,8 @@ class AudioTranscriber:
             return {
                 "ok": False,
                 "error": (
-                    "Whisper no esta instalado en este servidor. "
-                    "Instala openai-whisper y ffmpeg para habilitar la transcripcion de audio."
+                    "faster-whisper no esta instalado en este servidor. "
+                    "Contacta al administrador para habilitar la transcripcion de audio."
                 ),
             }
 
@@ -67,16 +84,27 @@ class AudioTranscriber:
 
         try:
             model = self._load_model()
-            result = model.transcribe(
+            segments, info = model.transcribe(
                 audio_path,
-                task="transcribe",      # keep original language
-                verbose=False,
+                task="transcribe",
+                beam_size=5,
             )
+            # faster-whisper returns a generator — consume it
+            segment_list = []
+            full_text_parts = []
+            for seg in segments:
+                full_text_parts.append(seg.text)
+                segment_list.append({
+                    "start": seg.start,
+                    "end": seg.end,
+                    "text": seg.text,
+                })
+
             return {
                 "ok": True,
-                "text": result.get("text", "").strip(),
-                "language": result.get("language", "unknown"),
-                "segments": result.get("segments", []),
+                "text": " ".join(full_text_parts).strip(),
+                "language": info.language,
+                "segments": segment_list,
             }
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
@@ -90,8 +118,8 @@ class AudioTranscriber:
             return {
                 "ok": False,
                 "error": (
-                    "Whisper no esta instalado en este servidor. "
-                    "Instala openai-whisper y ffmpeg para habilitar la transcripcion de audio."
+                    "faster-whisper no esta instalado en este servidor. "
+                    "Contacta al administrador para habilitar la transcripcion de audio."
                 ),
             }
 
@@ -109,5 +137,5 @@ class AudioTranscriber:
 
     @property
     def is_available(self) -> bool:
-        """True if Whisper is installed and usable."""
+        """True if faster-whisper is installed and usable."""
         return self._check_whisper()
