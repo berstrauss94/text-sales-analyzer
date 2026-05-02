@@ -5,10 +5,14 @@ Validates input text before it enters the processing pipeline.
 """
 from src.models.data_models import ValidationResult
 
+# Module-level constants (also available as class attributes)
+MIN_LENGTH = 3
+MAX_LENGTH = 50_000
+
 
 class Validator:
-    MIN_LENGTH = 3
-    MAX_LENGTH = 50_000
+    MIN_LENGTH = MIN_LENGTH
+    MAX_LENGTH = MAX_LENGTH
 
     def validate(self, text: str) -> ValidationResult:
         """

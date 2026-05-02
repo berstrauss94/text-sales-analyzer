@@ -1,15 +1,14 @@
 {
   "enabled": true,
   "name": "Auto Deploy on Agent Stop",
-  "description": "Runs the full deploy pipeline automatically when Kiro agent finishes making changes",
+  "description": "Notifies when Kiro finishes changes and asks if deploy should run",
   "version": "1",
   "when": {
     "type": "agentStop"
   },
   "then": {
-    "type": "runCommand",
-    "command": "python deploy.py \"Auto-deploy desde Kiro\" 2>&1",
-    "timeout": 120
+    "type": "askAgent",
+    "prompt": "El agente acaba de terminar sus cambios. Ejecuta 'python deploy.py --status' para mostrar el estado actual del repositorio (rama, cambios pendientes, últimos commits). Muestra el resultado de forma resumida y pregunta al usuario si desea hacer deploy."
   },
   "workspaceFolderName": "Proyecto 1",
   "shortName": "auto-deploy-on-agent-stop"
