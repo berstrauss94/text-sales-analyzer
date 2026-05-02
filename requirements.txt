@@ -6,5 +6,6 @@ hypothesis==6.100.0
 pytest==8.2.0
 flask==3.1.0
 gunicorn==22.0.0
+setuptools>=75.0.0
 openai-whisper==20231117
 ffmpeg-python==0.2.0
