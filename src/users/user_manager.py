@@ -57,9 +57,12 @@ class UserManager:
         password: str,
         nombre: str,
         apellido: str,
-        dni: str,
         email: str,
-        telefono: str = "",
+        celular: str,
+        direccion: str,
+        segundo_nombre: str = "",
+        tercer_nombre: str = "",
+        segundo_apellido: str = "",
         empresa: str = "",
         cargo: str = "",
     ) -> dict:
@@ -68,23 +71,44 @@ class UserManager:
         Returns {"ok": True} or {"ok": False, "error": "message"}.
         """
         # Validations
-        if not username or len(username) < 3:
-            return {"ok": False, "error": "El nombre de usuario debe tener al menos 3 caracteres."}
+        if not username or len(username) < 8:
+            return {"ok": False, "error": "El usuario debe tener al menos 8 caracteres."}
         if re.search(r'[^a-zA-Z0-9._-]', username):
             return {"ok": False, "error": "El usuario solo puede contener letras, numeros, puntos, guiones y guiones bajos."}
-        if not password or len(password) < 6:
-            return {"ok": False, "error": "La contrasena debe tener al menos 6 caracteres."}
+        if not any(c.isupper() for c in username):
+            return {"ok": False, "error": "El usuario debe contener al menos una letra mayuscula."}
+        if not password or len(password) < 8:
+            return {"ok": False, "error": "La contrasena debe tener al menos 8 caracteres."}
+        if not any(c.isupper() for c in password):
+            return {"ok": False, "error": "La contrasena debe contener al menos una letra mayuscula."}
         if not nombre.strip():
             return {"ok": False, "error": "El nombre es obligatorio."}
         if not apellido.strip():
             return {"ok": False, "error": "El apellido es obligatorio."}
-        if not dni.strip():
-            return {"ok": False, "error": "El DNI es obligatorio."}
+        if not email.strip():
+            return {"ok": False, "error": "El correo electronico es obligatorio."}
+        if not celular.strip():
+            return {"ok": False, "error": "El numero de celular es obligatorio."}
+        if not direccion.strip():
+            return {"ok": False, "error": "La direccion es obligatoria."}
         if self.user_exists(username):
             return {"ok": False, "error": f"El usuario '{username}' ya existe."}
 
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         password_hash = self._hash_password(password)
+
+        # Build full name
+        nombre_completo_parts = [nombre]
+        if segundo_nombre.strip():
+            nombre_completo_parts.append(segundo_nombre)
+        if tercer_nombre.strip():
+            nombre_completo_parts.append(tercer_nombre)
+        nombre_completo = " ".join(nombre_completo_parts)
+
+        apellido_completo_parts = [apellido]
+        if segundo_apellido.strip():
+            apellido_completo_parts.append(segundo_apellido)
+        apellido_completo = " ".join(apellido_completo_parts)
 
         # Write user file
         content = (
@@ -96,11 +120,11 @@ class UserManager:
             f"Contrasena (hash) : {password_hash}\n"
             f"\n"
             f"--- DATOS PERSONALES ---\n"
-            f"Nombre            : {nombre}\n"
-            f"Apellido          : {apellido}\n"
-            f"DNI               : {dni}\n"
+            f"Nombre            : {nombre_completo}\n"
+            f"Apellido          : {apellido_completo}\n"
+            f"Celular           : {celular}\n"
             f"Email             : {email}\n"
-            f"Telefono          : {telefono}\n"
+            f"Direccion         : {direccion}\n"
             f"\n"
             f"--- DATOS PROFESIONALES ---\n"
             f"Empresa           : {empresa}\n"

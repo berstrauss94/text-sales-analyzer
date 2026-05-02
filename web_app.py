@@ -1165,20 +1165,21 @@ LOGIN_HTML = """
 
                 <div class="section-divider">Datos de acceso</div>
                 <div class="form-group">
-                    <label for="reg-user">Usuario</label>
+                    <label for="reg-user">Usuario <span style="color:#f55b5b">*</span></label>
                     <input type="text" id="reg-user" name="username"
                            autocomplete="username"
-                           placeholder="Minimo 3 caracteres">
+                           placeholder="Min. 8 caracteres, una mayuscula">
+                    <div style="font-size:0.72rem; color:#555; margin-top:4px;">Letras, numeros, puntos y guiones. Al menos una mayuscula.</div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="reg-pass">Contrasena</label>
+                        <label for="reg-pass">Contrasena <span style="color:#f55b5b">*</span></label>
                         <input type="password" id="reg-pass" name="password"
                                autocomplete="new-password"
-                               placeholder="Minimo 6 caracteres">
+                               placeholder="Min. 8 caracteres, una mayuscula">
                     </div>
                     <div class="form-group">
-                        <label for="reg-pass2">Confirmar</label>
+                        <label for="reg-pass2">Confirmar <span style="color:#f55b5b">*</span></label>
                         <input type="password" id="reg-pass2" name="password2"
                                autocomplete="new-password"
                                placeholder="Repetir contrasena">
@@ -1188,23 +1189,43 @@ LOGIN_HTML = """
                 <div class="section-divider">Datos personales</div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="reg-nombre">Nombre</label>
-                        <input type="text" id="reg-nombre" name="nombre" placeholder="Nombre">
+                        <label for="reg-nombre">Nombre <span style="color:#f55b5b">*</span></label>
+                        <input type="text" id="reg-nombre" name="nombre" placeholder="Primer nombre">
                     </div>
                     <div class="form-group">
-                        <label for="reg-apellido">Apellido</label>
-                        <input type="text" id="reg-apellido" name="apellido" placeholder="Apellido">
+                        <label for="reg-nombre2">Segundo nombre</label>
+                        <input type="text" id="reg-nombre2" name="segundo_nombre" placeholder="Opcional">
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="reg-dni">DNI</label>
-                        <input type="text" id="reg-dni" name="dni" placeholder="Numero de DNI">
+                        <label for="reg-nombre3">Tercer nombre</label>
+                        <input type="text" id="reg-nombre3" name="tercer_nombre" placeholder="Opcional">
                     </div>
                     <div class="form-group">
-                        <label for="reg-email">Email</label>
+                        <label for="reg-apellido">Apellido <span style="color:#f55b5b">*</span></label>
+                        <input type="text" id="reg-apellido" name="apellido" placeholder="Primer apellido">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="reg-apellido2">Segundo apellido</label>
+                    <input type="text" id="reg-apellido2" name="segundo_apellido" placeholder="Opcional">
+                </div>
+
+                <div class="section-divider">Datos de contacto</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="reg-cel">Celular <span style="color:#f55b5b">*</span></label>
+                        <input type="text" id="reg-cel" name="celular" placeholder="Numero de celular">
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-email">Correo <span style="color:#f55b5b">*</span></label>
                         <input type="email" id="reg-email" name="email" placeholder="correo@ejemplo.com">
                     </div>
+                </div>
+                <div class="form-group">
+                    <label for="reg-dir">Direccion <span style="color:#f55b5b">*</span></label>
+                    <input type="text" id="reg-dir" name="direccion" placeholder="Direccion completa">
                 </div>
 
                 <div class="section-divider">Datos profesionales (opcional)</div>
@@ -1218,12 +1239,12 @@ LOGIN_HTML = """
                         <input type="text" id="reg-cargo" name="cargo" placeholder="Tu cargo">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="reg-tel">Telefono</label>
-                    <input type="text" id="reg-tel" name="telefono" placeholder="Numero de telefono">
+
+                <div style="font-size:0.72rem; color:#555; margin-bottom:12px;">
+                    <span style="color:#f55b5b">*</span> Campos obligatorios
                 </div>
 
-                <button type="submit" class="btn-submit" style="margin-top:8px;">Crear Cuenta</button>
+                <button type="submit" class="btn-submit">Crear Cuenta</button>
             </form>
         </div>
     </div>
@@ -1298,25 +1319,30 @@ def login_page():
 
         elif action == "register":
             active_tab = "register"
-            username  = request.form.get("username", "").strip()
-            password  = request.form.get("password", "")
-            password2 = request.form.get("password2", "")
-            nombre    = request.form.get("nombre", "").strip()
-            apellido  = request.form.get("apellido", "").strip()
-            dni       = request.form.get("dni", "").strip()
-            email     = request.form.get("email", "").strip()
-            telefono  = request.form.get("telefono", "").strip()
-            empresa   = request.form.get("empresa", "").strip()
-            cargo     = request.form.get("cargo", "").strip()
+            username       = request.form.get("username", "").strip()
+            password       = request.form.get("password", "")
+            password2      = request.form.get("password2", "")
+            nombre         = request.form.get("nombre", "").strip()
+            segundo_nombre = request.form.get("segundo_nombre", "").strip()
+            tercer_nombre  = request.form.get("tercer_nombre", "").strip()
+            apellido       = request.form.get("apellido", "").strip()
+            segundo_apellido = request.form.get("segundo_apellido", "").strip()
+            celular        = request.form.get("celular", "").strip()
+            email          = request.form.get("email", "").strip()
+            direccion      = request.form.get("direccion", "").strip()
+            empresa        = request.form.get("empresa", "").strip()
+            cargo          = request.form.get("cargo", "").strip()
 
             if password != password2:
                 error = "Las contrasenas no coinciden."
             else:
                 result = user_manager.register(
                     username=username, password=password,
-                    nombre=nombre, apellido=apellido,
-                    dni=dni, email=email,
-                    telefono=telefono, empresa=empresa, cargo=cargo
+                    nombre=nombre, segundo_nombre=segundo_nombre,
+                    tercer_nombre=tercer_nombre,
+                    apellido=apellido, segundo_apellido=segundo_apellido,
+                    celular=celular, email=email, direccion=direccion,
+                    empresa=empresa, cargo=cargo
                 )
                 if result["ok"]:
                     success = f"Cuenta creada exitosamente. Ya puedes iniciar sesion, {nombre}."
