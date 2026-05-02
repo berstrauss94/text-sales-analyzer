@@ -21,13 +21,18 @@ import secrets
 from flask import Flask, request, jsonify, render_template_string, session, redirect, url_for
 from src.factory import create_analyzer
 from src.components.commercial_analyzer import CommercialAnalyzer
+from src.components.audio_transcriber import AudioTranscriber
 from src.models.data_models import AnalysisReport, AnalysisError
 from src.users.user_manager import UserManager
+from src.users.history_manager import add_entry, get_history, get_flat_entries
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
+# Allow large audio uploads (no size limit enforced here — handled by gunicorn/nginx)
+app.config["MAX_CONTENT_LENGTH"] = None
 commercial_analyzer = CommercialAnalyzer()
 user_manager = UserManager()
+audio_transcriber = AudioTranscriber(model_name="base")
 
 # Load analyzer once at startup
 print("Loading models...")
@@ -1395,9 +1400,7 @@ def analyze():
     # Run commercial analysis in parallel
     ca = commercial_analyzer.analyze(data["text"])
 
-    return jsonify({
-        "error": False,
-        "input_text": result.input_text,
+    analysis_dict = {
         "intent": result.intent,
         "intent_confidence": result.intent_confidence,
         "sentiment": result.sentiment,
@@ -1415,7 +1418,6 @@ def analyze():
              "numeric_value": e.numeric_value, "unit": e.unit}
             for e in result.entities
         ],
-        "analyzed_at": result.analyzed_at,
         "commercial": {
             "palabras_positivas": ca.palabras_positivas,
             "respuestas_afirmativas": ca.respuestas_afirmativas,
@@ -1442,7 +1444,159 @@ def analyze():
                 "para_tibio": max(0, round(40 - ca.probabilidad_cierre, 1)),
             }
         }
+    }
+
+    # Save to history
+    add_entry(
+        username=session["username"],
+        text=data["text"],
+        analysis=analysis_dict,
+        source="text",
+    )
+
+    return jsonify({
+        "error": False,
+        "input_text": result.input_text,
+        "analyzed_at": result.analyzed_at,
+        **analysis_dict,
     })
+
+
+@app.route("/upload-audio", methods=["POST"])
+def upload_audio():
+    """
+    Receive an audio file, transcribe it with Whisper,
+    run the full analysis pipeline, save to history and return results.
+    """
+    if not session.get("username"):
+        return jsonify({"error": True, "error_code": "UNAUTHORIZED",
+                        "error_message": "Sesion no iniciada"}), 401
+
+    if "audio" not in request.files:
+        return jsonify({"error": True, "error_code": "NO_FILE",
+                        "error_message": "No se recibio ningun archivo de audio"}), 400
+
+    audio_file = request.files["audio"]
+    if not audio_file.filename:
+        return jsonify({"error": True, "error_code": "NO_FILE",
+                        "error_message": "Nombre de archivo vacio"}), 400
+
+    # Read bytes and get extension
+    audio_bytes = audio_file.read()
+    original_name = audio_file.filename
+    ext = os.path.splitext(original_name)[1].lower() or ".wav"
+
+    # Transcribe
+    transcription = audio_transcriber.transcribe_bytes(audio_bytes, suffix=ext)
+    if not transcription["ok"]:
+        return jsonify({
+            "error": True,
+            "error_code": "TRANSCRIPTION_ERROR",
+            "error_message": transcription["error"]
+        }), 500
+
+    transcribed_text = transcription["text"]
+    detected_language = transcription.get("language", "unknown")
+
+    if not transcribed_text.strip():
+        return jsonify({
+            "error": True,
+            "error_code": "EMPTY_TRANSCRIPTION",
+            "error_message": "No se pudo extraer texto del audio. Verifica que el audio tenga voz clara."
+        }), 422
+
+    # Run analysis pipeline
+    result = analyzer.analyze(transcribed_text)
+
+    if isinstance(result, AnalysisError):
+        return jsonify({
+            "error": True,
+            "error_code": result.error_code,
+            "error_message": result.error_message
+        })
+
+    ca = commercial_analyzer.analyze(transcribed_text)
+
+    analysis_dict = {
+        "intent": result.intent,
+        "intent_confidence": result.intent_confidence,
+        "sentiment": result.sentiment,
+        "sentiment_confidence": result.sentiment_confidence,
+        "sales_concepts": [
+            {"concept": c.concept, "confidence": c.confidence, "source_text": c.source_text}
+            for c in result.sales_concepts
+        ],
+        "real_estate_concepts": [
+            {"concept": c.concept, "confidence": c.confidence, "source_text": c.source_text}
+            for c in result.real_estate_concepts
+        ],
+        "entities": [
+            {"concept": e.concept, "raw_value": e.raw_value,
+             "numeric_value": e.numeric_value, "unit": e.unit}
+            for e in result.entities
+        ],
+        "commercial": {
+            "palabras_positivas": ca.palabras_positivas,
+            "respuestas_afirmativas": ca.respuestas_afirmativas,
+            "indicios_cierre": ca.indicios_cierre,
+            "escasez_comercial": ca.escasez_comercial,
+            "pedidos_referidos": ca.pedidos_referidos,
+            "objeciones": ca.objeciones,
+            "indicios_prospeccion": ca.indicios_prospeccion,
+            "total_palabras": ca.total_palabras,
+            "densidad_comercial": ca.densidad_comercial,
+            "probabilidad_cierre": ca.probabilidad_cierre,
+            "tipo_lead": ca.tipo_lead,
+            "nivel_interes": ca.nivel_interes,
+            "tendencia_cierre": ca.tendencia_cierre,
+            "recomendacion": ca.recomendacion,
+            "detalle": ca.detalle,
+            "formula": {
+                "indicios_cierre_pts": ca.indicios_cierre * 5,
+                "respuestas_afirmativas_pts": ca.respuestas_afirmativas * 2,
+                "objeciones_pts": ca.objeciones * 3,
+                "puntaje_neto": (ca.indicios_cierre * 5) + (ca.respuestas_afirmativas * 2) - (ca.objeciones * 3),
+                "total_palabras": ca.total_palabras,
+                "para_caliente": max(0, round(70 - ca.probabilidad_cierre, 1)),
+                "para_tibio": max(0, round(40 - ca.probabilidad_cierre, 1)),
+            }
+        }
+    }
+
+    # Save to history
+    add_entry(
+        username=session["username"],
+        text=transcribed_text,
+        analysis=analysis_dict,
+        source="audio",
+        audio_filename=original_name,
+    )
+
+    return jsonify({
+        "error": False,
+        "transcription": transcribed_text,
+        "language": detected_language,
+        "audio_filename": original_name,
+        "analyzed_at": result.analyzed_at,
+        **analysis_dict,
+    })
+
+
+@app.route("/history")
+def history():
+    """Return the full history tree for the logged-in user."""
+    if not session.get("username"):
+        return jsonify({"error": True, "error_code": "UNAUTHORIZED"}), 401
+    return jsonify(get_history(session["username"]))
+
+
+@app.route("/history/flat")
+def history_flat():
+    """Return the most recent 100 entries as a flat list."""
+    if not session.get("username"):
+        return jsonify({"error": True, "error_code": "UNAUTHORIZED"}), 401
+    limit = int(request.args.get("limit", 100))
+    return jsonify(get_flat_entries(session["username"], limit=limit))
 
 
 if __name__ == "__main__":
