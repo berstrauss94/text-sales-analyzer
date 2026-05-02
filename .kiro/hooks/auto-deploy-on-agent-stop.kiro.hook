@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "name": "Auto Deploy on Agent Stop",
+  "description": "Runs the full deploy pipeline automatically when Kiro agent finishes making changes",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "python deploy.py \"Auto-deploy desde Kiro\" 2>&1",
+    "timeout": 120
+  }
+}
