@@ -8,7 +8,7 @@
   },
   "then": {
     "type": "askAgent",
-    "prompt": "El agente acaba de terminar sus cambios. Ejecuta 'python deploy.py --status' para mostrar el estado actual del repositorio (rama, cambios pendientes, últimos commits). Muestra el resultado de forma resumida y pregunta al usuario si desea hacer deploy."
+    "prompt": "El agente acaba de terminar sus cambios. Primero ejecuta: 'git log master --oneline -1 --format=\"%cr %s\"' para ver cuándo fue el último deploy a master. Si el resultado muestra que el último commit en master fue hace menos de 3 minutos Y contiene la palabra 'Deploy', significa que acabas de hacer un deploy — en ese caso NO hagas nada, simplemente responde 'Deploy reciente detectado, no se requiere acción.' y termina. Si no hay deploy reciente, entonces ejecuta 'python deploy.py --status', muestra el resultado de forma resumida (rama, cambios pendientes, últimos commits) y pregunta al usuario si desea hacer deploy."
   },
   "workspaceFolderName": "Proyecto 1",
   "shortName": "auto-deploy-on-agent-stop"
