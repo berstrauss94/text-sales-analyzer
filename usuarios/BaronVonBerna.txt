@@ -1,0 +1,19 @@
+=== FICHA DE USUARIO ===
+Fecha de registro : 2026-05-02 14:00:00 UTC
+
+--- DATOS DE ACCESO ---
+Usuario           : BaronVonBerna
+Contrasena (hash) : 1f8a4e50e4cff268227de88676a8c63da73f54770ea09a6ca54cac69c573c0ce
+
+--- DATOS PERSONALES ---
+Nombre            : BaronVonBerna
+Apellido          : 
+Celular           : 
+Email             : 
+Direccion         : 
+
+--- DATOS PROFESIONALES ---
+Empresa           : 
+Cargo             : 
+
+========================
