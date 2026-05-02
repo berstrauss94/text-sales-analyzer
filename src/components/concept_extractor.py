@@ -208,7 +208,7 @@ class ConceptExtractor:
             proba_matrix = model.predict_proba(feature_vector)
 
             concepts: list[ConceptMatch] = []
-            threshold = 0.2
+            threshold = 0.15
 
             for i, class_label in enumerate(mlb.classes_):
                 prob = float(proba_matrix[0, i])
