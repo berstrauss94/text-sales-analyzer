@@ -68,6 +68,18 @@ from src.components.sync_pipeline import SyncPipeline
 
 sync_pipeline = SyncPipeline(analyzer=analyzer, add_entry_fn=add_entry)
 
+# ---------------------------------------------------------------------------
+# Auto-migrate JSON history files → PostgreSQL (runs once at startup)
+# ---------------------------------------------------------------------------
+try:
+    from src.users.history_manager import migrate_json_to_pg
+    _migration = migrate_json_to_pg()
+    if not _migration.get("skipped"):
+        print(f"Migración JSON→PG: {_migration.get('migrated', 0)} entradas migradas, "
+              f"{_migration.get('errors', 0)} errores.")
+except Exception as _mig_exc:
+    print(f"Warning: migración JSON→PG falló: {_mig_exc}")
+
 # Solo iniciar el scheduler si las credenciales están configuradas
 _mpc_configured = bool(os.environ.get("MPC_USERNAME") and os.environ.get("MPC_PASSWORD"))
 

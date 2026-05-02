@@ -1,0 +1,30 @@
+{
+  "2026": {
+    "05-Mayo": {
+      "Semana-18": {
+        "2026-05-02": {
+          "label": "02/05/2026",
+          "entries": [
+            {
+              "id": "20260502211336684039",
+              "timestamp": "2026-05-02T21:13:36.684039+00:00",
+              "source": "text",
+              "audio_filename": "",
+              "text": "Texto de prueba para verificar historial",
+              "text_full": "Texto de prueba para verificar historial",
+              "intent": "SALES",
+              "intent_confidence": 0.9,
+              "sentiment": "POSITIVE",
+              "sentiment_confidence": 0.8,
+              "sales_concepts": [],
+              "real_estate_concepts": [],
+              "entities": [],
+              "commercial": null,
+              "day_label": "02/05/2026"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
