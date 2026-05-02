@@ -541,6 +541,311 @@ HTML = """
         .lead-gap-caliente { background: #1a3a1a; color: #5bf5a3; }
         .lead-gap-tibio    { background: #3a2a1a; color: #f5a35b; }
         .lead-gap-frio     { background: #1a2a3a; color: #5bd4f5; }
+
+        /* ── Audio Upload Section ── */
+        .audio-section {
+            background: #1a1d27;
+            border: 1px solid #2a2d3a;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .audio-section-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #666;
+            margin-bottom: 14px;
+        }
+
+        .audio-drop-zone {
+            border: 2px dashed #2a2d3a;
+            border-radius: 10px;
+            padding: 32px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            position: relative;
+        }
+
+        .audio-drop-zone:hover,
+        .audio-drop-zone.dragover {
+            border-color: #4a6cf7;
+            background: #141720;
+        }
+
+        .audio-drop-zone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        .audio-icon {
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+
+        .audio-drop-label {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .audio-drop-label strong { color: #c0c0c0; }
+
+        .audio-formats {
+            font-size: 0.72rem;
+            color: #555;
+            margin-top: 6px;
+        }
+
+        .audio-selected {
+            display: none;
+            margin-top: 12px;
+            background: #0f1117;
+            border: 1px solid #2a2d3a;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 0.85rem;
+            color: #c0c0c0;
+            display: none;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .audio-selected.visible { display: flex; }
+
+        .audio-filename { flex: 1; word-break: break-all; }
+
+        .audio-remove {
+            cursor: pointer;
+            color: #555;
+            font-size: 1rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: color 0.2s;
+        }
+
+        .audio-remove:hover { color: #f55b5b; }
+
+        .audio-progress {
+            display: none;
+            margin-top: 12px;
+        }
+
+        .audio-progress-bar {
+            height: 4px;
+            background: #2a2d3a;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+
+        .audio-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4a6cf7, #a35bf5);
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.3s ease;
+            animation: pulse-bar 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse-bar {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .audio-progress-label {
+            font-size: 0.78rem;
+            color: #666;
+            text-align: center;
+        }
+
+        .transcription-box {
+            display: none;
+            background: #0f1117;
+            border-left: 3px solid #a35bf5;
+            padding: 10px 14px;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.85rem;
+            color: #c0c0c0;
+            line-height: 1.6;
+            margin-top: 12px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .transcription-box.visible { display: block; }
+
+        .transcription-header {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: #a35bf5;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            margin-bottom: 6px;
+        }
+
+        /* ── History Section ── */
+        .history-section {
+            background: #1a1d27;
+            border: 1px solid #2a2d3a;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 24px;
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            cursor: pointer;
+        }
+
+        .history-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #666;
+        }
+
+        .history-toggle {
+            font-size: 0.7rem;
+            color: #444;
+        }
+
+        .history-tree { display: none; }
+        .history-tree.open { display: block; }
+
+        .history-year {
+            margin-bottom: 12px;
+        }
+
+        .history-year-label {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #888;
+            padding: 4px 0;
+            border-bottom: 1px solid #2a2d3a;
+            margin-bottom: 8px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .history-month {
+            margin-left: 12px;
+            margin-bottom: 8px;
+        }
+
+        .history-month-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #666;
+            cursor: pointer;
+            padding: 3px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .history-week {
+            margin-left: 12px;
+            margin-bottom: 6px;
+        }
+
+        .history-week-label {
+            font-size: 0.7rem;
+            color: #555;
+            cursor: pointer;
+            padding: 2px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .history-day {
+            margin-left: 12px;
+        }
+
+        .history-day-label {
+            font-size: 0.68rem;
+            color: #444;
+            padding: 2px 0;
+            font-weight: 600;
+        }
+
+        .history-entry {
+            background: #0f1117;
+            border: 1px solid #1e2130;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin: 4px 0 4px 12px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .history-entry:hover { border-color: #4a6cf7; }
+
+        .history-entry-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .history-entry-badges {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .history-entry-time {
+            font-size: 0.68rem;
+            color: #444;
+        }
+
+        .history-entry-text {
+            font-size: 0.78rem;
+            color: #777;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .source-badge {
+            font-size: 0.65rem;
+            padding: 2px 7px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .source-text  { background: #1a2a3a; color: #5bd4f5; }
+        .source-audio { background: #2a1a3a; color: #a35bf5; }
+
+        .history-empty {
+            color: #444;
+            font-size: 0.82rem;
+            font-style: italic;
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        .history-entry-detail {
+            display: none;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #1e2130;
+            font-size: 0.78rem;
+            color: #888;
+            line-height: 1.6;
+        }
+
+        .history-entry-detail.open { display: block; }
     </style>
 </head>
 <body>
@@ -566,7 +871,59 @@ HTML = """
         <div class="loading" id="loading">Analizando texto...</div>
     </div>
 
+    <!-- ── AUDIO UPLOAD ── -->
+    <div class="audio-section">
+        <div class="audio-section-title">&#127908; Cargar Audio para Transcribir y Analizar</div>
+
+        <div class="audio-drop-zone" id="audioDropZone"
+             ondragover="audioDragOver(event)" ondragleave="audioDragLeave(event)" ondrop="audioDrop(event)">
+            <input type="file" id="audioFileInput" accept="audio/*,video/*,.mp3,.wav,.ogg,.m4a,.flac,.aac,.wma,.mp4,.webm"
+                   onchange="audioFileSelected(this)">
+            <div class="audio-icon">&#127925;</div>
+            <div class="audio-drop-label">
+                <strong>Arrastra tu audio aqui</strong> o haz clic para seleccionar
+            </div>
+            <div class="audio-formats">MP3, WAV, OGG, M4A, FLAC, AAC, WMA, MP4, WEBM &mdash; Sin limite de duracion</div>
+        </div>
+
+        <div class="audio-selected" id="audioSelected">
+            <span>&#127925;</span>
+            <span class="audio-filename" id="audioFilename"></span>
+            <span class="audio-remove" onclick="audioRemove()" title="Quitar archivo">&#10005;</span>
+        </div>
+
+        <div class="btn-row" style="margin-top:12px;">
+            <button class="btn-primary" id="btnAnalyzeAudio" onclick="analyzeAudio()" disabled
+                    style="background:#6a3cf7;">
+                &#127908; Transcribir y Analizar
+            </button>
+        </div>
+
+        <div class="audio-progress" id="audioProgress">
+            <div class="audio-progress-bar">
+                <div class="audio-progress-fill" id="audioProgressFill"></div>
+            </div>
+            <div class="audio-progress-label" id="audioProgressLabel">Transcribiendo audio con Whisper...</div>
+        </div>
+
+        <div class="transcription-box" id="transcriptionBox">
+            <div class="transcription-header">&#128221; Transcripcion detectada</div>
+            <div id="transcriptionText"></div>
+        </div>
+    </div>
+
     <div class="results" id="results"></div>
+
+    <!-- ── HISTORY ── -->
+    <div class="history-section" id="historySection">
+        <div class="history-header" onclick="toggleHistory()">
+            <div class="history-title">&#128197; Historial de Analisis</div>
+            <div class="history-toggle" id="historyToggleIcon">&#9660; Ver historial</div>
+        </div>
+        <div class="history-tree" id="historyTree">
+            <div class="history-empty" id="historyEmpty">Cargando historial...</div>
+        </div>
+    </div>
 </div>
 
 <script>
