@@ -59,6 +59,50 @@ except Exception as exc:
     raise
 
 # ---------------------------------------------------------------------------
+# Sync Pipeline + Scheduler
+# ---------------------------------------------------------------------------
+import logging
+logging.basicConfig(level=logging.INFO)
+
+from src.components.sync_pipeline import SyncPipeline
+
+sync_pipeline = SyncPipeline(analyzer=analyzer, add_entry_fn=add_entry)
+
+# Solo iniciar el scheduler si las credenciales están configuradas
+_mpc_configured = bool(os.environ.get("MPC_USERNAME") and os.environ.get("MPC_PASSWORD"))
+
+if _mpc_configured:
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.cron import CronTrigger
+
+        _scheduler = BackgroundScheduler(daemon=True)
+        _scheduler.add_job(
+            func=lambda: sync_pipeline.run(historical=False),
+            trigger=CronTrigger(hour=9, minute=0),
+            id="sync_morning",
+            name="Sync transcripciones 9:00",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        _scheduler.add_job(
+            func=lambda: sync_pipeline.run(historical=False),
+            trigger=CronTrigger(hour=18, minute=0),
+            id="sync_evening",
+            name="Sync transcripciones 18:00",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        _scheduler.start()
+        print("Scheduler de sincronización iniciado (9:00 y 18:00 diario).")
+    except Exception as _exc:
+        print(f"Warning: No se pudo iniciar el scheduler: {_exc}")
+else:
+    print("Info: MPC_USERNAME/MPC_PASSWORD no configurados — scheduler de sync desactivado.")
+
+# ---------------------------------------------------------------------------
 # HTML Template
 # ---------------------------------------------------------------------------
 
@@ -1987,7 +2031,36 @@ def status():
         "whisper_available": audio_transcriber.is_available,
         "whisper_model": audio_transcriber.model_name,
         "analyzer_loaded": analyzer is not None,
+        "sync_configured": _mpc_configured,
     })
+
+
+@app.route("/admin/sync", methods=["POST"])
+def admin_sync():
+    """Dispara una sincronización manual (solo admin)."""
+    if not session.get("username") or session["username"] != "admin":
+        return jsonify({"error": True, "error_message": "No autorizado"}), 403
+
+    historical = request.json.get("historical", False) if request.is_json else False
+    try:
+        summary = sync_pipeline.run(historical=historical)
+        return jsonify({"ok": True, "summary": summary})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.route("/admin/sync/log")
+def admin_sync_log():
+    """Retorna el log de sincronizaciones (solo admin)."""
+    if not session.get("username") or session["username"] != "admin":
+        return jsonify({"error": True, "error_message": "No autorizado"}), 403
+
+    import json as _json
+    log_file = os.path.join("config", "sync_log.json")
+    if not os.path.exists(log_file):
+        return jsonify([])
+    with open(log_file, "r", encoding="utf-8") as f:
+        return jsonify(_json.load(f))
 
 
 if __name__ == "__main__":
