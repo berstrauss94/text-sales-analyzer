@@ -1,0 +1,22 @@
+[
+  {
+    "started_at": "2026-05-02T20:15:49.478513+00:00",
+    "processed": 0,
+    "skipped_dedup": 0,
+    "skipped_no_mapping": 0,
+    "skipped_no_transcription": 0,
+    "errors": 0,
+    "unmapped_vendors": [],
+    "error": "Error en scraping: No module named 'bs4'"
+  },
+  {
+    "started_at": "2026-05-02T20:16:12.077720+00:00",
+    "processed": 0,
+    "skipped_dedup": 0,
+    "skipped_no_mapping": 0,
+    "skipped_no_transcription": 0,
+    "errors": 0,
+    "unmapped_vendors": [],
+    "error": "Credenciales no configuradas: 404 Client Error: Not Found for url: https://www.miprimercasa.ar/Administracion/Login.aspx"
+  }
+]
