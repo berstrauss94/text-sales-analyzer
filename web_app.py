@@ -1281,7 +1281,312 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('textInput').addEventListener('keydown', e => {
         if (e.ctrlKey && e.key === 'Enter') analyze();
     });
+    loadHistory();
 });
+
+// ── Audio Upload ──────────────────────────────────────────────────────────
+
+let selectedAudioFile = null;
+
+function audioDragOver(e) {
+    e.preventDefault();
+    document.getElementById('audioDropZone').classList.add('dragover');
+}
+
+function audioDragLeave(e) {
+    document.getElementById('audioDropZone').classList.remove('dragover');
+}
+
+function audioDrop(e) {
+    e.preventDefault();
+    document.getElementById('audioDropZone').classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) setAudioFile(file);
+}
+
+function audioFileSelected(input) {
+    if (input.files && input.files[0]) setAudioFile(input.files[0]);
+}
+
+function setAudioFile(file) {
+    selectedAudioFile = file;
+    document.getElementById('audioFilename').textContent = file.name + ' (' + formatBytes(file.size) + ')';
+    document.getElementById('audioSelected').classList.add('visible');
+    document.getElementById('btnAnalyzeAudio').disabled = false;
+    document.getElementById('transcriptionBox').classList.remove('visible');
+}
+
+function audioRemove() {
+    selectedAudioFile = null;
+    document.getElementById('audioFileInput').value = '';
+    document.getElementById('audioSelected').classList.remove('visible');
+    document.getElementById('btnAnalyzeAudio').disabled = true;
+    document.getElementById('transcriptionBox').classList.remove('visible');
+    document.getElementById('audioProgress').style.display = 'none';
+}
+
+function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+async function analyzeAudio() {
+    if (!selectedAudioFile) return;
+
+    const btn = document.getElementById('btnAnalyzeAudio');
+    btn.disabled = true;
+
+    const progress = document.getElementById('audioProgress');
+    const progressFill = document.getElementById('audioProgressFill');
+    const progressLabel = document.getElementById('audioProgressLabel');
+    progress.style.display = 'block';
+
+    // Animate progress bar (indeterminate)
+    let pct = 0;
+    const progressInterval = setInterval(() => {
+        pct = Math.min(pct + Math.random() * 3, 90);
+        progressFill.style.width = pct + '%';
+    }, 400);
+
+    progressLabel.textContent = 'Transcribiendo audio con Whisper... (puede tardar segun la duracion)';
+
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('transcriptionBox').classList.remove('visible');
+
+    try {
+        const formData = new FormData();
+        formData.append('audio', selectedAudioFile);
+
+        const response = await fetch('/upload-audio', {
+            method: 'POST',
+            body: formData
+        });
+
+        clearInterval(progressInterval);
+        progressFill.style.width = '100%';
+        progressLabel.textContent = 'Analisis completado.';
+
+        const data = await response.json();
+
+        if (data.error) {
+            const errorMessages = {
+                'TRANSCRIPTION_ERROR': 'Error al transcribir el audio: ' + (data.error_message || ''),
+                'EMPTY_TRANSCRIPTION': 'No se pudo extraer texto del audio. Verifica que tenga voz clara.',
+                'NO_FILE': 'No se recibio el archivo.',
+            };
+            document.getElementById('results').innerHTML =
+                '<div class="error-card"><strong>Error:</strong> ' +
+                (errorMessages[data.error_code] || data.error_message) + '</div>';
+            document.getElementById('results').style.display = 'block';
+        } else {
+            // Show transcription
+            document.getElementById('transcriptionText').textContent = data.transcription;
+            document.getElementById('transcriptionBox').classList.add('visible');
+
+            // Render analysis results (reuse existing renderer)
+            renderResults(data, data.transcription);
+
+            // Refresh history
+            loadHistory();
+        }
+
+        setTimeout(() => { progress.style.display = 'none'; }, 2000);
+
+    } catch (e) {
+        clearInterval(progressInterval);
+        progress.style.display = 'none';
+        document.getElementById('results').innerHTML =
+            '<div class="error-card">Error de conexion: ' + e.message + '</div>';
+        document.getElementById('results').style.display = 'block';
+    }
+
+    btn.disabled = false;
+}
+
+// ── History ───────────────────────────────────────────────────────────────
+
+let historyOpen = false;
+
+function toggleHistory() {
+    historyOpen = !historyOpen;
+    document.getElementById('historyTree').classList.toggle('open', historyOpen);
+    document.getElementById('historyToggleIcon').textContent =
+        historyOpen ? '▲ Ocultar historial' : '▼ Ver historial';
+    if (historyOpen) loadHistory();
+}
+
+async function loadHistory() {
+    try {
+        const resp = await fetch('/history');
+        const data = await resp.json();
+        renderHistoryTree(data);
+    } catch (e) {
+        document.getElementById('historyEmpty').textContent = 'Error al cargar historial.';
+    }
+}
+
+function renderHistoryTree(history) {
+    const container = document.getElementById('historyTree');
+    const emptyEl = document.getElementById('historyEmpty');
+
+    const years = Object.keys(history).sort().reverse();
+    if (years.length === 0) {
+        emptyEl.style.display = 'block';
+        emptyEl.textContent = 'Aun no hay analisis guardados.';
+        return;
+    }
+    emptyEl.style.display = 'none';
+
+    // Remove old rendered nodes (keep emptyEl)
+    Array.from(container.children).forEach(c => {
+        if (c.id !== 'historyEmpty') c.remove();
+    });
+
+    years.forEach(year => {
+        const yearDiv = document.createElement('div');
+        yearDiv.className = 'history-year';
+
+        const months = Object.keys(history[year]).sort().reverse();
+        let totalYear = 0;
+        months.forEach(m => {
+            Object.values(history[year][m]).forEach(w => {
+                Object.values(w).forEach(d => { totalYear += (d.entries || []).length; });
+            });
+        });
+
+        const yearLabel = document.createElement('div');
+        yearLabel.className = 'history-year-label';
+        yearLabel.innerHTML = `<span>&#128197; ${year}</span><span style="color:#555">${totalYear} analisis &#9660;</span>`;
+        let yearOpen = true;
+        const yearContent = document.createElement('div');
+
+        yearLabel.onclick = () => {
+            yearOpen = !yearOpen;
+            yearContent.style.display = yearOpen ? '' : 'none';
+            yearLabel.querySelector('span:last-child').innerHTML =
+                `${totalYear} analisis ${yearOpen ? '&#9650;' : '&#9660;'}`;
+        };
+
+        yearDiv.appendChild(yearLabel);
+        yearDiv.appendChild(yearContent);
+
+        months.forEach(monthKey => {
+            const monthDiv = document.createElement('div');
+            monthDiv.className = 'history-month';
+
+            const weeks = Object.keys(history[year][monthKey]).sort().reverse();
+            let totalMonth = 0;
+            weeks.forEach(w => {
+                Object.values(history[year][monthKey][w]).forEach(d => {
+                    totalMonth += (d.entries || []).length;
+                });
+            });
+
+            const monthLabel = document.createElement('div');
+            monthLabel.className = 'history-month-label';
+            const mName = monthKey.split('-').slice(1).join('-');
+            monthLabel.innerHTML = `<span>&#128198; ${mName}</span><span style="color:#444">${totalMonth} &#9660;</span>`;
+            let monthOpen = false;
+            const monthContent = document.createElement('div');
+            monthContent.style.display = 'none';
+
+            monthLabel.onclick = () => {
+                monthOpen = !monthOpen;
+                monthContent.style.display = monthOpen ? '' : 'none';
+                monthLabel.querySelector('span:last-child').innerHTML =
+                    `${totalMonth} ${monthOpen ? '&#9650;' : '&#9660;'}`;
+            };
+
+            monthDiv.appendChild(monthLabel);
+            monthDiv.appendChild(monthContent);
+
+            weeks.forEach(weekKey => {
+                const weekDiv = document.createElement('div');
+                weekDiv.className = 'history-week';
+
+                const days = Object.keys(history[year][monthKey][weekKey]).sort().reverse();
+                let totalWeek = 0;
+                days.forEach(d => { totalWeek += (history[year][monthKey][weekKey][d].entries || []).length; });
+
+                const weekLabel = document.createElement('div');
+                weekLabel.className = 'history-week-label';
+                weekLabel.innerHTML = `<span>&#128336; ${weekKey.replace('-', ' ')}</span><span style="color:#333">${totalWeek} &#9660;</span>`;
+                let weekOpen = false;
+                const weekContent = document.createElement('div');
+                weekContent.style.display = 'none';
+
+                weekLabel.onclick = () => {
+                    weekOpen = !weekOpen;
+                    weekContent.style.display = weekOpen ? '' : 'none';
+                    weekLabel.querySelector('span:last-child').innerHTML =
+                        `${totalWeek} ${weekOpen ? '&#9650;' : '&#9660;'}`;
+                };
+
+                weekDiv.appendChild(weekLabel);
+                weekDiv.appendChild(weekContent);
+
+                days.forEach(dayKey => {
+                    const dayData = history[year][monthKey][weekKey][dayKey];
+                    const dayDiv = document.createElement('div');
+                    dayDiv.className = 'history-day';
+
+                    const dayLabel = document.createElement('div');
+                    dayLabel.className = 'history-day-label';
+                    dayLabel.textContent = '📅 ' + (dayData.label || dayKey) +
+                        ' — ' + (dayData.entries || []).length + ' analisis';
+                    dayDiv.appendChild(dayLabel);
+
+                    (dayData.entries || []).forEach(entry => {
+                        const entryEl = document.createElement('div');
+                        entryEl.className = 'history-entry';
+
+                        const time = entry.timestamp
+                            ? new Date(entry.timestamp).toLocaleTimeString('es', {hour:'2-digit', minute:'2-digit'})
+                            : '';
+
+                        const intentEs = INTENT_ES[entry.intent] || entry.intent || '';
+                        const sentEs   = SENTIMENT_ES[entry.sentiment] || entry.sentiment || '';
+                        const srcClass = entry.source === 'audio' ? 'source-audio' : 'source-text';
+                        const srcLabel = entry.source === 'audio' ? '&#127908; Audio' : '&#128221; Texto';
+
+                        entryEl.innerHTML = `
+                            <div class="history-entry-header">
+                                <div class="history-entry-badges">
+                                    <span class="source-badge ${srcClass}">${srcLabel}</span>
+                                    <span class="badge badge-${entry.intent}" style="font-size:0.7rem;padding:2px 8px;">${intentEs}</span>
+                                    <span class="badge badge-${entry.sentiment}" style="font-size:0.7rem;padding:2px 8px;">${sentEs}</span>
+                                </div>
+                                <span class="history-entry-time">${time}</span>
+                            </div>
+                            <div class="history-entry-text">${entry.text || ''}</div>
+                            <div class="history-entry-detail" id="hdet-${entry.id}">
+                                ${entry.audio_filename ? '<div style="font-size:0.72rem;color:#a35bf5;margin-bottom:4px;">&#127908; ' + entry.audio_filename + '</div>' : ''}
+                                <div style="margin-bottom:4px;"><strong style="color:#888">Texto completo:</strong><br>${entry.text_full || entry.text || ''}</div>
+                                ${entry.commercial ? '<div style="font-size:0.72rem;color:#666;">Prob. cierre: <strong style="color:#e0e0e0">' + (entry.commercial.probabilidad_cierre || 0).toFixed(1) + '%</strong> &nbsp;|&nbsp; Lead: <strong style="color:#e0e0e0">' + (entry.commercial.tipo_lead || '') + '</strong></div>' : ''}
+                            </div>
+                        `;
+
+                        entryEl.onclick = () => {
+                            const det = document.getElementById('hdet-' + entry.id);
+                            if (det) det.classList.toggle('open');
+                        };
+
+                        dayDiv.appendChild(entryEl);
+                    });
+
+                    weekContent.appendChild(dayDiv);
+                });
+
+                monthContent.appendChild(weekDiv);
+            });
+
+            yearContent.appendChild(monthDiv);
+        });
+
+        container.appendChild(yearDiv);
+    });
+}
 </script>
 </body>
 </html>
