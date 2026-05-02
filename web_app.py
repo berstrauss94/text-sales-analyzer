@@ -861,19 +861,9 @@ HTML = """
         </div>
     </div>
 
-    <div class="input-section">
-        <textarea id="textInput"
-            placeholder="Escribe o pega aqui el texto que quieres analizar...&#10;&#10;Ejemplo: Ofrezco apartamento de 3 habitaciones en USD 180,000 negociable, zona norte, 95 m2."></textarea>
-        <div class="btn-row">
-            <button class="btn-primary" onclick="analyze()">Analizar</button>
-            <button class="btn-secondary" onclick="clearAll()">Limpiar</button>
-        </div>
-        <div class="loading" id="loading">Analizando texto...</div>
-    </div>
-
-    <!-- ── AUDIO UPLOAD ── -->
+    <!-- ── AUDIO UPLOAD (entre subtitulo y casilla de texto) ── -->
     <div class="audio-section">
-        <div class="audio-section-title">&#127908; Cargar Audio para Transcribir y Analizar</div>
+        <div class="audio-section-title">&#127908; Cargar Audio &mdash; Transcripcion y Analisis Automatico</div>
 
         <div class="audio-drop-zone" id="audioDropZone"
              ondragover="audioDragOver(event)" ondragleave="audioDragLeave(event)" ondrop="audioDrop(event)">
@@ -883,20 +873,13 @@ HTML = """
             <div class="audio-drop-label">
                 <strong>Arrastra tu audio aqui</strong> o haz clic para seleccionar
             </div>
-            <div class="audio-formats">MP3, WAV, OGG, M4A, FLAC, AAC, WMA, MP4, WEBM &mdash; Sin limite de duracion</div>
+            <div class="audio-formats">MP3 &middot; WAV &middot; OGG &middot; M4A &middot; FLAC &middot; AAC &middot; WMA &middot; MP4 &middot; WEBM &mdash; Sin limite de duracion</div>
         </div>
 
         <div class="audio-selected" id="audioSelected">
             <span>&#127925;</span>
             <span class="audio-filename" id="audioFilename"></span>
             <span class="audio-remove" onclick="audioRemove()" title="Quitar archivo">&#10005;</span>
-        </div>
-
-        <div class="btn-row" style="margin-top:12px;">
-            <button class="btn-primary" id="btnAnalyzeAudio" onclick="analyzeAudio()" disabled
-                    style="background:#6a3cf7;">
-                &#127908; Transcribir y Analizar
-            </button>
         </div>
 
         <div class="audio-progress" id="audioProgress">
@@ -910,6 +893,12 @@ HTML = """
             <div class="transcription-header">&#128221; Transcripcion detectada</div>
             <div id="transcriptionText"></div>
         </div>
+    </div>
+
+    <div class="input-section">
+        <textarea id="textInput"
+            placeholder="O escribe / pega aqui el texto que quieres analizar...&#10;&#10;Ejemplo: Ofrezco apartamento de 3 habitaciones en USD 180,000 negociable, zona norte, 95 m2."></textarea>
+        <div class="loading" id="loading" style="margin-top:10px;">Analizando texto...</div>
     </div>
 
     <div class="results" id="results"></div>
@@ -1276,11 +1265,26 @@ function toggleDetail(detailId, cardEl) {
     cardEl.classList.toggle('expanded', !isOpen);
 }
 
-// Allow Ctrl+Enter to submit
+// Allow Ctrl+Enter to submit, and auto-analyze after 2s of inactivity
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('textInput').addEventListener('keydown', e => {
-        if (e.ctrlKey && e.key === 'Enter') analyze();
+    let debounceTimer = null;
+    const textarea = document.getElementById('textInput');
+
+    textarea.addEventListener('keydown', e => {
+        if (e.ctrlKey && e.key === 'Enter') {
+            clearTimeout(debounceTimer);
+            analyze();
+        }
     });
+
+    textarea.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        const text = textarea.value.trim();
+        if (text.length >= 10) {
+            debounceTimer = setTimeout(() => analyze(), 2000);
+        }
+    });
+
     loadHistory();
 });
 
@@ -1312,15 +1316,15 @@ function setAudioFile(file) {
     selectedAudioFile = file;
     document.getElementById('audioFilename').textContent = file.name + ' (' + formatBytes(file.size) + ')';
     document.getElementById('audioSelected').classList.add('visible');
-    document.getElementById('btnAnalyzeAudio').disabled = false;
     document.getElementById('transcriptionBox').classList.remove('visible');
+    // Iniciar analisis automaticamente
+    analyzeAudio();
 }
 
 function audioRemove() {
     selectedAudioFile = null;
     document.getElementById('audioFileInput').value = '';
     document.getElementById('audioSelected').classList.remove('visible');
-    document.getElementById('btnAnalyzeAudio').disabled = true;
     document.getElementById('transcriptionBox').classList.remove('visible');
     document.getElementById('audioProgress').style.display = 'none';
 }
@@ -1333,9 +1337,6 @@ function formatBytes(bytes) {
 
 async function analyzeAudio() {
     if (!selectedAudioFile) return;
-
-    const btn = document.getElementById('btnAnalyzeAudio');
-    btn.disabled = true;
 
     const progress = document.getElementById('audioProgress');
     const progressFill = document.getElementById('audioProgressFill');
@@ -1400,8 +1401,6 @@ async function analyzeAudio() {
             '<div class="error-card">Error de conexion: ' + e.message + '</div>';
         document.getElementById('results').style.display = 'block';
     }
-
-    btn.disabled = false;
 }
 
 // ── History ───────────────────────────────────────────────────────────────
