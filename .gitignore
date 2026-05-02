@@ -10,8 +10,8 @@ venv/
 env/
 .env/
 
-# Models (large binary files - regenerate with train_models.py)
-models/*.joblib
+# Models are committed to git so Railway can use them without retraining
+# models/*.joblib
 
 # Temp files
 .kiro_tmp/

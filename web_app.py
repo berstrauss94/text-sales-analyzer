@@ -40,11 +40,23 @@ try:
     analyzer = create_analyzer()
     print("Models loaded successfully.")
 except FileNotFoundError:
-    print("Models not found. Training now...")
+    print("Models not found. Training now (this may take a minute)...")
     import subprocess
-    subprocess.run(["python", "-m", "src.training.train_models"], check=True)
+    result = subprocess.run(
+        ["python", "-m", "src.training.train_models"],
+        capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        print("Training failed:", result.stderr)
+        raise RuntimeError(
+            "Could not load or train models. "
+            "Run 'python -m src.training.train_models' locally and commit the models/ directory."
+        )
     analyzer = create_analyzer()
     print("Models trained and loaded.")
+except Exception as exc:
+    print(f"FATAL: Could not initialize analyzer: {exc}")
+    raise
 
 # ---------------------------------------------------------------------------
 # HTML Template
