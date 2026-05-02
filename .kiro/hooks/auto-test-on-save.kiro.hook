@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "Auto Test on Save",
+  "description": "Runs pytest automatically when any Python source file is saved",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/**/*.py",
+      "tests/**/*.py"
+    ]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "python -m pytest tests/ -q --tb=short 2>&1"
+  }
+}
