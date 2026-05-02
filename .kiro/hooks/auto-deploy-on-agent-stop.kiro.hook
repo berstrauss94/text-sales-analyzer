@@ -1,7 +1,7 @@
 {
   "enabled": true,
   "name": "Auto Deploy on Agent Stop",
-  "description": "Notifies wheInstala openai-whisper y ffmpeg para habilitar la transcripcion de audio.n Kiro finishes changes and asks if deploy should run",
+  "description": "Notifies when Kiro finishes changes and asks if deploy should run",
   "version": "1",
   "when": {
     "type": "agentStop"
