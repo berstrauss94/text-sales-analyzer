@@ -7,3 +7,6 @@ pytest==8.2.0
 flask==3.1.0
 gunicorn==22.0.0
 setuptools>=75.0.0
+requests==2.31.0
+beautifulsoup4==4.12.3
+APScheduler==3.10.4
