@@ -723,3 +723,467 @@ REAL_ESTATE_CONCEPT_DATA += [
     ("The complex has great amenities including a pool and gym.", "amenities"),
     ("Urbanizacion con seguridad privada y areas recreativas.", "amenities"),
 ]
+
+
+# ---------------------------------------------------------------------------
+# Extended training data v3 — improved coverage for mixed/complex texts
+# Addresses: low intent confidence, missing sales concepts in offer texts
+# ---------------------------------------------------------------------------
+
+# More OFFER intent examples with varied vocabulary
+INTENT_DATA += [
+    # OFFER - direct price mentions
+    ("Ofrezco apartamento de 3 habitaciones en USD 180,000 negociable.", "OFFER"),
+    ("Vendo casa de 4 cuartos, 95 m2, zona norte, precio 220,000.", "OFFER"),
+    ("Se vende local comercial 120 m2, precio 150,000 USD.", "OFFER"),
+    ("Pongo en venta penthouse de lujo, USD 450,000.", "OFFER"),
+    ("Selling 2-bedroom apartment, 75 sqm, asking 130,000.", "OFFER"),
+    ("Ofrezco terreno de 500 m2 en zona residencial, 80,000 USD.", "OFFER"),
+    ("Vendo duplex 3 habitaciones, 2 banos, precio 195,000.", "OFFER"),
+    ("For sale: 4-bedroom house, 200 sqm, priced at 310,000.", "OFFER"),
+    ("Ofrezco casa con piscina, 5 habitaciones, USD 380,000.", "OFFER"),
+    ("Selling commercial warehouse 800 sqm, asking 500,000.", "OFFER"),
+    ("Vendo apartamento amoblado, piso 8, 85 m2, 165,000 USD.", "OFFER"),
+    ("Se vende casa de campo, 3 cuartos, 1000 m2 terreno, 250,000.", "OFFER"),
+    ("Ofrezco local en esquina, 80 m2, zona comercial, 120,000.", "OFFER"),
+    ("Selling beachfront condo, 2 bedrooms, ocean view, 280,000.", "OFFER"),
+    ("Vendo oficina corporativa, 150 m2, edificio A, 200,000 USD.", "OFFER"),
+
+    # INQUIRY - more varied
+    ("Cuanto vale el apartamento de 3 habitaciones?", "INQUIRY"),
+    ("Me interesa la propiedad, tiene estacionamiento?", "INQUIRY"),
+    ("What is the price per square meter in that area?", "INQUIRY"),
+    ("Podria darme informacion sobre el inmueble disponible?", "INQUIRY"),
+    ("Is the 4-bedroom house still on the market?", "INQUIRY"),
+    ("Cuantos metros cuadrados tiene el apartamento?", "INQUIRY"),
+    ("Does the property include furniture?", "INQUIRY"),
+    ("Cual es el precio final de la casa?", "INQUIRY"),
+    ("Can I visit the property this weekend?", "INQUIRY"),
+    ("Tiene la propiedad titulo limpio y libre de deudas?", "INQUIRY"),
+    ("What floor is the apartment on?", "INQUIRY"),
+    ("El precio incluye los gastos de escritura?", "INQUIRY"),
+    ("Is there parking available with the unit?", "INQUIRY"),
+    ("Cuanto tiempo lleva en venta la propiedad?", "INQUIRY"),
+    ("Are pets allowed in the building?", "INQUIRY"),
+
+    # NEGOTIATION - more varied
+    ("El precio esta un poco alto, podemos negociar?", "NEGOTIATION"),
+    ("Si pago de contado, me das un mejor precio?", "NEGOTIATION"),
+    ("I can offer 10,000 less if you close this week.", "NEGOTIATION"),
+    ("Podemos acordar un precio intermedio?", "NEGOTIATION"),
+    ("What if I pay cash and we skip the inspection?", "NEGOTIATION"),
+    ("Estoy dispuesto a subir mi oferta si incluyes los muebles.", "NEGOTIATION"),
+    ("Can we negotiate the closing costs?", "NEGOTIATION"),
+    ("Si bajas 5,000 del precio, acepto hoy mismo.", "NEGOTIATION"),
+    ("I'll increase my offer if you fix the roof first.", "NEGOTIATION"),
+    ("Podemos dividir los gastos de cierre entre las dos partes?", "NEGOTIATION"),
+    ("What's the lowest price you'd accept for a cash offer?", "NEGOTIATION"),
+    ("Acepto el precio si me das 60 dias para desocupar.", "NEGOTIATION"),
+    ("Can we agree on a price and close before month end?", "NEGOTIATION"),
+    ("Estoy abierto a negociar si la inspeccion sale bien.", "NEGOTIATION"),
+    ("Let's split the difference and close the deal today.", "NEGOTIATION"),
+
+    # CLOSING - more varied
+    ("Acordamos el precio, firmamos el contrato manana.", "CLOSING"),
+    ("Deal is done, we close on Friday at the notary.", "CLOSING"),
+    ("El comprador acepto, procedemos con la escritura.", "CLOSING"),
+    ("Both parties signed, keys handed over today.", "CLOSING"),
+    ("Precio final 200,000, contrato firmado esta manana.", "CLOSING"),
+    ("The sale is complete, title transferred successfully.", "CLOSING"),
+    ("Cerramos el trato, el vendedor recibio el pago.", "CLOSING"),
+    ("Escrow closed, transaction finalized.", "CLOSING"),
+    ("Escritura firmada ante notario, propiedad entregada.", "CLOSING"),
+    ("Purchase agreement executed, closing in 30 days.", "CLOSING"),
+    ("Trato cerrado a 185,000, ambas partes satisfechas.", "CLOSING"),
+    ("The deal closed at asking price, no contingencies.", "CLOSING"),
+    ("Contrato de compraventa firmado, fondos transferidos.", "CLOSING"),
+    ("Final walkthrough complete, closing tomorrow.", "CLOSING"),
+    ("La venta se formalizo, comision pagada al agente.", "CLOSING"),
+
+    # DESCRIPTION - more varied
+    ("Apartamento de 3 habitaciones, 2 banos, 95 m2, zona norte.", "DESCRIPTION"),
+    ("Casa de 4 cuartos con piscina y jardin en urbanizacion cerrada.", "DESCRIPTION"),
+    ("Modern 2-bedroom condo, 75 sqm, 5th floor, city views.", "DESCRIPTION"),
+    ("Local comercial 120 m2, planta baja, zona de alto trafico.", "DESCRIPTION"),
+    ("Penthouse 300 m2, 4 habitaciones, terraza privada, jacuzzi.", "DESCRIPTION"),
+    ("3-bedroom townhouse with backyard and 2-car garage.", "DESCRIPTION"),
+    ("Terreno residencial 600 m2, todos los servicios, zona norte.", "DESCRIPTION"),
+    ("Oficina 80 m2, piso 10, edificio corporativo, vista ciudad.", "DESCRIPTION"),
+    ("Duplex 2 pisos, 3 habitaciones, patio trasero, 150 m2.", "DESCRIPTION"),
+    ("Studio apartment, 45 sqm, recently renovated, downtown.", "DESCRIPTION"),
+    ("Casa colonial 4 habitaciones, patio interior, garaje doble.", "DESCRIPTION"),
+    ("Warehouse 1500 sqm, loading dock, office area, industrial zone.", "DESCRIPTION"),
+    ("Condominio lujo, piscina, gimnasio, seguridad 24h, 2 hab.", "DESCRIPTION"),
+    ("Ranch property 2 acres, barn, horse facilities, 5 bedrooms.", "DESCRIPTION"),
+    ("Apartamento luminoso, 2 hab, balcon, estacionamiento cubierto.", "DESCRIPTION"),
+]
+
+# More sales concept examples — especially "offer" in full property texts
+SALES_CONCEPT_DATA += [
+    # offer — full property texts
+    ("Ofrezco apartamento de 3 habitaciones en USD 180,000.", "offer"),
+    ("Vendo casa de 4 cuartos, precio 220,000 USD.", "offer"),
+    ("Se vende local comercial, precio 150,000.", "offer"),
+    ("Selling 2-bedroom apartment, asking 130,000.", "offer"),
+    ("Ofrezco terreno de 500 m2, 80,000 USD.", "offer"),
+    ("Pongo en venta penthouse, USD 450,000.", "offer"),
+    ("For sale: 4-bedroom house, priced at 310,000.", "offer"),
+    ("Vendo duplex 3 habitaciones, precio 195,000.", "offer"),
+    ("Ofrezco casa con piscina, USD 380,000.", "offer"),
+    ("Selling commercial warehouse, asking 500,000.", "offer"),
+    ("Vendo apartamento amoblado, 165,000 USD.", "offer"),
+    ("Se vende casa de campo, 250,000.", "offer"),
+    ("Ofrezco local en esquina, 120,000.", "offer"),
+    ("Selling beachfront condo, 280,000.", "offer"),
+    ("Vendo oficina corporativa, 200,000 USD.", "offer"),
+    ("Tengo disponible un apartamento para la venta.", "offer"),
+    ("Estoy vendiendo mi propiedad a precio de mercado.", "offer"),
+    ("I have a property for sale at a great price.", "offer"),
+    ("Ponemos a la venta esta residencia.", "offer"),
+    ("This property is available for purchase.", "offer"),
+
+    # discount — more examples
+    ("Precio reducido para venta rapida.", "discount"),
+    ("Price drop, motivated seller.", "discount"),
+    ("Ofrezco un 15% de descuento por pago inmediato.", "discount"),
+    ("Significant reduction from original asking price.", "discount"),
+    ("Rebaja especial, solo por esta semana.", "discount"),
+    ("We are offering a price reduction of 20,000.", "discount"),
+    ("Precio rebajado de 200,000 a 180,000.", "discount"),
+    ("Special offer: 10% off for cash buyers.", "discount"),
+
+    # negotiation — more examples
+    ("Estamos dispuestos a negociar el precio.", "negotiation"),
+    ("El precio es negociable para cierre rapido.", "negotiation"),
+    ("Price is negotiable, make an offer.", "negotiation"),
+    ("Precio a convenir segun condiciones.", "negotiation"),
+    ("Open to negotiation on the final price.", "negotiation"),
+    ("Negociable, contactar para mas detalles.", "negotiation"),
+    ("Willing to negotiate for a quick sale.", "negotiation"),
+    ("Precio negociable, acepto contraoferta.", "negotiation"),
+
+    # closing — more examples
+    ("Precio final acordado, listo para firmar.", "closing"),
+    ("Ready to close, all terms agreed.", "closing"),
+    ("Cerramos esta semana si hay acuerdo.", "closing"),
+    ("Closing date set, documents ready.", "closing"),
+    ("Trato cerrado, procedemos con la escritura.", "closing"),
+    ("Deal finalized, keys available immediately.", "closing"),
+    ("Precio de cierre: 200,000 USD.", "closing"),
+    ("Final price agreed, signing tomorrow.", "closing"),
+
+    # prospect — more examples
+    ("Tengo un comprador interesado y calificado.", "prospect"),
+    ("Hay un cliente serio que quiere ver la propiedad.", "prospect"),
+    ("A motivated buyer is ready to make an offer.", "prospect"),
+    ("El prospecto tiene financiamiento pre-aprobado.", "prospect"),
+    ("Serious buyer, pre-qualified, ready to close.", "prospect"),
+    ("Tengo varios interesados en la propiedad.", "prospect"),
+    ("Multiple buyers interested, showing this weekend.", "prospect"),
+    ("Qualified buyer wants to schedule a visit.", "prospect"),
+
+    # objection — more examples
+    ("El precio le parece elevado al comprador.", "objection"),
+    ("The buyer is concerned about the location.", "objection"),
+    ("El cliente tiene dudas sobre el estado de la propiedad.", "objection"),
+    ("Buyer hesitant due to high HOA fees.", "objection"),
+    ("El prospecto objeta la falta de estacionamiento.", "objection"),
+    ("Concerns about the age of the building.", "objection"),
+    ("El comprador no esta convencido del vecindario.", "objection"),
+    ("Buyer worried about flood zone designation.", "objection"),
+
+    # follow_up — more examples
+    ("Hago seguimiento de la visita de ayer.", "follow_up"),
+    ("Following up on the offer submitted last week.", "follow_up"),
+    ("Le escribo para dar seguimiento a nuestra conversacion.", "follow_up"),
+    ("Checking in to see if you've decided.", "follow_up"),
+    ("Queria hacer un seguimiento de su interes.", "follow_up"),
+    ("Just following up on the property inquiry.", "follow_up"),
+    ("Llamare manana para hacer seguimiento.", "follow_up"),
+    ("Reaching out to follow up on your visit.", "follow_up"),
+]
+
+# More real estate concept examples
+REAL_ESTATE_CONCEPT_DATA += [
+    # property_type — more examples
+    ("Apartamento de 3 habitaciones disponible.", "property_type"),
+    ("Casa de 4 cuartos en venta.", "property_type"),
+    ("Local comercial en zona de alto trafico.", "property_type"),
+    ("Terreno residencial disponible.", "property_type"),
+    ("Penthouse de lujo en edificio nuevo.", "property_type"),
+    ("Oficina en edificio corporativo.", "property_type"),
+    ("Deposito industrial en zona franca.", "property_type"),
+    ("Duplex de 2 pisos en venta.", "property_type"),
+    ("Studio apartment available for sale.", "property_type"),
+    ("Commercial retail space for lease.", "property_type"),
+    ("Townhouse in gated community.", "property_type"),
+    ("Warehouse with office space available.", "property_type"),
+
+    # price — more examples
+    ("Precio de venta: 180,000 USD.", "price"),
+    ("Asking 220,000 for this property.", "price"),
+    ("El inmueble se ofrece en 150,000.", "price"),
+    ("Listed at 310,000, negotiable.", "price"),
+    ("Precio: 95,000 dolares.", "price"),
+    ("Sale price: 450,000 USD.", "price"),
+    ("Cuesta 200,000 USD negociable.", "price"),
+    ("Priced at 130,000, motivated seller.", "price"),
+    ("Valor: 380,000 dolares.", "price"),
+    ("Asking price 500,000.", "price"),
+    ("Precio de lista 165,000 USD.", "price"),
+    ("Selling for 280,000.", "price"),
+
+    # area_sqm — more examples
+    ("Apartamento de 95 metros cuadrados.", "area_sqm"),
+    ("Casa de 200 m2 con jardin.", "area_sqm"),
+    ("Local de 120 m2 en planta baja.", "area_sqm"),
+    ("Property of 150 sqm available.", "area_sqm"),
+    ("Terreno de 600 m2.", "area_sqm"),
+    ("Office space 80 sqm.", "area_sqm"),
+    ("Penthouse de 300 m2.", "area_sqm"),
+    ("House with 2500 square feet.", "area_sqm"),
+    ("Deposito de 800 m2.", "area_sqm"),
+    ("Apartment 75 sqm, 5th floor.", "area_sqm"),
+    ("Duplex de 150 m2 total.", "area_sqm"),
+    ("Warehouse 1200 sqm with loading dock.", "area_sqm"),
+
+    # bedrooms — more examples
+    ("Apartamento de 3 habitaciones.", "bedrooms"),
+    ("Casa de 4 cuartos amplios.", "bedrooms"),
+    ("2-bedroom condo available.", "bedrooms"),
+    ("Propiedad de 5 dormitorios.", "bedrooms"),
+    ("Single bedroom studio.", "bedrooms"),
+    ("3 bedrooms, master suite.", "bedrooms"),
+    ("Casa con 4 habitaciones y closets.", "bedrooms"),
+    ("6-bedroom mansion.", "bedrooms"),
+    ("Duplex de 3 cuartos.", "bedrooms"),
+    ("Two-bedroom apartment.", "bedrooms"),
+    ("Penthouse de 4 habitaciones.", "bedrooms"),
+    ("One bedroom unit available.", "bedrooms"),
+
+    # bathrooms — more examples
+    ("Casa con 3 banos completos.", "bathrooms"),
+    ("2 full bathrooms.", "bathrooms"),
+    ("Apartamento con 2 banos.", "bathrooms"),
+    ("Property has 4 bathrooms.", "bathrooms"),
+    ("Bano principal y de servicio.", "bathrooms"),
+    ("3 bathrooms, recently renovated.", "bathrooms"),
+    ("Master bath with jacuzzi.", "bathrooms"),
+    ("Two and a half baths.", "bathrooms"),
+    ("Cada habitacion con bano privado.", "bathrooms"),
+    ("Modern bathrooms with premium fixtures.", "bathrooms"),
+    ("Un bano completo con tina.", "bathrooms"),
+    ("5 bathrooms including spa.", "bathrooms"),
+
+    # location — more examples
+    ("Propiedad en zona norte de la ciudad.", "location"),
+    ("Located in downtown area.", "location"),
+    ("Casa en urbanizacion cerrada.", "location"),
+    ("Property in Miami Beach.", "location"),
+    ("Apartamento en el este de la ciudad.", "location"),
+    ("Near top-rated schools.", "location"),
+    ("Inmueble en sector Las Mercedes.", "location"),
+    ("In the financial district.", "location"),
+    ("Zona residencial exclusiva.", "location"),
+    ("Minutes from the beach.", "location"),
+    ("Centro historico de la ciudad.", "location"),
+    ("Near highways and shopping centers.", "location"),
+
+    # amenities — more examples
+    ("Edificio con piscina y gimnasio.", "amenities"),
+    ("Pool, gym, and tennis courts.", "amenities"),
+    ("Seguridad 24 horas y area de juegos.", "amenities"),
+    ("Rooftop terrace and concierge.", "amenities"),
+    ("Canchas deportivas y parque.", "amenities"),
+    ("Spa and business center.", "amenities"),
+    ("Piscina olimpica y salon de fiestas.", "amenities"),
+    ("Resort-style pool and gym.", "amenities"),
+    ("Lobby de lujo y seguridad biometrica.", "amenities"),
+    ("Clubhouse and walking trails.", "amenities"),
+    ("Cine privado y terraza panoramica.", "amenities"),
+    ("Valet parking and doorman service.", "amenities"),
+
+    # zoning — more examples
+    ("Zonificacion comercial.", "zoning"),
+    ("Zoned for residential use.", "zoning"),
+    ("Zona industrial.", "zoning"),
+    ("Mixed-use zoning.", "zoning"),
+    ("Uso de suelo comercial.", "zoning"),
+    ("Multi-family residential zoning.", "zoning"),
+    ("Permiso para uso mixto.", "zoning"),
+    ("Commercial zoning, high traffic.", "zoning"),
+    ("Zonificacion industrial liviana.", "zoning"),
+    ("Single-family residential only.", "zoning"),
+    ("Terreno con zonificacion R2.", "zoning"),
+    ("Agricultural zoning with potential.", "zoning"),
+
+    # condition — more examples
+    ("Propiedad en excelente estado.", "condition"),
+    ("Needs renovation, sold as-is.", "condition"),
+    ("Recien remodelado.", "condition"),
+    ("Good condition, minor repairs.", "condition"),
+    ("Apartamento nuevo, nunca habitado.", "condition"),
+    ("Well-maintained, updated systems.", "condition"),
+    ("Recien pintado, pisos nuevos.", "condition"),
+    ("Fixer-upper, priced accordingly.", "condition"),
+    ("Completamente renovado.", "condition"),
+    ("Move-in ready.", "condition"),
+    ("En construccion, entrega en 6 meses.", "condition"),
+    ("Historic property, original details.", "condition"),
+]
+
+# Sentiment — more examples for better coverage
+SENTIMENT_DATA += [
+    # POSITIVE
+    ("Propiedad en perfectas condiciones, excelente precio.", "POSITIVE"),
+    ("Great deal, highly recommend this property.", "POSITIVE"),
+    ("Oportunidad de inversion excepcional.", "POSITIVE"),
+    ("Beautiful home, amazing location, great value.", "POSITIVE"),
+    ("Muy satisfecho con la compra, todo perfecto.", "POSITIVE"),
+    ("Outstanding property at a competitive price.", "POSITIVE"),
+    ("Excelente agente, proceso muy profesional.", "POSITIVE"),
+    ("Wonderful neighborhood, great schools nearby.", "POSITIVE"),
+    ("Increible vista, acabados de primera.", "POSITIVE"),
+    ("Best investment decision I've made.", "POSITIVE"),
+
+    # NEUTRAL
+    ("Propiedad de 3 habitaciones en zona norte.", "NEUTRAL"),
+    ("The property has 2 bathrooms and a garage.", "NEUTRAL"),
+    ("Casa de 150 m2 disponible para visita.", "NEUTRAL"),
+    ("The listing price is 200,000 dollars.", "NEUTRAL"),
+    ("Apartamento en piso 5, 85 m2.", "NEUTRAL"),
+    ("Property built in 2010, 3 bedrooms.", "NEUTRAL"),
+    ("Local comercial de 80 m2 disponible.", "NEUTRAL"),
+    ("The building has parking and storage.", "NEUTRAL"),
+    ("Terreno de 500 m2 en zona comercial.", "NEUTRAL"),
+    ("The lease is for 12 months.", "NEUTRAL"),
+
+    # NEGATIVE
+    ("Propiedad en mal estado, muchos problemas.", "NEGATIVE"),
+    ("Terrible location, too much noise.", "NEGATIVE"),
+    ("Overpriced for the condition.", "NEGATIVE"),
+    ("El agente fue muy poco profesional.", "NEGATIVE"),
+    ("Awful neighborhood, high crime.", "NEGATIVE"),
+    ("Serious structural issues found.", "NEGATIVE"),
+    ("Very disappointed with the property.", "NEGATIVE"),
+    ("Pesima administracion del edificio.", "NEGATIVE"),
+    ("The property has major water damage.", "NEGATIVE"),
+    ("Worst experience, dishonest seller.", "NEGATIVE"),
+]
+
+
+# ---------------------------------------------------------------------------
+# Extended training data v4 — fix UNKNOWN for short/English texts
+# ---------------------------------------------------------------------------
+
+INTENT_DATA += [
+    # OFFER - short English
+    ("Making an offer on this property.", "OFFER"),
+    ("I want to buy this house.", "OFFER"),
+    ("Interested in purchasing this property.", "OFFER"),
+    ("I'd like to make an offer.", "OFFER"),
+    ("We want to buy this apartment.", "OFFER"),
+    ("Putting in an offer today.", "OFFER"),
+    ("Ready to purchase, what's the price?", "OFFER"),
+    ("I'll take it at the asking price.", "OFFER"),
+
+    # NEGOTIATION - short texts
+    ("Can we negotiate the price?", "NEGOTIATION"),
+    ("El precio es negociable?", "NEGOTIATION"),
+    ("Willing to negotiate.", "NEGOTIATION"),
+    ("Precio a convenir.", "NEGOTIATION"),
+    ("Open to offers.", "NEGOTIATION"),
+    ("Acepto contraoferta.", "NEGOTIATION"),
+    ("Let's work out a deal.", "NEGOTIATION"),
+    ("Podemos llegar a un acuerdo.", "NEGOTIATION"),
+    ("Price is negotiable.", "NEGOTIATION"),
+    ("Negociable.", "NEGOTIATION"),
+
+    # INQUIRY - short texts
+    ("What's the price?", "INQUIRY"),
+    ("Cuanto cuesta?", "INQUIRY"),
+    ("Is it available?", "INQUIRY"),
+    ("Esta disponible?", "INQUIRY"),
+    ("More info please.", "INQUIRY"),
+    ("Mas informacion?", "INQUIRY"),
+    ("Can I visit?", "INQUIRY"),
+    ("Puedo visitar?", "INQUIRY"),
+    ("How many bedrooms?", "INQUIRY"),
+    ("Cuantas habitaciones?", "INQUIRY"),
+
+    # CLOSING - short texts
+    ("Deal done.", "CLOSING"),
+    ("Trato cerrado.", "CLOSING"),
+    ("We have a deal.", "CLOSING"),
+    ("Cerramos.", "CLOSING"),
+    ("Agreed.", "CLOSING"),
+    ("Acordado.", "CLOSING"),
+    ("Signed and done.", "CLOSING"),
+    ("Firmado.", "CLOSING"),
+    ("Sold.", "CLOSING"),
+    ("Vendido.", "CLOSING"),
+
+    # DESCRIPTION - short texts
+    ("3 bedrooms, 2 baths, garage.", "DESCRIPTION"),
+    ("3 habitaciones, 2 banos, garaje.", "DESCRIPTION"),
+    ("Modern apartment, city views.", "DESCRIPTION"),
+    ("Apartamento moderno, vista ciudad.", "DESCRIPTION"),
+    ("Large house with pool.", "DESCRIPTION"),
+    ("Casa grande con piscina.", "DESCRIPTION"),
+    ("Commercial space, ground floor.", "DESCRIPTION"),
+    ("Local comercial, planta baja.", "DESCRIPTION"),
+]
+
+SALES_CONCEPT_DATA += [
+    # commission — more examples
+    ("La comision es del 3 por ciento.", "commission"),
+    ("Agent fee is 3%.", "commission"),
+    ("Comision del corredor: 4%.", "commission"),
+    ("Realtor commission included.", "commission"),
+    ("Honorarios del agente acordados.", "commission"),
+    ("Commission is negotiable.", "commission"),
+    ("Pago comision al agente vendedor.", "commission"),
+    ("Buyer's agent fee is 2.5%.", "commission"),
+
+    # offer — more short/varied
+    ("Quiero comprar esta propiedad.", "offer"),
+    ("I want to purchase this house.", "offer"),
+    ("Interesado en adquirir el inmueble.", "offer"),
+    ("Ready to buy at asking price.", "offer"),
+    ("Presento oferta formal.", "offer"),
+    ("Submitting an offer today.", "offer"),
+    ("Oferta en firme por la propiedad.", "offer"),
+    ("Making a formal offer.", "offer"),
+]
+
+REAL_ESTATE_CONCEPT_DATA += [
+    # property_type — short
+    ("Apartamento disponible.", "property_type"),
+    ("Casa en venta.", "property_type"),
+    ("Local comercial.", "property_type"),
+    ("Terreno disponible.", "property_type"),
+    ("Penthouse en venta.", "property_type"),
+    ("Apartment for sale.", "property_type"),
+    ("House available.", "property_type"),
+    ("Commercial space.", "property_type"),
+
+    # price — short
+    ("USD 180,000.", "price"),
+    ("180,000 dolares.", "price"),
+    ("Asking 220,000.", "price"),
+    ("Precio 150,000.", "price"),
+    ("200k.", "price"),
+    ("$250,000.", "price"),
+    ("310,000 USD.", "price"),
+    ("Cuesta 95,000.", "price"),
+
+    # area_sqm — short
+    ("95 m2.", "area_sqm"),
+    ("200 metros cuadrados.", "area_sqm"),
+    ("150 sqm.", "area_sqm"),
+    ("500 m2 de terreno.", "area_sqm"),
+    ("2500 square feet.", "area_sqm"),
+    ("80 m2.", "area_sqm"),
+    ("300 m2.", "area_sqm"),
+    ("1200 sqm.", "area_sqm"),
+]

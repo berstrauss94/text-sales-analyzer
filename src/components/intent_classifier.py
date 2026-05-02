@@ -12,7 +12,7 @@ from src.models.data_models import IntentResult
 
 
 INTENTS = ["OFFER", "INQUIRY", "NEGOTIATION", "CLOSING", "DESCRIPTION", "UNKNOWN"]
-UNKNOWN_THRESHOLD = 0.3
+UNKNOWN_THRESHOLD = 0.25
 
 
 class IntentClassifier:
