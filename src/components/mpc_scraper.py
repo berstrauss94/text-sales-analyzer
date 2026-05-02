@@ -28,7 +28,7 @@ from bs4 import BeautifulSoup
 logger = logging.getLogger(__name__)
 
 BASE_URL   = "https://www.miprimercasa.ar"
-LOGIN_URL  = f"{BASE_URL}/Administracion/Login.aspx"
+LOGIN_URL  = f"{BASE_URL}/acceso.aspx"
 LIST_URL   = f"{BASE_URL}/Administracion/GRABACIONAUDITORSUBE.aspx"
 DETAIL_URL = f"{BASE_URL}/Administracion/GRABACIONAUDITORSUBEDETALLE.aspx"
 
