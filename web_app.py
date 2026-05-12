@@ -644,6 +644,29 @@ HTML = """
 
         .empty-msg { color: #555; font-size: 0.85rem; font-style: italic; }
 
+        /* Collapsible card styles */
+        .card-title-collapsible {
+            cursor: pointer;
+            user-select: none;
+            transition: color 0.2s;
+        }
+        .card-title-collapsible:hover {
+            color: #4a6cf7;
+        }
+        .card-arrow {
+            font-size: 0.65rem;
+            color: #555;
+            transition: transform 0.3s, color 0.2s;
+            display: inline-block;
+        }
+        .card-title-collapsible:hover .card-arrow { color: #4a6cf7; }
+        .card-arrow.open { transform: rotate(180deg); }
+        .card-collapsible-content {
+            display: none;
+            animation: slideDown 0.25s ease-out;
+        }
+        .card-collapsible-content.open { display: block; }
+
         .full-width { grid-column: 1 / -1; }
 
         .error-card {
@@ -1757,9 +1780,13 @@ function renderResults(data, inputText) {
                 ${reHtml}
             </div>
             <div class="card full-width">
-                <div class="card-title">Datos Extraidos del Texto</div>
-                ${entitiesHtml}
-                ${extDataHtml}
+                <div class="card-title card-title-collapsible" onclick="toggleCardContent('datos-extraidos-content')">
+                    Datos Extraidos del Texto &nbsp;<span class="card-arrow" id="datos-extraidos-arrow">&#9660;</span>
+                </div>
+                <div class="card-collapsible-content" id="datos-extraidos-content">
+                    ${entitiesHtml}
+                    ${extDataHtml}
+                </div>
             </div>
         </div>
         ${renderCommercial(data.commercial)}
@@ -2040,6 +2067,14 @@ function toggleExtDetail(panelId) {
         if (p.id !== panelId) p.classList.remove('open');
     });
     panel.classList.toggle('open');
+}
+
+function toggleCardContent(contentId) {
+    const content = document.getElementById(contentId);
+    if (!content) return;
+    content.classList.toggle('open');
+    const arrow = document.getElementById(contentId.replace('-content', '-arrow'));
+    if (arrow) arrow.classList.toggle('open');
 }
 
 function toggleDetail(detailId, cardEl) {
