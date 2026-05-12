@@ -264,7 +264,7 @@ HTML = """
 
         textarea {
             width: 100%;
-            height: 130px;
+            height: 325px;
             background: #0f1117;
             border: 1px solid #2a2d3a;
             border-radius: 8px;
@@ -294,7 +294,7 @@ HTML = """
             top: 0;
             left: 0;
             right: 0;
-            min-height: 130px;
+            min-height: 325px;
             height: 100%;
             background: #0f1117;
             border: 2px solid #4a6cf7;
@@ -2993,7 +2993,7 @@ function highlightSingleWord(word, indicatorKey) {
     overlay.classList.add('active');
     closeBtn.classList.add('active');
 
-    // Scroll to the textarea area
+    // Scroll to the textarea area only when clicking a specific word
     const wrapper = document.getElementById('textareaWrapper');
     wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
@@ -3019,9 +3019,7 @@ function highlightInText(indicatorKey) {
     overlay.classList.add('active');
     closeBtn.classList.add('active');
 
-    // Scroll to the textarea area
-    const wrapper = document.getElementById('textareaWrapper');
-    wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // No scroll here — only scroll when clicking a specific word in the detail
 }
 
 function buildHighlightedText(text, words, indicatorKey) {
