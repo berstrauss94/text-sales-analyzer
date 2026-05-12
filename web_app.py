@@ -505,6 +505,110 @@ HTML = """
             line-height: 1.4;
         }
 
+        /* Clickable pills and detail panels */
+        .ext-pill-clickable {
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            position: relative;
+        }
+        .ext-pill-clickable:hover {
+            border-color: #4a6cf7;
+            background: #111828;
+        }
+        .ext-pill-arrow {
+            display: block;
+            font-size: 0.55rem;
+            color: #555;
+            margin-top: 3px;
+            transition: color 0.2s;
+        }
+        .ext-pill-clickable:hover .ext-pill-arrow { color: #4a6cf7; }
+
+        .ext-detail-panel {
+            display: none;
+            margin-top: 8px;
+            padding: 14px;
+            background: #0a0c14;
+            border: 1px solid #1e2a40;
+            border-radius: 10px;
+            border-left: 3px solid #4a6cf7;
+            animation: slideDown 0.2s ease-out;
+        }
+        .ext-detail-panel.open { display: block; }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .ext-detail-header {
+            font-size: 0.82rem;
+            color: #e0e0e0;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #1e2130;
+        }
+        .ext-detail-progress {
+            height: 6px;
+            background: #1a1d2e;
+            border-radius: 3px;
+            margin-bottom: 8px;
+            overflow: hidden;
+        }
+        .ext-detail-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4a6cf7, #5bf5a3);
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+        .ext-progress-urgencia {
+            background: linear-gradient(90deg, #5bf5a3, #f5a35b, #f55b5b);
+        }
+        .ext-progress-compromiso {
+            background: linear-gradient(90deg, #555, #f5a35b, #5bf5a3);
+        }
+        .ext-detail-stages {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding: 0 2px;
+        }
+        .ext-detail-stages span {
+            font-size: 0.62rem;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .ext-detail-stages .stage-active {
+            color: #4a6cf7;
+            background: #111828;
+            font-weight: 700;
+            border: 1px solid #4a6cf7;
+        }
+        .ext-detail-body {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .ext-detail-desc {
+            font-size: 0.78rem;
+            color: #ccc;
+            line-height: 1.5;
+        }
+        .ext-detail-item {
+            font-size: 0.73rem;
+            color: #aaa;
+            line-height: 1.4;
+            padding: 6px 10px;
+            background: #0d1018;
+            border-radius: 6px;
+        }
+        .ext-detail-item strong {
+            color: #ddd;
+        }
+
         .empty-msg { color: #555; font-size: 0.85rem; font-style: italic; }
 
         .full-width { grid-column: 1 / -1; }
@@ -1279,14 +1383,225 @@ function renderResults(data, inputText) {
             'FINANCIAMIENTO_DIRECTO': '🤝 Directo', 'NO_DETECTADO': '—'
         };
 
+        // Build detailed explanations for each pill
+        const funnelDetail = {
+            'AWARENESS': {
+                desc: 'El cliente esta en la etapa inicial. Aun no conoce bien la oferta ni ha mostrado interes concreto.',
+                signals: 'No hay indicios de cierre ni respuestas afirmativas claras.',
+                action: 'Presentar la propuesta de valor, generar interes y calificar al prospecto.',
+                progress: 10
+            },
+            'CONSIDERATION': {
+                desc: 'El cliente esta evaluando opciones activamente. Muestra interes pero aun no decide.',
+                signals: 'Se detectan indicios de prospeccion, objeciones o respuestas positivas iniciales.',
+                action: 'Resolver dudas, enviar comparables, mostrar beneficios diferenciadores.',
+                progress: 50
+            },
+            'DECISION': {
+                desc: 'El cliente esta muy cerca de tomar una decision. Las senales de cierre son claras.',
+                signals: 'Indicios de cierre presentes, respuestas afirmativas y/o alta probabilidad.',
+                action: 'Presentar propuesta final, crear urgencia y facilitar el cierre.',
+                progress: 80
+            },
+            'CLOSED': {
+                desc: 'La operacion esta cerrada o practicamente cerrada.',
+                signals: 'Acuerdo alcanzado, firma realizada o precio final acordado.',
+                action: 'Gestionar post-venta, solicitar referidos y mantener la relacion.',
+                progress: 100
+            }
+        };
+
+        const urgenciaDetail = {
+            'BAJA': {
+                desc: 'No se detectan senales de urgencia en el texto. El cliente no tiene prisa.',
+                signals: 'Sin menciones de tiempo, plazos o inmediatez.',
+                action: 'Crear urgencia con escasez o beneficios por tiempo limitado.',
+                progress: 15
+            },
+            'MEDIA': {
+                desc: 'Hay alguna senal de urgencia moderada. El cliente tiene cierta prisa.',
+                signals: 'Menciones aisladas de tiempo o plazos.',
+                action: 'Reforzar la urgencia y facilitar el proceso para no perder momentum.',
+                progress: 45
+            },
+            'ALTA': {
+                desc: 'Multiples senales de urgencia. El cliente necesita resolver pronto.',
+                signals: 'Varias menciones de inmediatez, plazos cortos o necesidad rapida.',
+                action: 'Actuar rapido, simplificar pasos y ofrecer solucion inmediata.',
+                progress: 75
+            },
+            'CRITICA': {
+                desc: 'Urgencia maxima. El cliente necesita una solucion ya.',
+                signals: 'Multiples palabras de urgencia: hoy, ahora, urgente, inmediato.',
+                action: 'Priorizar este lead. Responder de inmediato y cerrar hoy si es posible.',
+                progress: 95
+            }
+        };
+
+        const compromisoDetail = {
+            'BAJO': {
+                desc: 'El cliente muestra poco compromiso. Hay mas evasivas que confirmaciones.',
+                signals: 'Frases como "tengo que pensar", "despues", "no estoy seguro".',
+                action: 'No presionar. Nutrir con informacion y hacer seguimiento suave.',
+                progress: 20
+            },
+            'MEDIO': {
+                desc: 'Compromiso moderado. Hay senales positivas pero tambien dudas.',
+                signals: 'Mezcla de confirmaciones y evasivas. Interes real pero con reservas.',
+                action: 'Resolver las dudas especificas y reforzar los beneficios clave.',
+                progress: 55
+            },
+            'ALTO': {
+                desc: 'Alto compromiso. El cliente esta decidido y muestra disposicion clara.',
+                signals: 'Multiples confirmaciones: "acepto", "listo", "de acuerdo", "vamos".',
+                action: 'Aprovechar el momento. Facilitar el cierre y no agregar friccion.',
+                progress: 90
+            }
+        };
+
+        const operacionDetail = {
+            'VENTA': {
+                desc: 'Se trata de una operacion de compra-venta de inmueble.',
+                signals: 'Palabras detectadas: venta, vender, comprar, adquirir.',
+                action: 'Enfocar en precio, condiciones de pago y documentacion legal.',
+                icon: '🏷️'
+            },
+            'ALQUILER': {
+                desc: 'Se trata de una operacion de alquiler o arrendamiento.',
+                signals: 'Palabras detectadas: alquiler, renta, arrendamiento, inquilino.',
+                action: 'Enfocar en plazo, condiciones del contrato y garantias.',
+                icon: '🔑'
+            },
+            'INVERSION': {
+                desc: 'El cliente busca una oportunidad de inversion inmobiliaria.',
+                signals: 'Palabras detectadas: inversion, invertir, rentabilidad, retorno.',
+                action: 'Presentar numeros: ROI, rentabilidad, plusvalia y proyecciones.',
+                icon: '📈'
+            },
+            'INDEFINIDO': {
+                desc: 'No se pudo determinar el tipo de operacion con claridad.',
+                signals: 'No se detectaron palabras clave de ningun tipo de operacion.',
+                action: 'Preguntar directamente al cliente que tipo de operacion busca.',
+                icon: '❓'
+            }
+        };
+
+        const financDetail = {
+            'CONTADO': {
+                desc: 'El cliente menciona pago de contado o en efectivo.',
+                signals: 'Palabras detectadas: contado, cash, efectivo, pago completo.',
+                action: 'Ofrecer descuento por pago de contado. Agilizar el cierre.',
+                icon: '💵'
+            },
+            'CREDITO': {
+                desc: 'Se menciona financiamiento bancario o hipotecario.',
+                signals: 'Palabras detectadas: credito, hipoteca, banco, prestamo, pre-aprobado.',
+                action: 'Verificar pre-aprobacion, coordinar con el banco y ajustar plazos.',
+                icon: '🏦'
+            },
+            'FINANCIAMIENTO_DIRECTO': {
+                desc: 'Se menciona financiamiento directo del vendedor o pago en cuotas.',
+                signals: 'Palabras detectadas: cuotas, facilidades de pago, plan de pago.',
+                action: 'Definir condiciones: enganche, plazo, tasa y garantias.',
+                icon: '🤝'
+            },
+            'NO_DETECTADO': {
+                desc: 'No se detecto mencion de forma de pago o financiamiento.',
+                signals: 'Sin palabras clave de financiamiento en el texto.',
+                action: 'Preguntar al cliente como planea financiar la operacion.',
+                icon: '—'
+            }
+        };
+
+        const fd = funnelDetail[c.etapa_funnel] || funnelDetail['AWARENESS'];
+        const ud = urgenciaDetail[c.urgencia] || urgenciaDetail['BAJA'];
+        const cd = compromisoDetail[c.nivel_compromiso] || compromisoDetail['BAJO'];
+        const od = operacionDetail[c.tipo_operacion] || operacionDetail['INDEFINIDO'];
+        const fid = financDetail[c.financiamiento] || financDetail['NO_DETECTADO'];
+
         extDataHtml = `
             <div class="ext-data-grid">
-                <div class="ext-data-pill"><span class="ext-pill-label">Funnel</span><span class="ext-pill-value">${funnelLabels[c.etapa_funnel] || c.etapa_funnel || '—'}</span></div>
-                <div class="ext-data-pill"><span class="ext-pill-label">Urgencia</span><span class="ext-pill-value">${urgLabels[c.urgencia] || c.urgencia || '—'}</span></div>
-                <div class="ext-data-pill"><span class="ext-pill-label">Compromiso</span><span class="ext-pill-value">${compLabels[c.nivel_compromiso] || c.nivel_compromiso || '—'}</span></div>
-                <div class="ext-data-pill"><span class="ext-pill-label">Operacion</span><span class="ext-pill-value">${opLabels[c.tipo_operacion] || c.tipo_operacion || '—'}</span></div>
-                <div class="ext-data-pill"><span class="ext-pill-label">Financiamiento</span><span class="ext-pill-value">${finLabels[c.financiamiento] || c.financiamiento || '—'}</span></div>
-            </div>`;
+                <div class="ext-data-pill ext-pill-clickable" onclick="toggleExtDetail('ext-detail-funnel')">
+                    <span class="ext-pill-label">Funnel</span>
+                    <span class="ext-pill-value">${funnelLabels[c.etapa_funnel] || c.etapa_funnel || '—'}</span>
+                    <span class="ext-pill-arrow">&#9660;</span>
+                </div>
+                <div class="ext-data-pill ext-pill-clickable" onclick="toggleExtDetail('ext-detail-urgencia')">
+                    <span class="ext-pill-label">Urgencia</span>
+                    <span class="ext-pill-value">${urgLabels[c.urgencia] || c.urgencia || '—'}</span>
+                    <span class="ext-pill-arrow">&#9660;</span>
+                </div>
+                <div class="ext-data-pill ext-pill-clickable" onclick="toggleExtDetail('ext-detail-compromiso')">
+                    <span class="ext-pill-label">Compromiso</span>
+                    <span class="ext-pill-value">${compLabels[c.nivel_compromiso] || c.nivel_compromiso || '—'}</span>
+                    <span class="ext-pill-arrow">&#9660;</span>
+                </div>
+                <div class="ext-data-pill ext-pill-clickable" onclick="toggleExtDetail('ext-detail-operacion')">
+                    <span class="ext-pill-label">Operacion</span>
+                    <span class="ext-pill-value">${opLabels[c.tipo_operacion] || c.tipo_operacion || '—'}</span>
+                    <span class="ext-pill-arrow">&#9660;</span>
+                </div>
+                <div class="ext-data-pill ext-pill-clickable" onclick="toggleExtDetail('ext-detail-financ')">
+                    <span class="ext-pill-label">Financiamiento</span>
+                    <span class="ext-pill-value">${finLabels[c.financiamiento] || c.financiamiento || '—'}</span>
+                    <span class="ext-pill-arrow">&#9660;</span>
+                </div>
+            </div>
+
+            <div class="ext-detail-panel" id="ext-detail-funnel">
+                <div class="ext-detail-header">🎯 Etapa del Funnel: <strong>${c.etapa_funnel}</strong></div>
+                <div class="ext-detail-progress"><div class="ext-detail-progress-fill" style="width:${fd.progress}%"></div></div>
+                <div class="ext-detail-stages">
+                    <span class="${c.etapa_funnel === 'AWARENESS' ? 'stage-active' : ''}">Awareness</span>
+                    <span class="${c.etapa_funnel === 'CONSIDERATION' ? 'stage-active' : ''}">Consideration</span>
+                    <span class="${c.etapa_funnel === 'DECISION' ? 'stage-active' : ''}">Decision</span>
+                    <span class="${c.etapa_funnel === 'CLOSED' ? 'stage-active' : ''}">Closed</span>
+                </div>
+                <div class="ext-detail-body">
+                    <div class="ext-detail-desc">${fd.desc}</div>
+                    <div class="ext-detail-item"><strong>Senales detectadas:</strong> ${fd.signals}</div>
+                    <div class="ext-detail-item"><strong>Que hacer:</strong> ${fd.action}</div>
+                </div>
+            </div>
+
+            <div class="ext-detail-panel" id="ext-detail-urgencia">
+                <div class="ext-detail-header">⏱️ Nivel de Urgencia: <strong>${c.urgencia}</strong></div>
+                <div class="ext-detail-progress"><div class="ext-detail-progress-fill ext-progress-urgencia" style="width:${ud.progress}%"></div></div>
+                <div class="ext-detail-body">
+                    <div class="ext-detail-desc">${ud.desc}</div>
+                    <div class="ext-detail-item"><strong>Senales detectadas:</strong> ${ud.signals}</div>
+                    <div class="ext-detail-item"><strong>Que hacer:</strong> ${ud.action}</div>
+                </div>
+            </div>
+
+            <div class="ext-detail-panel" id="ext-detail-compromiso">
+                <div class="ext-detail-header">🤝 Nivel de Compromiso: <strong>${c.nivel_compromiso}</strong></div>
+                <div class="ext-detail-progress"><div class="ext-detail-progress-fill ext-progress-compromiso" style="width:${cd.progress}%"></div></div>
+                <div class="ext-detail-body">
+                    <div class="ext-detail-desc">${cd.desc}</div>
+                    <div class="ext-detail-item"><strong>Senales detectadas:</strong> ${cd.signals}</div>
+                    <div class="ext-detail-item"><strong>Que hacer:</strong> ${cd.action}</div>
+                </div>
+            </div>
+
+            <div class="ext-detail-panel" id="ext-detail-operacion">
+                <div class="ext-detail-header">${od.icon} Tipo de Operacion: <strong>${c.tipo_operacion}</strong></div>
+                <div class="ext-detail-body">
+                    <div class="ext-detail-desc">${od.desc}</div>
+                    <div class="ext-detail-item"><strong>Senales detectadas:</strong> ${od.signals}</div>
+                    <div class="ext-detail-item"><strong>Que hacer:</strong> ${od.action}</div>
+                </div>
+            </div>
+
+            <div class="ext-detail-panel" id="ext-detail-financ">
+                <div class="ext-detail-header">${fid.icon} Financiamiento: <strong>${c.financiamiento.replace('_', ' ')}</strong></div>
+                <div class="ext-detail-body">
+                    <div class="ext-detail-desc">${fid.desc}</div>
+                    <div class="ext-detail-item"><strong>Senales detectadas:</strong> ${fid.signals}</div>
+                    <div class="ext-detail-item"><strong>Que hacer:</strong> ${fid.action}</div>
+                </div>
+            </div>
+        `;
 
         // Señales de compra
         if (c.senales_compra && c.senales_compra.length > 0) {
@@ -1639,6 +1954,16 @@ function renderLeadDetail(c) {
 function toggleLeadDetail(panelId) {
     const panel = document.getElementById(panelId);
     if (!panel) return;
+    panel.classList.toggle('open');
+}
+
+function toggleExtDetail(panelId) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    // Close other ext-detail panels
+    document.querySelectorAll('.ext-detail-panel').forEach(p => {
+        if (p.id !== panelId) p.classList.remove('open');
+    });
     panel.classList.toggle('open');
 }
 
