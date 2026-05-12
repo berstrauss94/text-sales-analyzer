@@ -317,6 +317,81 @@ HTML = """
             border-color: #4a6cf7;
         }
 
+        /* Save confirmation panel */
+        .save-confirmation {
+            margin-top: 12px;
+            padding: 12px 16px;
+            background: #111828;
+            border: 1px solid #1e2a40;
+            border-radius: 10px;
+        }
+        .save-conf-main {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .save-conf-icon { font-size: 1.1rem; }
+        .save-conf-text {
+            font-size: 0.82rem;
+            color: #ccc;
+            flex: 1;
+        }
+        .save-conf-text strong { color: #5bf5a3; }
+        .save-conf-btn {
+            background: transparent;
+            border: 1px solid #4a6cf7;
+            color: #4a6cf7;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .save-conf-btn:hover {
+            background: #111828;
+        }
+        .save-relocate-panel {
+            display: none;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #1e2130;
+        }
+        .save-relocate-panel.open { display: block; }
+        .save-relocate-desc {
+            font-size: 0.73rem;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        .save-relocate-selects {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .save-relocate-selects select {
+            background: #0d0f18;
+            color: #e0e0e0;
+            border: 1px solid #2a2d3e;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            outline: none;
+        }
+        .save-relocate-selects select:focus { border-color: #4a6cf7; }
+        .save-relocate-confirm {
+            background: #4a6cf7;
+            color: #fff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .save-relocate-confirm:hover { background: #3a5cd7; }
+
         .btn-row {
             display: flex;
             gap: 10px;
@@ -2084,6 +2159,7 @@ function renderResults(data, inputText) {
         </div>
         ${renderCommercial(data.commercial)}
         <div class="timestamp">Analizado el: ${data.analyzed_at}</div>
+        ${renderSaveConfirmation(data)}
     `;
     el.style.display = 'block';
 }
@@ -2368,6 +2444,86 @@ function toggleCardContent(contentId) {
     content.classList.toggle('closed');
     const arrow = document.getElementById(contentId.replace('-content', '-arrow'));
     if (arrow) arrow.classList.toggle('open');
+}
+
+function renderSaveConfirmation(data) {
+    const months = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    const savedYear = data.year || new Date().getFullYear();
+    const savedMonth = data.month || (new Date().getMonth() + 1);
+    const monthName = months[savedMonth] || '';
+
+    let yearOptions = '';
+    for (let y = 2026; y <= 2030; y++) {
+        yearOptions += `<option value="${y}" ${y == savedYear ? 'selected' : ''}>${y}</option>`;
+    }
+    let monthOptions = '';
+    for (let m = 1; m <= 12; m++) {
+        monthOptions += `<option value="${m}" ${m == savedMonth ? 'selected' : ''}>${months[m]}</option>`;
+    }
+
+    return `
+        <div class="save-confirmation">
+            <div class="save-conf-main">
+                <span class="save-conf-icon">📁</span>
+                <span class="save-conf-text">Guardado en: <strong>${monthName} ${savedYear}</strong></span>
+                <button class="save-conf-btn" onclick="toggleRelocate()">&#9998; Reubicar</button>
+            </div>
+            <div class="save-relocate-panel" id="relocatePanel">
+                <div class="save-relocate-desc">Mover este analisis a otro periodo:</div>
+                <div class="save-relocate-selects">
+                    <select id="relocateYear">${yearOptions}</select>
+                    <select id="relocateMonth">${monthOptions}</select>
+                    <button class="save-relocate-confirm" onclick="relocateEntry()">Mover</button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function toggleRelocate() {
+    const panel = document.getElementById('relocatePanel');
+    if (panel) panel.classList.toggle('open');
+}
+
+async function relocateEntry() {
+    const year = parseInt(document.getElementById('relocateYear').value);
+    const month = parseInt(document.getElementById('relocateMonth').value);
+    const months = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+    // Update the selectors at the top to match
+    document.getElementById('selectYear').value = year;
+    document.getElementById('selectMonth').value = month;
+
+    // Re-analyze with the new date
+    const text = document.getElementById('textInput').value.trim();
+    if (!text) return;
+
+    try {
+        const response = await fetch('/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, year, month })
+        });
+        const data = await response.json();
+        if (!data.error) {
+            // Update the confirmation display
+            const confText = document.querySelector('.save-conf-text');
+            if (confText) confText.innerHTML = `Guardado en: <strong>${months[month]} ${year}</strong>`;
+            const panel = document.getElementById('relocatePanel');
+            if (panel) panel.classList.remove('open');
+            // Show brief success feedback
+            const btn = document.querySelector('.save-relocate-confirm');
+            if (btn) {
+                btn.textContent = '✓ Movido';
+                btn.style.background = '#1a4a2a';
+                setTimeout(() => { btn.textContent = 'Mover'; btn.style.background = ''; }, 2000);
+            }
+            // Refresh history
+            if (typeof loadHistory === 'function') loadHistory();
+        }
+    } catch(e) {
+        console.error('Error relocating:', e);
+    }
 }
 
 function renderSentimentDetail(sentiment) {
