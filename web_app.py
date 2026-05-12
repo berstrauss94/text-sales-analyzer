@@ -667,6 +667,75 @@ HTML = """
         }
         .card-collapsible-content.open { display: block; }
 
+        /* Intent detail panel styles */
+        .intent-detail-panel {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #1e2130;
+        }
+        .intent-detail-header {
+            font-size: 0.9rem;
+            color: #e0e0e0;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .intent-detail-desc {
+            font-size: 0.78rem;
+            color: #aaa;
+            line-height: 1.5;
+            margin-bottom: 12px;
+        }
+        .intent-detail-section {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #0a0c14;
+            border-radius: 8px;
+            border: 1px solid #1a1d2e;
+        }
+        .intent-section-title {
+            font-size: 0.7rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        .intent-section-text {
+            font-size: 0.76rem;
+            color: #ccc;
+            line-height: 1.5;
+        }
+        .intent-seller-box {
+            border-left: 3px solid #4a6cf7;
+        }
+        .intent-tips-list {
+            margin: 0;
+            padding-left: 18px;
+            list-style: none;
+        }
+        .intent-tips-list li {
+            font-size: 0.74rem;
+            color: #bbb;
+            line-height: 1.6;
+            position: relative;
+            padding-left: 4px;
+        }
+        .intent-tips-list li::before {
+            content: "•";
+            color: #4a6cf7;
+            font-weight: bold;
+            position: absolute;
+            left: -14px;
+        }
+        .intent-next-step {
+            border-left: 3px solid #5bf5a3;
+            background: #0a140a;
+        }
+        .intent-next-step .intent-section-text {
+            color: #5bf5a3;
+            font-weight: 500;
+        }
+
         .full-width { grid-column: 1 / -1; }
 
         .error-card {
@@ -1758,6 +1827,60 @@ function renderResults(data, inputText) {
         }
     }
 
+    // Build intent detail panel
+    const intentDetail = {
+        'OFFER': {
+            icon: '🏷️',
+            desc: 'El texto contiene una oferta activa. Alguien esta presentando una propiedad o servicio para la venta.',
+            meaning: 'El emisor esta en modo de venta activa, presentando precio, condiciones o disponibilidad de un inmueble.',
+            forSeller: 'Si eres el vendedor: tu mensaje esta bien posicionado como oferta. Asegurate de incluir precio, ubicacion y diferenciadores. Si eres el comprador: evalua si la oferta se ajusta a tus necesidades.',
+            tips: ['Incluir precio claro y condiciones', 'Destacar beneficios unicos de la propiedad', 'Crear sentido de urgencia si es posible', 'Facilitar el siguiente paso (visita, llamada)'],
+            nextStep: 'Esperar respuesta del prospecto. Si no responde en 24-48hs, hacer seguimiento.'
+        },
+        'INQUIRY': {
+            icon: '❓',
+            desc: 'El texto contiene preguntas o solicitudes de informacion. Alguien quiere saber mas.',
+            meaning: 'El emisor esta interesado pero necesita mas datos antes de avanzar. Esta en etapa de evaluacion.',
+            forSeller: 'El prospecto esta mostrando interes real. Cada pregunta es una oportunidad para acercarlo al cierre. Responde rapido y con informacion completa.',
+            tips: ['Responder todas las preguntas de forma clara y completa', 'Agregar informacion adicional que anticipe futuras dudas', 'Incluir fotos, planos o documentos relevantes', 'Proponer una visita o llamada para profundizar'],
+            nextStep: 'Responder con toda la informacion solicitada y proponer una accion concreta (visita, llamada).'
+        },
+        'NEGOTIATION': {
+            icon: '⚖️',
+            desc: 'El texto contiene elementos de negociacion. Se estan discutiendo terminos, precios o condiciones.',
+            meaning: 'Las partes estan activamente negociando. Esto indica interes real y cercania al cierre.',
+            forSeller: 'La negociacion es una senal muy positiva: el cliente quiere comprar, solo esta ajustando condiciones. No pierdas este momentum.',
+            tips: ['Mantener firmeza en los puntos clave pero mostrar flexibilidad en secundarios', 'Ofrecer alternativas en vez de solo decir no', 'Crear urgencia: "esta oferta es valida hasta..."', 'Buscar el win-win para cerrar mas rapido'],
+            nextStep: 'Presentar contraoferta o aceptar condiciones. No dejar pasar mas de 24hs sin responder.'
+        },
+        'CLOSING': {
+            icon: '✅',
+            desc: 'El texto indica que se esta cerrando o ya se cerro una operacion. Hay acuerdo entre las partes.',
+            meaning: 'La venta esta practicamente cerrada. Se mencionan firmas, acuerdos finales o confirmaciones.',
+            forSeller: 'Felicidades, estas en la recta final. Asegurate de que todos los documentos esten en orden y no haya sorpresas de ultimo momento.',
+            tips: ['Confirmar todos los terminos por escrito', 'Coordinar firma y entrega de documentos', 'Preparar la documentacion legal necesaria', 'Planificar el seguimiento post-venta y solicitar referidos'],
+            nextStep: 'Coordinar firma, verificar documentacion y planificar entrega. Solicitar referidos.'
+        },
+        'DESCRIPTION': {
+            icon: '📝',
+            desc: 'El texto es principalmente descriptivo. Detalla caracteristicas de una propiedad o situacion.',
+            meaning: 'Se esta presentando informacion factual sobre un inmueble: metraje, habitaciones, ubicacion, amenidades.',
+            forSeller: 'Las descripciones son la base de la venta. Asegurate de que sean atractivas, completas y destaquen los diferenciadores.',
+            tips: ['Destacar los 3-5 beneficios principales primero', 'Usar numeros concretos (m2, habitaciones, precio)', 'Incluir la ubicacion y sus ventajas', 'Mencionar amenidades y valor agregado'],
+            nextStep: 'Compartir la descripcion con prospectos calificados y medir el interes generado.'
+        },
+        'UNKNOWN': {
+            icon: '🔍',
+            desc: 'No se pudo determinar una intencion clara del texto con suficiente confianza.',
+            meaning: 'El texto puede ser ambiguo, muy corto, o no encaja claramente en ninguna categoria de venta.',
+            forSeller: 'El texto no tiene una intencion comercial clara. Puede ser una conversacion casual o un mensaje incompleto.',
+            tips: ['Revisar si el texto esta completo', 'Buscar el contexto de la conversacion', 'Hacer preguntas para clarificar la intencion del interlocutor'],
+            nextStep: 'Solicitar mas contexto o informacion al interlocutor.'
+        }
+    };
+
+    const iDetail = intentDetail[data.intent] || intentDetail['UNKNOWN'];
+
     el.innerHTML = `
         <div class="input-preview">"${preview}"</div>
         <div class="result-grid">
@@ -1768,6 +1891,28 @@ function renderResults(data, inputText) {
                 <div class="card-collapsible-content" id="intencion-content">
                     <span class="badge badge-${data.intent}">${intentEs}</span>
                     ${confBar(data.intent_confidence)}
+                    <div class="intent-detail-panel">
+                        <div class="intent-detail-header">${iDetail.icon} ${intentEs}</div>
+                        <div class="intent-detail-desc">${iDetail.desc}</div>
+                        <div class="intent-detail-section">
+                            <div class="intent-section-title">Que significa para la venta</div>
+                            <div class="intent-section-text">${iDetail.meaning}</div>
+                        </div>
+                        <div class="intent-detail-section intent-seller-box">
+                            <div class="intent-section-title">👤 Para el vendedor</div>
+                            <div class="intent-section-text">${iDetail.forSeller}</div>
+                        </div>
+                        <div class="intent-detail-section">
+                            <div class="intent-section-title">💡 Tips practicos</div>
+                            <ul class="intent-tips-list">
+                                ${iDetail.tips.map(t => `<li>${t}</li>`).join('')}
+                            </ul>
+                        </div>
+                        <div class="intent-detail-section intent-next-step">
+                            <div class="intent-section-title">▶️ Siguiente paso</div>
+                            <div class="intent-section-text">${iDetail.nextStep}</div>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="card">
