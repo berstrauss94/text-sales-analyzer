@@ -3,7 +3,7 @@ Fecha de registro : 2026-05-02 19:04:08 UTC
 
 --- DATOS DE ACCESO ---
 Usuario           : FernandezCeci
-Contrasena (hash) : 245a48115c4421369da8c07128a637f04fa6aa07806627bc88113ce8393358d2
+Contrasena (hash) : 3074c554eca8fdb5a82e00782db8854cbd1bd3890f0db2ed893f12492fce5f39
 
 --- DATOS PERSONALES ---
 Nombre            : Cecilia
