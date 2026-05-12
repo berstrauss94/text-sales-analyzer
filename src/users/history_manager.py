@@ -204,6 +204,7 @@ def add_entry(
     users_dir: str = USERS_DIR,
     year: int | None = None,
     month: int | None = None,
+    entry_name: str = "",
 ) -> dict:
     """
     Add an analysis entry to the user's history.
@@ -213,18 +214,19 @@ def add_entry(
     now = datetime.now(timezone.utc)
     # If year/month provided, use them for categorization but keep real timestamp
     if year and month:
-        # Create a datetime with the specified year/month for categorization
         cat_date = datetime(year, month, now.day if now.day <= 28 else 28,
                            now.hour, now.minute, now.second, tzinfo=timezone.utc)
     else:
         cat_date = now
 
     entry = _build_entry(username, text, analysis, source, audio_filename, now)
-    # Add year/month metadata to entry
+    # Add year/month/name metadata to entry
     if year:
         entry["year"] = year
     if month:
         entry["month"] = month
+    if entry_name:
+        entry["entry_name"] = entry_name
 
     if _is_pg_available():
         _pg_add_entry(entry, username)

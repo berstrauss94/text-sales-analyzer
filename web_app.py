@@ -392,6 +392,102 @@ HTML = """
         }
         .save-relocate-confirm:hover { background: #3a5cd7; }
 
+        /* Save name input */
+        .save-name-row {
+            margin-bottom: 6px;
+        }
+        .save-name-input {
+            width: 100%;
+            background: #0d0f18;
+            color: #e0e0e0;
+            border: 1px solid #2a2d3e;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.82rem;
+            outline: none;
+        }
+        .save-name-input:focus { border-color: #4a6cf7; }
+
+        /* Saved texts button and panel */
+        .saved-texts-btn {
+            background: #0d0f18;
+            color: #e0e0e0;
+            border: 1px solid #2a2d3e;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            white-space: nowrap;
+        }
+        .saved-texts-btn:hover { border-color: #4a6cf7; }
+        .saved-texts-panel {
+            display: none;
+            margin-top: 10px;
+            padding: 12px;
+            background: #0a0c14;
+            border: 1px solid #1e2a40;
+            border-radius: 10px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        .saved-texts-panel.open { display: block; }
+        .saved-texts-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 0.78rem;
+            color: #888;
+            font-weight: 600;
+        }
+        .saved-texts-close {
+            background: none;
+            border: none;
+            color: #666;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .saved-texts-close:hover { color: #f55b5b; }
+        .saved-text-item {
+            padding: 8px 10px;
+            background: #111828;
+            border: 1px solid #1e2130;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .saved-text-item:hover { border-color: #4a6cf7; }
+        .saved-text-name {
+            font-size: 0.8rem;
+            color: #e0e0e0;
+            font-weight: 500;
+            margin-bottom: 3px;
+        }
+        .saved-text-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.68rem;
+            color: #666;
+        }
+        .st-badge {
+            background: #1a2a3a;
+            color: #5bd4f5;
+            padding: 1px 6px;
+            border-radius: 8px;
+            font-size: 0.62rem;
+        }
+        .saved-text-time { color: #555; }
+        .saved-texts-empty {
+            font-size: 0.78rem;
+            color: #555;
+            font-style: italic;
+            text-align: center;
+            padding: 12px;
+        }
+
         .btn-row {
             display: flex;
             gap: 10px;
@@ -1488,7 +1584,7 @@ HTML = """
         <div class="date-selectors">
             <div class="date-select-group">
                 <label for="selectYear">Año</label>
-                <select id="selectYear">
+                <select id="selectYear" onchange="loadSavedTexts()">
                     <option value="2026" selected>2026</option>
                     <option value="2027">2027</option>
                     <option value="2028">2028</option>
@@ -1498,7 +1594,7 @@ HTML = """
             </div>
             <div class="date-select-group">
                 <label for="selectMonth">Mes</label>
-                <select id="selectMonth">
+                <select id="selectMonth" onchange="loadSavedTexts()">
                     <option value="1">Enero</option>
                     <option value="2">Febrero</option>
                     <option value="3">Marzo</option>
@@ -1513,7 +1609,22 @@ HTML = """
                     <option value="12">Diciembre</option>
                 </select>
             </div>
+            <div class="date-select-group">
+                <label>Textos</label>
+                <button class="saved-texts-btn" onclick="toggleSavedTexts()">📄 Ver textos <span id="savedTextsCount">(0)</span></button>
+            </div>
         </div>
+
+        <div class="saved-texts-panel" id="savedTextsPanel">
+            <div class="saved-texts-header">
+                <span>📄 Textos guardados en este periodo</span>
+                <button class="saved-texts-close" onclick="toggleSavedTexts()">✕</button>
+            </div>
+            <div class="saved-texts-list" id="savedTextsList">
+                <div class="saved-texts-empty">Selecciona un periodo para ver los textos guardados.</div>
+            </div>
+        </div>
+
         <textarea id="textInput"
             placeholder="O escribe / pega aqui el texto que quieres analizar...&#10;&#10;Ejemplo: Ofrezco apartamento de 3 habitaciones en USD 180,000 negociable, zona norte, 95 m2."></textarea>
         <div class="btn-row">
@@ -2452,6 +2563,9 @@ function renderSaveConfirmation(data) {
     const savedMonth = data.month || (new Date().getMonth() + 1);
     const monthName = months[savedMonth] || '';
 
+    // Generate a default name from the first words of the text
+    const defaultName = (data.input_text || '').substring(0, 40).replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s]/g, '').trim() + '...';
+
     let yearOptions = '';
     for (let y = 2026; y <= 2030; y++) {
         yearOptions += `<option value="${y}" ${y == savedYear ? 'selected' : ''}>${y}</option>`;
@@ -2466,14 +2580,18 @@ function renderSaveConfirmation(data) {
             <div class="save-conf-main">
                 <span class="save-conf-icon">📁</span>
                 <span class="save-conf-text">Guardado en: <strong>${monthName} ${savedYear}</strong></span>
-                <button class="save-conf-btn" onclick="toggleRelocate()">&#9998; Reubicar</button>
+                <button class="save-conf-btn" onclick="toggleRelocate()">&#9998; Editar</button>
             </div>
             <div class="save-relocate-panel" id="relocatePanel">
-                <div class="save-relocate-desc">Mover este analisis a otro periodo:</div>
+                <div class="save-relocate-desc">Nombre del texto (para identificarlo):</div>
+                <div class="save-name-row">
+                    <input type="text" id="entryName" class="save-name-input" value="${defaultName}" placeholder="Nombre del texto...">
+                </div>
+                <div class="save-relocate-desc" style="margin-top:8px;">Periodo:</div>
                 <div class="save-relocate-selects">
                     <select id="relocateYear">${yearOptions}</select>
                     <select id="relocateMonth">${monthOptions}</select>
-                    <button class="save-relocate-confirm" onclick="relocateEntry()">Mover</button>
+                    <button class="save-relocate-confirm" onclick="saveWithName()">💾 Guardar</button>
                 </div>
             </div>
         </div>
@@ -2485,16 +2603,16 @@ function toggleRelocate() {
     if (panel) panel.classList.toggle('open');
 }
 
-async function relocateEntry() {
+async function saveWithName() {
     const year = parseInt(document.getElementById('relocateYear').value);
     const month = parseInt(document.getElementById('relocateMonth').value);
+    const name = document.getElementById('entryName').value.trim() || 'Sin nombre';
     const months = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
     // Update the selectors at the top to match
     document.getElementById('selectYear').value = year;
     document.getElementById('selectMonth').value = month;
 
-    // Re-analyze with the new date
     const text = document.getElementById('textInput').value.trim();
     if (!text) return;
 
@@ -2502,27 +2620,77 @@ async function relocateEntry() {
         const response = await fetch('/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, year, month })
+            body: JSON.stringify({ text, year, month, entry_name: name })
         });
         const data = await response.json();
         if (!data.error) {
-            // Update the confirmation display
             const confText = document.querySelector('.save-conf-text');
-            if (confText) confText.innerHTML = `Guardado en: <strong>${months[month]} ${year}</strong>`;
+            if (confText) confText.innerHTML = `Guardado en: <strong>${months[month]} ${year}</strong> como "<em>${name}</em>"`;
             const panel = document.getElementById('relocatePanel');
             if (panel) panel.classList.remove('open');
-            // Show brief success feedback
             const btn = document.querySelector('.save-relocate-confirm');
             if (btn) {
-                btn.textContent = '✓ Movido';
+                btn.textContent = '✓ Guardado';
                 btn.style.background = '#1a4a2a';
-                setTimeout(() => { btn.textContent = 'Mover'; btn.style.background = ''; }, 2000);
+                setTimeout(() => { btn.textContent = '💾 Guardar'; btn.style.background = ''; }, 2000);
             }
-            // Refresh history
             if (typeof loadHistory === 'function') loadHistory();
+            loadSavedTexts();
         }
     } catch(e) {
-        console.error('Error relocating:', e);
+        console.error('Error saving:', e);
+    }
+}
+
+function toggleSavedTexts() {
+    const panel = document.getElementById('savedTextsPanel');
+    if (panel) {
+        panel.classList.toggle('open');
+        if (panel.classList.contains('open')) loadSavedTexts();
+    }
+}
+
+async function loadSavedTexts() {
+    const year = document.getElementById('selectYear').value;
+    const month = document.getElementById('selectMonth').value;
+    const months = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+    try {
+        const response = await fetch(`/saved-texts?year=${year}&month=${month}`);
+        const data = await response.json();
+        const list = document.getElementById('savedTextsList');
+        const count = document.getElementById('savedTextsCount');
+
+        if (data.entries && data.entries.length > 0) {
+            count.textContent = `(${data.entries.length})`;
+            list.innerHTML = data.entries.map(e => {
+                const preview = (e.text || '').substring(0, 60) + '...';
+                const intentBadge = e.intent ? `<span class="st-badge">${e.intent}</span>` : '';
+                return `<div class="saved-text-item" onclick="loadSavedText('${e.id}')">
+                    <div class="saved-text-name">${e.entry_name || preview}</div>
+                    <div class="saved-text-meta">${intentBadge} <span class="saved-text-time">${e.timestamp || ''}</span></div>
+                </div>`;
+            }).join('');
+        } else {
+            count.textContent = '(0)';
+            list.innerHTML = `<div class="saved-texts-empty">No hay textos guardados en ${months[month]} ${year}.</div>`;
+        }
+    } catch(e) {
+        console.error('Error loading saved texts:', e);
+    }
+}
+
+async function loadSavedText(entryId) {
+    // Load a saved text into the textarea for re-analysis
+    try {
+        const response = await fetch(`/saved-text/${entryId}`);
+        const data = await response.json();
+        if (data.text) {
+            document.getElementById('textInput').value = data.text;
+            toggleSavedTexts();
+        }
+    } catch(e) {
+        console.error('Error loading text:', e);
     }
 }
 
@@ -3357,6 +3525,7 @@ def analyze():
     # Save to history
     year = data.get("year")
     month = data.get("month")
+    entry_name = data.get("entry_name", "")
     add_entry(
         username=session["username"],
         text=data["text"],
@@ -3364,6 +3533,7 @@ def analyze():
         source="text",
         year=year,
         month=month,
+        entry_name=entry_name,
     )
 
     return jsonify({
@@ -3374,6 +3544,48 @@ def analyze():
         "month": month,
         **analysis_dict,
     })
+
+
+@app.route("/saved-texts")
+def saved_texts():
+    """Return entries filtered by year/month for the saved texts panel."""
+    if not session.get("username"):
+        return jsonify({"entries": []}), 401
+
+    year = request.args.get("year", type=int)
+    month = request.args.get("month", type=int)
+
+    entries = get_flat_entries(session["username"], limit=100)
+
+    # Filter by year/month
+    filtered = []
+    for e in entries:
+        e_year = e.get("year")
+        e_month = e.get("month")
+        if e_year == year and e_month == month:
+            filtered.append({
+                "id": e.get("id", ""),
+                "entry_name": e.get("entry_name", ""),
+                "text": (e.get("text", "") or "")[:60],
+                "intent": e.get("intent", ""),
+                "timestamp": e.get("timestamp", "")[:10],
+            })
+
+    return jsonify({"entries": filtered})
+
+
+@app.route("/saved-text/<entry_id>")
+def saved_text(entry_id):
+    """Return the full text of a saved entry."""
+    if not session.get("username"):
+        return jsonify({"error": "unauthorized"}), 401
+
+    entries = get_flat_entries(session["username"], limit=200)
+    for e in entries:
+        if e.get("id") == entry_id:
+            return jsonify({"text": e.get("text_full", e.get("text", ""))})
+
+    return jsonify({"text": ""}), 404
 
 
 @app.route("/upload-audio", methods=["POST"])
