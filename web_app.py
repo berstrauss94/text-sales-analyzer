@@ -417,6 +417,94 @@ HTML = """
 
         .entity-numeric { color: #5bf5a3; font-size: 0.8rem; }
 
+        /* Extended data extraction styles */
+        .ext-data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 6px;
+            margin: 12px 0;
+            padding-top: 10px;
+            border-top: 1px solid #1e2130;
+        }
+        .ext-data-pill {
+            background: #0d0f18;
+            border: 1px solid #1e2130;
+            border-radius: 8px;
+            padding: 8px 10px;
+            text-align: center;
+        }
+        .ext-pill-label {
+            display: block;
+            font-size: 0.6rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 3px;
+        }
+        .ext-pill-value {
+            display: block;
+            font-size: 0.75rem;
+            color: #e0e0e0;
+            font-weight: 600;
+        }
+        .ext-data-row {
+            margin-top: 10px;
+            padding: 8px 10px;
+            background: #0a0c14;
+            border-radius: 6px;
+            border: 1px solid #1a1d2e;
+        }
+        .ext-row-label {
+            display: block;
+            font-size: 0.68rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        .ext-row-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .ext-tag {
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.68rem;
+        }
+        .ext-tag-green { background: #0d2818; color: #5bf5a3; border: 1px solid #1a4a2a; }
+        .ext-tag-red { background: #2a0d0d; color: #f55b5b; border: 1px solid #4a1a1a; }
+        .ext-tag-purple { background: #1a0d2a; color: #a35bf5; border: 1px solid #2a1a4a; }
+        .ext-tag-blue { background: #0d1a2a; color: #5b9ef5; border: 1px solid #1a2a4a; }
+        .ext-row-questions {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .ext-question {
+            font-size: 0.72rem;
+            color: #aaa;
+            font-style: italic;
+            padding: 3px 8px;
+            background: #111320;
+            border-radius: 4px;
+            border-left: 2px solid #4a6cf7;
+        }
+        .ext-summary-row { border-left: 3px solid #4a6cf7; }
+        .ext-summary-text {
+            font-size: 0.76rem;
+            color: #ccc;
+            line-height: 1.5;
+        }
+        .ext-action-row { border-left: 3px solid #5bf5a3; background: #0a140a; }
+        .ext-action-text {
+            font-size: 0.78rem;
+            color: #5bf5a3;
+            font-weight: 500;
+            line-height: 1.4;
+        }
+
         .empty-msg { color: #555; font-size: 0.85rem; font-style: italic; }
 
         .full-width { grid-column: 1 / -1; }
@@ -1168,6 +1256,95 @@ function renderResults(data, inputText) {
         entitiesHtml = '<span class="empty-msg">Ninguna detectada</span>';
     }
 
+    // Build extended data section
+    const c = data.commercial || {};
+    let extDataHtml = '';
+    if (c) {
+        const funnelLabels = {
+            'AWARENESS': '🔍 Conocimiento', 'CONSIDERATION': '⚖️ Evaluacion',
+            'DECISION': '🎯 Decision', 'CLOSED': '✅ Cerrado'
+        };
+        const urgLabels = {
+            'BAJA': '🟢 Baja', 'MEDIA': '🟡 Media', 'ALTA': '🟠 Alta', 'CRITICA': '🔴 Critica'
+        };
+        const compLabels = {
+            'BAJO': '⬜ Bajo', 'MEDIO': '🟨 Medio', 'ALTO': '🟩 Alto'
+        };
+        const opLabels = {
+            'VENTA': '🏷️ Compra-Venta', 'ALQUILER': '🔑 Alquiler',
+            'INVERSION': '📈 Inversion', 'INDEFINIDO': '—'
+        };
+        const finLabels = {
+            'CONTADO': '💵 Contado', 'CREDITO': '🏦 Credito',
+            'FINANCIAMIENTO_DIRECTO': '🤝 Directo', 'NO_DETECTADO': '—'
+        };
+
+        extDataHtml = `
+            <div class="ext-data-grid">
+                <div class="ext-data-pill"><span class="ext-pill-label">Funnel</span><span class="ext-pill-value">${funnelLabels[c.etapa_funnel] || c.etapa_funnel || '—'}</span></div>
+                <div class="ext-data-pill"><span class="ext-pill-label">Urgencia</span><span class="ext-pill-value">${urgLabels[c.urgencia] || c.urgencia || '—'}</span></div>
+                <div class="ext-data-pill"><span class="ext-pill-label">Compromiso</span><span class="ext-pill-value">${compLabels[c.nivel_compromiso] || c.nivel_compromiso || '—'}</span></div>
+                <div class="ext-data-pill"><span class="ext-pill-label">Operacion</span><span class="ext-pill-value">${opLabels[c.tipo_operacion] || c.tipo_operacion || '—'}</span></div>
+                <div class="ext-data-pill"><span class="ext-pill-label">Financiamiento</span><span class="ext-pill-value">${finLabels[c.financiamiento] || c.financiamiento || '—'}</span></div>
+            </div>`;
+
+        // Señales de compra
+        if (c.senales_compra && c.senales_compra.length > 0) {
+            extDataHtml += `<div class="ext-data-row">
+                <span class="ext-row-label">🛒 Senales de compra</span>
+                <div class="ext-row-tags">${c.senales_compra.map(s => `<span class="ext-tag ext-tag-green">${s}</span>`).join('')}</div>
+            </div>`;
+        }
+
+        // Objeciones específicas
+        if (c.objeciones_especificas && c.objeciones_especificas.length > 0) {
+            extDataHtml += `<div class="ext-data-row">
+                <span class="ext-row-label">⚠️ Objeciones</span>
+                <div class="ext-row-tags">${c.objeciones_especificas.map(o => `<span class="ext-tag ext-tag-red">${o}</span>`).join('')}</div>
+            </div>`;
+        }
+
+        // Técnicas de persuasión
+        if (c.tecnicas_persuasion && c.tecnicas_persuasion.length > 0) {
+            extDataHtml += `<div class="ext-data-row">
+                <span class="ext-row-label">🧠 Persuasion</span>
+                <div class="ext-row-tags">${c.tecnicas_persuasion.map(t => `<span class="ext-tag ext-tag-purple">${t}</span>`).join('')}</div>
+            </div>`;
+        }
+
+        // Preguntas abiertas
+        if (c.preguntas_abiertas && c.preguntas_abiertas.length > 0) {
+            extDataHtml += `<div class="ext-data-row">
+                <span class="ext-row-label">❓ Preguntas abiertas</span>
+                <div class="ext-row-questions">${c.preguntas_abiertas.map(q => `<div class="ext-question">"${q}"</div>`).join('')}</div>
+            </div>`;
+        }
+
+        // Keywords
+        if (c.keywords && c.keywords.length > 0) {
+            extDataHtml += `<div class="ext-data-row">
+                <span class="ext-row-label">🔑 Keywords</span>
+                <div class="ext-row-tags">${c.keywords.map(k => `<span class="ext-tag ext-tag-blue">${k}</span>`).join('')}</div>
+            </div>`;
+        }
+
+        // Resumen
+        if (c.resumen) {
+            extDataHtml += `<div class="ext-data-row ext-summary-row">
+                <span class="ext-row-label">📋 Resumen del analisis</span>
+                <div class="ext-summary-text">${c.resumen}</div>
+            </div>`;
+        }
+
+        // Acción siguiente
+        if (c.accion_siguiente) {
+            extDataHtml += `<div class="ext-data-row ext-action-row">
+                <span class="ext-row-label">▶️ Accion siguiente</span>
+                <div class="ext-action-text">${c.accion_siguiente}</div>
+            </div>`;
+        }
+    }
+
     el.innerHTML = `
         <div class="input-preview">"${preview}"</div>
         <div class="result-grid">
@@ -1192,6 +1369,7 @@ function renderResults(data, inputText) {
             <div class="card full-width">
                 <div class="card-title">Datos Extraidos del Texto</div>
                 ${entitiesHtml}
+                ${extDataHtml}
             </div>
         </div>
         ${renderCommercial(data.commercial)}
