@@ -202,18 +202,34 @@ def add_entry(
     source: str = "text",
     audio_filename: str = "",
     users_dir: str = USERS_DIR,
+    year: int | None = None,
+    month: int | None = None,
 ) -> dict:
     """
     Add an analysis entry to the user's history.
+    If year/month are provided, they override the entry's date for categorization.
     Returns the entry dict that was saved.
     """
     now = datetime.now(timezone.utc)
+    # If year/month provided, use them for categorization but keep real timestamp
+    if year and month:
+        # Create a datetime with the specified year/month for categorization
+        cat_date = datetime(year, month, now.day if now.day <= 28 else 28,
+                           now.hour, now.minute, now.second, tzinfo=timezone.utc)
+    else:
+        cat_date = now
+
     entry = _build_entry(username, text, analysis, source, audio_filename, now)
+    # Add year/month metadata to entry
+    if year:
+        entry["year"] = year
+    if month:
+        entry["month"] = month
 
     if _is_pg_available():
         _pg_add_entry(entry, username)
     else:
-        _json_add_entry(username, entry, now, users_dir)
+        _json_add_entry(username, entry, cat_date, users_dir)
 
     return entry
 
