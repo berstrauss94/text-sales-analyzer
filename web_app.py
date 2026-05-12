@@ -36,29 +36,48 @@ audio_transcriber = AudioTranscriber(model_name="base")
 
 # Load analyzer once at startup
 print("Loading models...")
-try:
-    analyzer = create_analyzer()
-    # Quick sanity check: run a test analysis to verify models work
-    _test = analyzer.analyze("Test de verificacion de modelos.")
-    if hasattr(_test, 'error_code') and _test.error_code == "ANALYSIS_ERROR":
-        raise RuntimeError(f"Models loaded but analysis failed: {_test.error_message}")
-    print("Models loaded successfully.")
-except Exception as exc:
-    print(f"Models could not be loaded: {exc}")
-    print("Training models now (this may take a minute)...")
+
+def _train_models():
+    """Train models from scratch using the training data."""
     import subprocess
     result = subprocess.run(
         ["python", "-m", "src.training.train_models"],
         capture_output=True, text=True
     )
     if result.returncode != 0:
-        print("Training failed:", result.stderr)
+        print("Training stdout:", result.stdout)
+        print("Training stderr:", result.stderr)
         raise RuntimeError(
-            "Could not load or train models. "
-            "Run 'python -m src.training.train_models' locally and commit the models/ directory."
+            "Could not train models. "
+            "Run 'python -m src.training.train_models' locally."
         )
+
+# In production (Railway), always retrain to avoid version mismatch issues
+_is_production = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("PORT"))
+
+if _is_production:
+    print("Production environment detected. Training models fresh...")
+    _train_models()
     analyzer = create_analyzer()
-    print("Models trained and loaded.")
+    # Sanity check
+    _test = analyzer.analyze("Test de verificacion de modelos.")
+    if hasattr(_test, 'error_code') and _test.error_code == "ANALYSIS_ERROR":
+        raise RuntimeError(f"Freshly trained models failed: {_test.error_message}")
+    print("Models trained and loaded successfully.")
+else:
+    try:
+        analyzer = create_analyzer()
+        # Quick sanity check: run a test analysis to verify models work
+        _test = analyzer.analyze("Test de verificacion de modelos.")
+        if hasattr(_test, 'error_code') and _test.error_code == "ANALYSIS_ERROR":
+            raise RuntimeError(f"Models loaded but analysis failed: {_test.error_message}")
+        print("Models loaded successfully.")
+    except Exception as exc:
+        print(f"Models could not be loaded: {exc}")
+        print("Training models now (this may take a minute)...")
+        _train_models()
+        analyzer = create_analyzer()
+        print("Models trained and loaded.")
 
 # ---------------------------------------------------------------------------
 # Sync Pipeline + Scheduler
