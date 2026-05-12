@@ -252,6 +252,42 @@ def _count_keyword(text: str, keyword: str) -> int:
     return len(re.findall(pattern, text))
 
 
+def _count_affirmative_si(text: str) -> int:
+    """
+    Count "si" only when it's a genuine affirmative response, NOT conditional.
+
+    Affirmative "si" patterns:
+    - At start of sentence: "Si, claro" / "Si." / "Si!"
+    - After punctuation: "? Si," / ". Si,"
+    - Standalone with comma/period: "si," / "si."
+
+    NOT affirmative (conditional/conjunction):
+    - "si tenes" / "si bien" / "si es que" / "si no" / "si hay"
+    - "es posible que si los..." (mid-sentence filler)
+    """
+    # Pattern: "si" that is followed by comma, period, exclamation, or end of string
+    # OR "si" at the very start of text followed by comma/space+affirmative
+    affirmative_patterns = [
+        # "Si," or "Si." or "Si!" at sentence start (after . ! ? or start of text)
+        r'(?:^|[.!?\n]\s*)si(?:\s*[,.]|\s*$)',
+        # "Si, " followed by anything (affirmative with comma)
+        r'(?:^|[.!?\n]\s*)si,\s',
+        # Standalone "si" as a complete sentence/response
+        r'(?:^|[.!?\n]\s*)si[.!]',
+    ]
+
+    count = 0
+    normalized = text.lower()
+    # Remove accents for matching
+    nfkd = unicodedata.normalize("NFKD", normalized)
+    normalized = "".join(c for c in nfkd if not unicodedata.combining(c))
+
+    for pattern in affirmative_patterns:
+        count += len(re.findall(pattern, normalized, re.MULTILINE))
+
+    return count
+
+
 def _count_total_words(text: str) -> int:
     """Count total words in text."""
     return len(re.findall(r'\b\w+\b', text))
@@ -319,7 +355,15 @@ class CommercialAnalyzer:
             word_counts: dict[str, int] = {}
             total = 0
             for kw in keywords:
-                count = _count_keyword(normalized, kw)
+                # Special handling for "si" in respuestas_afirmativas:
+                # Only count when it's a genuine affirmative response
+                if group == "respuestas_afirmativas" and kw == "si":
+                    count = _count_affirmative_si(text)
+                elif group == "respuestas_afirmativas" and kw == "yes":
+                    # "yes" is almost always affirmative in this context
+                    count = _count_keyword(normalized, kw)
+                else:
+                    count = _count_keyword(normalized, kw)
                 if count > 0:
                     word_counts[kw] = count
                     total += count

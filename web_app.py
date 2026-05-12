@@ -391,6 +391,17 @@ HTML = """
             transition: background 0.2s;
         }
         .save-relocate-confirm:hover { background: #3a5cd7; }
+        .save-delete-btn {
+            background: transparent;
+            color: #f55b5b;
+            border: 1px solid #f55b5b;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .save-delete-btn:hover { background: #2a0d0d; }
 
         /* Save name input */
         .save-name-row {
@@ -455,15 +466,25 @@ HTML = """
             border: 1px solid #1e2130;
             border-radius: 6px;
             margin-bottom: 6px;
-            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
             transition: border-color 0.2s;
         }
         .saved-text-item:hover { border-color: #4a6cf7; }
+        .saved-text-row {
+            flex: 1;
+            cursor: pointer;
+            min-width: 0;
+        }
         .saved-text-name {
             font-size: 0.8rem;
             color: #e0e0e0;
             font-weight: 500;
             margin-bottom: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .saved-text-meta {
             display: flex;
@@ -472,6 +493,18 @@ HTML = """
             font-size: 0.68rem;
             color: #666;
         }
+        .saved-text-delete {
+            background: none;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            padding: 4px 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            opacity: 0.5;
+            transition: opacity 0.2s, border-color 0.2s;
+        }
+        .saved-text-item:hover .saved-text-delete { opacity: 1; }
+        .saved-text-delete:hover { border-color: #f55b5b; opacity: 1; }
         .st-badge {
             background: #1a2a3a;
             color: #5bd4f5;
@@ -2592,6 +2625,7 @@ function renderSaveConfirmation(data) {
                     <select id="relocateYear">${yearOptions}</select>
                     <select id="relocateMonth">${monthOptions}</select>
                     <button class="save-relocate-confirm" onclick="saveWithName()">💾 Guardar</button>
+                    <button class="save-delete-btn" onclick="deleteLastEntry()">🗑️ Eliminar</button>
                 </div>
             </div>
         </div>
@@ -2666,9 +2700,12 @@ async function loadSavedTexts() {
             list.innerHTML = data.entries.map(e => {
                 const preview = (e.text || '').substring(0, 60) + '...';
                 const intentBadge = e.intent ? `<span class="st-badge">${e.intent}</span>` : '';
-                return `<div class="saved-text-item" onclick="loadSavedText('${e.id}')">
-                    <div class="saved-text-name">${e.entry_name || preview}</div>
-                    <div class="saved-text-meta">${intentBadge} <span class="saved-text-time">${e.timestamp || ''}</span></div>
+                return `<div class="saved-text-item">
+                    <div class="saved-text-row" onclick="loadSavedText('${e.id}')">
+                        <div class="saved-text-name">${e.entry_name || preview}</div>
+                        <div class="saved-text-meta">${intentBadge} <span class="saved-text-time">${e.timestamp || ''}</span></div>
+                    </div>
+                    <button class="saved-text-delete" onclick="deleteSavedText('${e.id}')" title="Eliminar">🗑️</button>
                 </div>`;
             }).join('');
         } else {
@@ -2691,6 +2728,47 @@ async function loadSavedText(entryId) {
         }
     } catch(e) {
         console.error('Error loading text:', e);
+    }
+}
+
+async function deleteSavedText(entryId) {
+    if (!confirm('Eliminar este texto del historial?')) return;
+    try {
+        const response = await fetch(`/delete-entry/${entryId}`, { method: 'DELETE' });
+        const data = await response.json();
+        if (data.success) {
+            loadSavedTexts();
+            if (typeof loadHistory === 'function') loadHistory();
+        }
+    } catch(e) {
+        console.error('Error deleting:', e);
+    }
+}
+
+async function deleteLastEntry() {
+    if (!confirm('¿Eliminar este texto del historial? Esta accion no se puede deshacer.')) return;
+
+    try {
+        const response = await fetch('/delete-last-entry', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        if (data.success) {
+            // Hide the save confirmation
+            const conf = document.querySelector('.save-confirmation');
+            if (conf) {
+                conf.innerHTML = '<div style="color:#f55b5b; font-size:0.8rem; padding:8px;">🗑️ Texto eliminado del historial.</div>';
+                setTimeout(() => { conf.style.display = 'none'; }, 3000);
+            }
+            // Refresh history and saved texts
+            if (typeof loadHistory === 'function') loadHistory();
+            loadSavedTexts();
+        } else {
+            alert('No se pudo eliminar: ' + (data.message || 'Error desconocido'));
+        }
+    } catch(e) {
+        console.error('Error deleting:', e);
     }
 }
 
@@ -3574,6 +3652,25 @@ def saved_texts():
     return jsonify({"entries": filtered})
 
 
+@app.route("/delete-last-entry", methods=["POST"])
+def delete_last_entry():
+    """Delete the most recent entry from the user's history."""
+    if not session.get("username"):
+        return jsonify({"success": False, "message": "No autorizado"}), 401
+
+    try:
+        from src.users.history_manager import delete_entry
+        entries = get_flat_entries(session["username"], limit=1)
+        if entries:
+            entry_id = entries[0].get("id")
+            if entry_id:
+                delete_entry(session["username"], entry_id)
+                return jsonify({"success": True})
+        return jsonify({"success": False, "message": "No hay entradas para eliminar"})
+    except Exception as exc:
+        return jsonify({"success": False, "message": str(exc)})
+
+
 @app.route("/saved-text/<entry_id>")
 def saved_text(entry_id):
     """Return the full text of a saved entry."""
@@ -3586,6 +3683,19 @@ def saved_text(entry_id):
             return jsonify({"text": e.get("text_full", e.get("text", ""))})
 
     return jsonify({"text": ""}), 404
+
+
+@app.route("/delete-entry/<entry_id>", methods=["DELETE"])
+def delete_entry_route(entry_id):
+    """Delete a saved entry by ID."""
+    if not session.get("username"):
+        return jsonify({"error": "unauthorized"}), 401
+
+    from src.users.history_manager import delete_entry
+    success = delete_entry(session["username"], entry_id)
+    if success:
+        return jsonify({"success": True})
+    return jsonify({"success": False, "error": "Entry not found"}), 404
 
 
 @app.route("/upload-audio", methods=["POST"])

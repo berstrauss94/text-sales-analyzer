@@ -254,6 +254,81 @@ def get_flat_entries(
     return _json_get_flat(username, limit, users_dir)
 
 
+def delete_entry(username: str, entry_id: str, users_dir: str = USERS_DIR) -> bool:
+    """Delete an entry by ID from the user's history. Returns True if deleted."""
+    if _is_pg_available():
+        return _pg_delete_entry(username, entry_id)
+    return _json_delete_entry(username, entry_id, users_dir)
+
+
+def _pg_delete_entry(username: str, entry_id: str) -> bool:
+    """Delete an entry from PostgreSQL."""
+    conn = _get_pg_conn()
+    if conn is None:
+        return False
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM analysis_history WHERE username = %s AND id = %s",
+                (username, entry_id)
+            )
+            conn.commit()
+            return cur.rowcount > 0
+    except Exception as exc:
+        logger.error(f"PG delete error: {exc}")
+        conn.rollback()
+        return False
+
+
+def _json_delete_entry(username: str, entry_id: str, users_dir: str) -> bool:
+    """Delete an entry from JSON file storage."""
+    import json
+    history = _load_json(username, users_dir)
+    if not history:
+        return False
+
+    # Walk the nested tree and find/remove the entry
+    found = False
+    for year_key, months in list(history.items()):
+        if not isinstance(months, dict):
+            continue
+        for month_key, weeks in list(months.items()):
+            if not isinstance(weeks, dict):
+                continue
+            for week_key, days in list(weeks.items()):
+                if not isinstance(days, dict):
+                    continue
+                for day_key, day_data in list(days.items()):
+                    if not isinstance(day_data, dict):
+                        continue
+                    entries = day_data.get("entries", [])
+                    new_entries = [e for e in entries if e.get("id") != entry_id]
+                    if len(new_entries) < len(entries):
+                        day_data["entries"] = new_entries
+                        found = True
+                        break
+                if found:
+                    break
+            if found:
+                break
+        if found:
+            break
+
+    if found:
+        _save_json(username, history, users_dir)
+    return found
+
+
+def _save_json(username: str, data: dict, users_dir: str) -> None:
+    """Save the full history tree to JSON."""
+    import json
+    user_dir = os.path.join(users_dir, username)
+    path = os.path.join(user_dir, "history.json")
+    os.makedirs(user_dir, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
 # ---------------------------------------------------------------------------
 # PostgreSQL implementation
 # ---------------------------------------------------------------------------
