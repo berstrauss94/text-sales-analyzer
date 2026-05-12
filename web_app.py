@@ -3034,6 +3034,26 @@ function buildHighlightedText(text, words, indicatorKey) {
     // Find all match positions
     let matches = [];
     for (const word of words) {
+        // Special handling for "si" in respuestas_afirmativas:
+        // Only highlight affirmative "si" (at sentence start + comma/period/exclamation)
+        if (indicatorKey === 'respuestas_afirmativas' && word === 'si') {
+            const affirmativePatterns = [
+                /(?:^|[.!?\\n]\\s*)si(?:\\s*[,.]|\\s*$)/gim,
+                /(?:^|[.!?\\n]\\s*)si,\\s/gim,
+                /(?:^|[.!?\\n]\\s*)si[.!]/gim,
+            ];
+            for (const pattern of affirmativePatterns) {
+                let match;
+                while ((match = pattern.exec(normalizedText)) !== null) {
+                    // Find the actual "si" position within the match
+                    const siIdx = match[0].toLowerCase().indexOf('si');
+                    const start = match.index + siIdx;
+                    matches.push({ start: start, end: start + 2 });
+                }
+            }
+            continue;
+        }
+
         const normalizedWord = normalize(word);
         // Use word boundary matching
         const escapedWord = normalizedWord.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
