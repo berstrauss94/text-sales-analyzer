@@ -70,7 +70,16 @@ class MPCScraper:
     # ------------------------------------------------------------------
 
     def login(self) -> requests.Session:
-        """Realiza el login y retorna la sesión autenticada."""
+        """
+        Realiza el login completo (multi-paso) y retorna la sesión autenticada.
+        
+        Flujo:
+          1. GET /acceso.aspx → obtener ViewState
+          2. POST /acceso.aspx → login con usuario/contraseña
+          3. POST en página de empresas → seleccionar empresa (botón ACCEDER)
+          4. POST en página de módulos → acceder al módulo AUDITOR
+          5. GET /Administracion/GRABACIONAUDITORSUBE.aspx → página de grabaciones
+        """
         username, password = self._get_credentials()
         session = requests.Session()
         session.headers.update({
@@ -81,22 +90,70 @@ class MPCScraper:
             )
         })
 
-        # GET login page → obtener ViewState y tokens ASP.NET
+        # --- Paso 1: GET login page ---
         resp = session.get(LOGIN_URL, timeout=30)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
 
+        # --- Paso 2: POST login ---
         payload = self._extract_hidden_fields(soup)
         payload[_F_USUARIO]   = username
         payload[_F_PASSWORD]  = password
         payload[_F_BTN_LOGIN] = "Ingresar al Sistema"
 
-        resp = session.post(LOGIN_URL, data=payload, timeout=30)
+        resp = session.post(LOGIN_URL, data=payload, timeout=30, allow_redirects=True)
         resp.raise_for_status()
+        logger.info(f"Login POST completado. URL actual: {resp.url}")
 
-        # Verificar login exitoso: intentar acceder a la página de grabaciones
-        test = session.get(LIST_URL, timeout=30)
-        if "acceso.aspx" in test.url.lower():
+        # --- Paso 3: Seleccionar empresa (si estamos en página de empresas) ---
+        soup = BeautifulSoup(resp.text, "html.parser")
+        
+        # Buscar si hay un botón/link de "ACCEDER" para seleccionar empresa
+        acceder_btn = soup.find("input", {"value": lambda v: v and "ACCEDER" in v.upper()}) or \
+                      soup.find("input", {"type": "submit", "value": lambda v: v and "Acceder" in str(v)})
+        
+        if acceder_btn:
+            logger.info("Página de selección de empresa detectada. Seleccionando...")
+            payload = self._extract_hidden_fields(soup)
+            btn_name = acceder_btn.get("name", "")
+            if btn_name:
+                payload[btn_name] = acceder_btn.get("value", "ACCEDER")
+            resp = session.post(resp.url, data=payload, timeout=30, allow_redirects=True)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+            logger.info(f"Empresa seleccionada. URL actual: {resp.url}")
+        
+        # --- Paso 4: Acceder al módulo AUDITOR (si estamos en página de módulos) ---
+        # Buscar link o botón que lleve al módulo de grabaciones
+        modulo_link = soup.find("a", href=lambda h: h and "GRABACIONAUDITORSUBE" in h.upper()) if soup else None
+        modulo_btn = soup.find("input", {"value": lambda v: v and "Acceder" in str(v)}) if not modulo_link else None
+        
+        if modulo_link:
+            href = modulo_link.get("href", "")
+            if not href.startswith("http"):
+                href = BASE_URL + "/" + href.lstrip("/")
+            resp = session.get(href, timeout=30, allow_redirects=True)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+            logger.info(f"Módulo accedido via link. URL: {resp.url}")
+        elif modulo_btn:
+            payload = self._extract_hidden_fields(soup)
+            btn_name = modulo_btn.get("name", "")
+            if btn_name:
+                payload[btn_name] = modulo_btn.get("value", "Acceder")
+            resp = session.post(resp.url, data=payload, timeout=30, allow_redirects=True)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+            logger.info(f"Módulo accedido via botón. URL: {resp.url}")
+        
+        # --- Paso 5: Verificar que llegamos a la página de grabaciones ---
+        # Intentar acceder directamente si aún no estamos ahí
+        if "GRABACIONAUDITORSUBE" not in resp.url.upper():
+            resp = session.get(LIST_URL, timeout=30, allow_redirects=True)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+        
+        if "acceso.aspx" in resp.url.lower():
             raise PermissionError(
                 "Login fallido en miprimercasa.ar. "
                 "Verificar MPC_USERNAME y MPC_PASSWORD."
@@ -105,7 +162,7 @@ class MPCScraper:
         self._session = session
 
         # Construir mapa de periodos desde el dropdown
-        soup_list = BeautifulSoup(test.text, "html.parser")
+        soup_list = BeautifulSoup(resp.text, "html.parser")
         self._periodo_map = self._build_periodo_map(soup_list)
         logger.info(f"Login exitoso. Periodos disponibles: {list(self._periodo_map.keys())[:6]}...")
         return session
