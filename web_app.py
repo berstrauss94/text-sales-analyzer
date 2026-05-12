@@ -662,10 +662,10 @@ HTML = """
         .card-title-collapsible:hover .card-arrow { color: #4a6cf7; }
         .card-arrow.open { transform: rotate(180deg); }
         .card-collapsible-content {
-            display: none;
+            display: block;
             animation: slideDown 0.25s ease-out;
         }
-        .card-collapsible-content.open { display: block; }
+        .card-collapsible-content.closed { display: none; }
 
         /* Intent detail panel styles */
         .intent-detail-panel {
@@ -2299,7 +2299,7 @@ function toggleExtDetail(panelId) {
 function toggleCardContent(contentId) {
     const content = document.getElementById(contentId);
     if (!content) return;
-    content.classList.toggle('open');
+    content.classList.toggle('closed');
     const arrow = document.getElementById(contentId.replace('-content', '-arrow'));
     if (arrow) arrow.classList.toggle('open');
 }
@@ -2327,7 +2327,7 @@ function renderSentimentDetail(sentiment) {
             desc: 'El tono del texto es negativo. El emisor expresa insatisfaccion, preocupacion o rechazo.',
             meaning: 'Un sentimiento negativo indica problemas: objeciones no resueltas, expectativas no cumplidas o mala experiencia previa.',
             forSeller: 'Atencion: el cliente esta insatisfecho. Antes de vender, necesitas resolver el problema. Escucha activamente y valida sus preocupaciones.',
-            tips: ['Escuchar sin interrumpir ni justificar', 'Validar la preocupacion: "Entiendo su frustracion"', 'Ofrecer solucion concreta al problema planteado', 'No presionar la venta hasta resolver la objecion', 'Si es necesario, ofrecer alternativas o compensaciones'],
+            tips: ['Escuchar sin interrumpir ni justificar', 'Validar la preocupacion del cliente', 'Ofrecer solucion concreta al problema planteado', 'No presionar la venta hasta resolver la objecion', 'Si es necesario, ofrecer alternativas o compensaciones'],
             risk: 'Alto. Riesgo de perder al cliente si no se maneja bien.'
         }
     };
