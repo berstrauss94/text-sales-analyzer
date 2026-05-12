@@ -1762,22 +1762,38 @@ function renderResults(data, inputText) {
         <div class="input-preview">"${preview}"</div>
         <div class="result-grid">
             <div class="card">
-                <div class="card-title">Intencion del Texto</div>
-                <span class="badge badge-${data.intent}">${intentEs}</span>
-                ${confBar(data.intent_confidence)}
+                <div class="card-title card-title-collapsible" onclick="toggleCardContent('intencion-content')">
+                    Intencion del Texto &nbsp;<span class="card-arrow" id="intencion-arrow">&#9660;</span>
+                </div>
+                <div class="card-collapsible-content" id="intencion-content">
+                    <span class="badge badge-${data.intent}">${intentEs}</span>
+                    ${confBar(data.intent_confidence)}
+                </div>
             </div>
             <div class="card">
-                <div class="card-title">Sentimiento</div>
-                <span class="badge badge-${data.sentiment}">${sentimentEs}</span>
-                ${confBar(data.sentiment_confidence)}
+                <div class="card-title card-title-collapsible" onclick="toggleCardContent('sentimiento-content')">
+                    Sentimiento &nbsp;<span class="card-arrow" id="sentimiento-arrow">&#9660;</span>
+                </div>
+                <div class="card-collapsible-content" id="sentimiento-content">
+                    <span class="badge badge-${data.sentiment}">${sentimentEs}</span>
+                    ${confBar(data.sentiment_confidence)}
+                </div>
             </div>
             <div class="card">
-                <div class="card-title">Conceptos de Ventas Detectados</div>
-                ${salesHtml}
+                <div class="card-title card-title-collapsible" onclick="toggleCardContent('ventas-content')">
+                    Conceptos de Ventas Detectados &nbsp;<span class="card-arrow" id="ventas-arrow">&#9660;</span>
+                </div>
+                <div class="card-collapsible-content" id="ventas-content">
+                    ${salesHtml}
+                </div>
             </div>
             <div class="card">
-                <div class="card-title">Conceptos de Bienes Raices Detectados</div>
-                ${reHtml}
+                <div class="card-title card-title-collapsible" onclick="toggleCardContent('bienes-raices-content')">
+                    Conceptos de Bienes Raices Detectados &nbsp;<span class="card-arrow" id="bienes-raices-arrow">&#9660;</span>
+                </div>
+                <div class="card-collapsible-content" id="bienes-raices-content">
+                    ${reHtml}
+                </div>
             </div>
             <div class="card full-width">
                 <div class="card-title card-title-collapsible" onclick="toggleCardContent('datos-extraidos-content')">
