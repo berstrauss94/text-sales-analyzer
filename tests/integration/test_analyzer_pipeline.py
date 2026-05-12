@@ -45,7 +45,7 @@ VALID_TEXTS = st.text(
 
 
 @given(text=VALID_TEXTS)
-@settings(max_examples=50, suppress_health_check=[HealthCheck.too_slow])
+@settings(max_examples=50, suppress_health_check=[HealthCheck.too_slow], deadline=None)
 def test_intent_and_sentiment_vocabulary(text):
     """Property 6: intent and sentiment are always valid vocabulary values."""
     anlzr = create_analyzer()

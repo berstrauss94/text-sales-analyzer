@@ -38,9 +38,14 @@ audio_transcriber = AudioTranscriber(model_name="base")
 print("Loading models...")
 try:
     analyzer = create_analyzer()
+    # Quick sanity check: run a test analysis to verify models work
+    _test = analyzer.analyze("Test de verificacion de modelos.")
+    if hasattr(_test, 'error_code') and _test.error_code == "ANALYSIS_ERROR":
+        raise RuntimeError(f"Models loaded but analysis failed: {_test.error_message}")
     print("Models loaded successfully.")
-except FileNotFoundError:
-    print("Models not found. Training now (this may take a minute)...")
+except Exception as exc:
+    print(f"Models could not be loaded: {exc}")
+    print("Training models now (this may take a minute)...")
     import subprocess
     result = subprocess.run(
         ["python", "-m", "src.training.train_models"],
@@ -54,9 +59,6 @@ except FileNotFoundError:
         )
     analyzer = create_analyzer()
     print("Models trained and loaded.")
-except Exception as exc:
-    print(f"FATAL: Could not initialize analyzer: {exc}")
-    raise
 
 # ---------------------------------------------------------------------------
 # Sync Pipeline + Scheduler
@@ -1864,6 +1866,7 @@ def analyze():
     result = analyzer.analyze(data["text"])
 
     if isinstance(result, AnalysisError):
+        print(f"[ANALYSIS_ERROR] code={result.error_code} msg={result.error_message}")
         return jsonify({
             "error": True,
             "error_code": result.error_code,
