@@ -34,6 +34,48 @@ commercial_analyzer = CommercialAnalyzer()
 user_manager = UserManager()
 audio_transcriber = AudioTranscriber(model_name="base")
 
+
+def _build_commercial_dict(ca) -> dict:
+    """Build the commercial analysis dictionary for JSON response."""
+    return {
+        "palabras_positivas": ca.palabras_positivas,
+        "respuestas_afirmativas": ca.respuestas_afirmativas,
+        "indicios_cierre": ca.indicios_cierre,
+        "escasez_comercial": ca.escasez_comercial,
+        "pedidos_referidos": ca.pedidos_referidos,
+        "objeciones": ca.objeciones,
+        "indicios_prospeccion": ca.indicios_prospeccion,
+        "total_palabras": ca.total_palabras,
+        "densidad_comercial": ca.densidad_comercial,
+        "probabilidad_cierre": ca.probabilidad_cierre,
+        "tipo_lead": ca.tipo_lead,
+        "nivel_interes": ca.nivel_interes,
+        "tendencia_cierre": ca.tendencia_cierre,
+        "recomendacion": ca.recomendacion,
+        "detalle": ca.detalle,
+        "formula": {
+            "indicios_cierre_pts": ca.indicios_cierre * 5,
+            "respuestas_afirmativas_pts": ca.respuestas_afirmativas * 2,
+            "objeciones_pts": ca.objeciones * 3,
+            "puntaje_neto": (ca.indicios_cierre * 5) + (ca.respuestas_afirmativas * 2) - (ca.objeciones * 3),
+            "total_palabras": ca.total_palabras,
+            "para_caliente": max(0, round(70 - ca.probabilidad_cierre, 1)),
+            "para_tibio": max(0, round(40 - ca.probabilidad_cierre, 1)),
+        },
+        "etapa_funnel": ca.etapa_funnel,
+        "urgencia": ca.urgencia,
+        "nivel_compromiso": ca.nivel_compromiso,
+        "senales_compra": ca.senales_compra,
+        "objeciones_especificas": ca.objeciones_especificas,
+        "tipo_operacion": ca.tipo_operacion,
+        "financiamiento": ca.financiamiento,
+        "tecnicas_persuasion": ca.tecnicas_persuasion,
+        "preguntas_abiertas": ca.preguntas_abiertas,
+        "keywords": ca.keywords,
+        "resumen": ca.resumen,
+        "accion_siguiente": ca.accion_siguiente,
+    }
+
 # Load analyzer once at startup
 print("Loading models...")
 
@@ -668,6 +710,120 @@ HTML = """
         .lead-gap-tibio    { background: #3a2a1a; color: #f5a35b; }
         .lead-gap-frio     { background: #1a2a3a; color: #5bd4f5; }
 
+        /* Lead extended panel styles */
+        .lead-extended-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .lead-ext-card {
+            background: #111320;
+            border: 1px solid #222;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+        .lead-ext-card-title {
+            font-size: 0.65rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+        .lead-ext-card-value {
+            font-size: 0.8rem;
+            color: #e0e0e0;
+            font-weight: 600;
+        }
+        .lead-extended-item {
+            margin-bottom: 12px;
+            padding: 10px;
+            background: #0d0f18;
+            border-radius: 8px;
+            border: 1px solid #1a1d2e;
+        }
+        .lead-ext-label {
+            display: block;
+            font-size: 0.72rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+        .lead-ext-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .tag-green {
+            background: #0d2818;
+            color: #5bf5a3;
+            border: 1px solid #1a4a2a;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+        }
+        .tag-red {
+            background: #2a0d0d;
+            color: #f55b5b;
+            border: 1px solid #4a1a1a;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+        }
+        .tag-purple {
+            background: #1a0d2a;
+            color: #a35bf5;
+            border: 1px solid #2a1a4a;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+        }
+        .tag-blue {
+            background: #0d1a2a;
+            color: #5b9ef5;
+            border: 1px solid #1a2a4a;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+        }
+        .lead-ext-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .lead-question {
+            font-size: 0.75rem;
+            color: #aaa;
+            font-style: italic;
+            padding: 4px 8px;
+            background: #111320;
+            border-radius: 4px;
+            border-left: 2px solid #4a6cf7;
+        }
+        .lead-ext-summary {
+            font-size: 0.78rem;
+            color: #ccc;
+            line-height: 1.5;
+        }
+        .lead-next-action {
+            border: 1px solid #2a4a1a;
+            background: #0d1a0d;
+        }
+        .lead-ext-action {
+            font-size: 0.8rem;
+            color: #5bf5a3;
+            font-weight: 500;
+            line-height: 1.4;
+        }
+        .lead-formula-section {
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid #222;
+        }
+
         /* ── History Section ── */
         .history-section {
             background: #1a1d27;
@@ -1162,40 +1318,143 @@ function renderLeadDetail(c) {
         </div>`;
     }
 
+    // Extended analysis sections
+    const funnelLabels = {
+        'AWARENESS': '🔍 Conocimiento inicial',
+        'CONSIDERATION': '⚖️ Evaluando opciones',
+        'DECISION': '🎯 Cerca de decidir',
+        'CLOSED': '✅ Operacion cerrada'
+    };
+    const urgenciaLabels = {
+        'BAJA': '🟢 Baja', 'MEDIA': '🟡 Media', 'ALTA': '🟠 Alta', 'CRITICA': '🔴 Critica'
+    };
+    const compromisoLabels = {
+        'BAJO': '⬜ Bajo', 'MEDIO': '🟨 Medio', 'ALTO': '🟩 Alto'
+    };
+    const operacionLabels = {
+        'VENTA': '🏷️ Compra-Venta', 'ALQUILER': '🔑 Alquiler',
+        'INVERSION': '📈 Inversion', 'INDEFINIDO': '❓ No identificado'
+    };
+    const financLabels = {
+        'CONTADO': '💵 Contado', 'CREDITO': '🏦 Credito/Hipoteca',
+        'FINANCIAMIENTO_DIRECTO': '🤝 Financiamiento directo', 'NO_DETECTADO': '—'
+    };
+
+    let senalesHtml = '';
+    if (c.senales_compra && c.senales_compra.length > 0) {
+        senalesHtml = `<div class="lead-extended-item">
+            <span class="lead-ext-label">🛒 Senales de compra</span>
+            <div class="lead-ext-tags">${c.senales_compra.map(s => `<span class="tag-green">${s}</span>`).join('')}</div>
+        </div>`;
+    }
+
+    let objeccionesEspHtml = '';
+    if (c.objeciones_especificas && c.objeciones_especificas.length > 0) {
+        objeccionesEspHtml = `<div class="lead-extended-item">
+            <span class="lead-ext-label">⚠️ Objeciones detectadas</span>
+            <div class="lead-ext-tags">${c.objeciones_especificas.map(o => `<span class="tag-red">${o}</span>`).join('')}</div>
+        </div>`;
+    }
+
+    let persuasionHtml = '';
+    if (c.tecnicas_persuasion && c.tecnicas_persuasion.length > 0) {
+        persuasionHtml = `<div class="lead-extended-item">
+            <span class="lead-ext-label">🧠 Tecnicas de persuasion</span>
+            <div class="lead-ext-tags">${c.tecnicas_persuasion.map(t => `<span class="tag-purple">${t}</span>`).join('')}</div>
+        </div>`;
+    }
+
+    let preguntasHtml = '';
+    if (c.preguntas_abiertas && c.preguntas_abiertas.length > 0) {
+        preguntasHtml = `<div class="lead-extended-item">
+            <span class="lead-ext-label">❓ Preguntas abiertas</span>
+            <div class="lead-ext-list">${c.preguntas_abiertas.map(q => `<div class="lead-question">"${q}"</div>`).join('')}</div>
+        </div>`;
+    }
+
+    let keywordsHtml = '';
+    if (c.keywords && c.keywords.length > 0) {
+        keywordsHtml = `<div class="lead-extended-item">
+            <span class="lead-ext-label">🔑 Keywords principales</span>
+            <div class="lead-ext-tags">${c.keywords.map(k => `<span class="tag-blue">${k}</span>`).join('')}</div>
+        </div>`;
+    }
+
     return `
-        <div style="font-size:0.75rem; color:#666; margin-bottom:10px;">
-            La probabilidad de cierre se calcula con esta formula:
-            <br><code style="color:#4a6cf7; font-size:0.8rem;">(Indicios_Cierre x 5 + Respuestas_Afirm x 2 - Objeciones x 3) / Total_Palabras x 100</code>
+        <div class="lead-extended-grid">
+            <div class="lead-ext-card">
+                <div class="lead-ext-card-title">Etapa del Funnel</div>
+                <div class="lead-ext-card-value">${funnelLabels[c.etapa_funnel] || c.etapa_funnel}</div>
+            </div>
+            <div class="lead-ext-card">
+                <div class="lead-ext-card-title">Urgencia</div>
+                <div class="lead-ext-card-value">${urgenciaLabels[c.urgencia] || c.urgencia}</div>
+            </div>
+            <div class="lead-ext-card">
+                <div class="lead-ext-card-title">Compromiso</div>
+                <div class="lead-ext-card-value">${compromisoLabels[c.nivel_compromiso] || c.nivel_compromiso}</div>
+            </div>
+            <div class="lead-ext-card">
+                <div class="lead-ext-card-title">Tipo Operacion</div>
+                <div class="lead-ext-card-value">${operacionLabels[c.tipo_operacion] || c.tipo_operacion}</div>
+            </div>
+            <div class="lead-ext-card">
+                <div class="lead-ext-card-title">Financiamiento</div>
+                <div class="lead-ext-card-value">${financLabels[c.financiamiento] || c.financiamiento}</div>
+            </div>
         </div>
-        <table class="formula-table">
-            <tr class="positive-row">
-                <td>Indicios de Cierre</td>
-                <td>${c.indicios_cierre} x 5</td>
-                <td>+${f.indicios_cierre_pts}</td>
-            </tr>
-            <tr class="positive-row">
-                <td>Respuestas Afirmativas</td>
-                <td>${c.respuestas_afirmativas} x 2</td>
-                <td>+${f.respuestas_afirmativas_pts}</td>
-            </tr>
-            <tr class="negative-row">
-                <td>Objeciones</td>
-                <td>${c.objeciones} x 3</td>
-                <td>-${f.objeciones_pts}</td>
-            </tr>
-            <tr class="total-row">
-                <td colspan="2">Puntaje neto</td>
-                <td>${f.puntaje_neto}</td>
-            </tr>
-        </table>
-        <div class="formula-result">
-            <strong>(${f.puntaje_neto} / ${f.total_palabras} palabras) x 100 = ${pct.toFixed(2)}%</strong>
-            <br>
-            <span style="font-size:0.75rem;">
-                Umbral CALIENTE: &gt;70% &nbsp;|&nbsp; Umbral TIBIO: &gt;40% &nbsp;|&nbsp; FRIO: &lt;40%
-            </span>
+
+        ${senalesHtml}
+        ${objeccionesEspHtml}
+        ${persuasionHtml}
+        ${preguntasHtml}
+        ${keywordsHtml}
+
+        ${c.resumen ? `<div class="lead-extended-item">
+            <span class="lead-ext-label">📋 Resumen</span>
+            <div class="lead-ext-summary">${c.resumen}</div>
+        </div>` : ''}
+
+        ${c.accion_siguiente ? `<div class="lead-extended-item lead-next-action">
+            <span class="lead-ext-label">▶️ Accion siguiente recomendada</span>
+            <div class="lead-ext-action">${c.accion_siguiente}</div>
+        </div>` : ''}
+
+        <div class="lead-formula-section">
+            <div class="lead-ext-label" style="margin-bottom:8px;">📊 Formula de probabilidad</div>
+            <div style="font-size:0.75rem; color:#666; margin-bottom:10px;">
+                <code style="color:#4a6cf7; font-size:0.8rem;">(Indicios_Cierre x 5 + Respuestas_Afirm x 2 - Objeciones x 3) / Total_Palabras x 100</code>
+            </div>
+            <table class="formula-table">
+                <tr class="positive-row">
+                    <td>Indicios de Cierre</td>
+                    <td>${c.indicios_cierre} x 5</td>
+                    <td>+${f.indicios_cierre_pts}</td>
+                </tr>
+                <tr class="positive-row">
+                    <td>Respuestas Afirmativas</td>
+                    <td>${c.respuestas_afirmativas} x 2</td>
+                    <td>+${f.respuestas_afirmativas_pts}</td>
+                </tr>
+                <tr class="negative-row">
+                    <td>Objeciones</td>
+                    <td>${c.objeciones} x 3</td>
+                    <td>-${f.objeciones_pts}</td>
+                </tr>
+                <tr class="total-row">
+                    <td colspan="2">Puntaje neto</td>
+                    <td>${f.puntaje_neto}</td>
+                </tr>
+            </table>
+            <div class="formula-result">
+                <strong>(${f.puntaje_neto} / ${f.total_palabras} palabras) x 100 = ${pct.toFixed(2)}%</strong>
+                <br>
+                <span style="font-size:0.75rem;">
+                    Umbral CALIENTE: &gt;70% &nbsp;|&nbsp; Umbral TIBIO: &gt;40% &nbsp;|&nbsp; FRIO: &lt;40%
+                </span>
+            </div>
+            ${gapHtml}
         </div>
-        ${gapHtml}
     `;
 }
 
@@ -1913,32 +2172,7 @@ def analyze():
              "numeric_value": e.numeric_value, "unit": e.unit}
             for e in result.entities
         ],
-        "commercial": {
-            "palabras_positivas": ca.palabras_positivas,
-            "respuestas_afirmativas": ca.respuestas_afirmativas,
-            "indicios_cierre": ca.indicios_cierre,
-            "escasez_comercial": ca.escasez_comercial,
-            "pedidos_referidos": ca.pedidos_referidos,
-            "objeciones": ca.objeciones,
-            "indicios_prospeccion": ca.indicios_prospeccion,
-            "total_palabras": ca.total_palabras,
-            "densidad_comercial": ca.densidad_comercial,
-            "probabilidad_cierre": ca.probabilidad_cierre,
-            "tipo_lead": ca.tipo_lead,
-            "nivel_interes": ca.nivel_interes,
-            "tendencia_cierre": ca.tendencia_cierre,
-            "recomendacion": ca.recomendacion,
-            "detalle": ca.detalle,
-            "formula": {
-                "indicios_cierre_pts": ca.indicios_cierre * 5,
-                "respuestas_afirmativas_pts": ca.respuestas_afirmativas * 2,
-                "objeciones_pts": ca.objeciones * 3,
-                "puntaje_neto": (ca.indicios_cierre * 5) + (ca.respuestas_afirmativas * 2) - (ca.objeciones * 3),
-                "total_palabras": ca.total_palabras,
-                "para_caliente": max(0, round(70 - ca.probabilidad_cierre, 1)),
-                "para_tibio": max(0, round(40 - ca.probabilidad_cierre, 1)),
-            }
-        }
+        "commercial": _build_commercial_dict(ca)
     }
 
     # Save to history
@@ -2030,39 +2264,11 @@ def upload_audio():
              "numeric_value": e.numeric_value, "unit": e.unit}
             for e in result.entities
         ],
-        "commercial": {
-            "palabras_positivas": ca.palabras_positivas,
-            "respuestas_afirmativas": ca.respuestas_afirmativas,
-            "indicios_cierre": ca.indicios_cierre,
-            "escasez_comercial": ca.escasez_comercial,
-            "pedidos_referidos": ca.pedidos_referidos,
-            "objeciones": ca.objeciones,
-            "indicios_prospeccion": ca.indicios_prospeccion,
-            "total_palabras": ca.total_palabras,
-            "densidad_comercial": ca.densidad_comercial,
-            "probabilidad_cierre": ca.probabilidad_cierre,
-            "tipo_lead": ca.tipo_lead,
-            "nivel_interes": ca.nivel_interes,
-            "tendencia_cierre": ca.tendencia_cierre,
-            "recomendacion": ca.recomendacion,
-            "detalle": ca.detalle,
-            "formula": {
-                "indicios_cierre_pts": ca.indicios_cierre * 5,
-                "respuestas_afirmativas_pts": ca.respuestas_afirmativas * 2,
-                "objeciones_pts": ca.objeciones * 3,
-                "puntaje_neto": (ca.indicios_cierre * 5) + (ca.respuestas_afirmativas * 2) - (ca.objeciones * 3),
-                "total_palabras": ca.total_palabras,
-                "para_caliente": max(0, round(70 - ca.probabilidad_cierre, 1)),
-                "para_tibio": max(0, round(40 - ca.probabilidad_cierre, 1)),
-            }
-        }
+        "commercial": _build_commercial_dict(ca)
     }
 
     # Save to history
     add_entry(
-        username=session["username"],
-        text=transcribed_text,
-        analysis=analysis_dict,
         source="audio",
         audio_filename=original_name,
     )
