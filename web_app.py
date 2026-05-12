@@ -283,6 +283,74 @@ HTML = """
 
         textarea::placeholder { color: #555; }
 
+        /* Highlight overlay for indicator word highlighting */
+        .textarea-wrapper {
+            position: relative;
+        }
+
+        .highlight-overlay {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            min-height: 130px;
+            height: 100%;
+            background: #0f1117;
+            border: 2px solid #4a6cf7;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 0.95rem;
+            padding: 12px;
+            padding-right: 30px;
+            overflow-y: auto;
+            font-family: inherit;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            z-index: 10;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+
+        .highlight-overlay.active {
+            display: block;
+        }
+
+        .highlight-close-btn {
+            display: none;
+            position: absolute;
+            top: 6px;
+            right: 8px;
+            background: #1a1d27;
+            border: 1px solid #3a3d4a;
+            color: #aaa;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            z-index: 11;
+            line-height: 1;
+        }
+
+        .highlight-close-btn.active {
+            display: block;
+        }
+
+        .highlight-close-btn:hover {
+            background: #2a2d3a;
+            color: #fff;
+        }
+
+        .hl-palabras_positivas { background: rgba(91, 245, 163, 0.25); color: #5bf5a3; border-radius: 3px; padding: 0 2px; }
+        .hl-respuestas_afirmativas { background: rgba(74, 108, 247, 0.25); color: #7b9cff; border-radius: 3px; padding: 0 2px; }
+        .hl-indicios_cierre { background: rgba(245, 215, 91, 0.25); color: #f5d75b; border-radius: 3px; padding: 0 2px; }
+        .hl-escasez_comercial { background: rgba(245, 163, 91, 0.25); color: #f5a35b; border-radius: 3px; padding: 0 2px; }
+        .hl-pedidos_referidos { background: rgba(163, 91, 245, 0.25); color: #b38bff; border-radius: 3px; padding: 0 2px; }
+        .hl-objeciones { background: rgba(245, 91, 91, 0.25); color: #f55b5b; border-radius: 3px; padding: 0 2px; }
+        .hl-indicios_prospeccion { background: rgba(91, 212, 245, 0.25); color: #5bd4f5; border-radius: 3px; padding: 0 2px; }
+
         /* Date selectors */
         .date-selectors {
             display: flex;
@@ -1249,6 +1317,17 @@ HTML = """
 
         .detail-word-row:last-child { border-bottom: none; }
 
+        .detail-word-clickable {
+            cursor: pointer;
+            border-radius: 4px;
+            padding: 3px 6px !important;
+            transition: background 0.15s;
+        }
+
+        .detail-word-clickable:hover {
+            background: #1a1d27;
+        }
+
         .detail-word { color: #c0c0c0; }
 
         .detail-count {
@@ -1658,8 +1737,12 @@ HTML = """
             </div>
         </div>
 
-        <textarea id="textInput"
-            placeholder="O escribe / pega aqui el texto que quieres analizar...&#10;&#10;Ejemplo: Ofrezco apartamento de 3 habitaciones en USD 180,000 negociable, zona norte, 95 m2."></textarea>
+        <div class="textarea-wrapper" id="textareaWrapper">
+            <textarea id="textInput"
+                placeholder="O escribe / pega aqui el texto que quieres analizar...&#10;&#10;Ejemplo: Ofrezco apartamento de 3 habitaciones en USD 180,000 negociable, zona norte, 95 m2."></textarea>
+            <div class="highlight-overlay" id="highlightOverlay" onclick="closeHighlightOverlay()"></div>
+            <button class="highlight-close-btn" id="highlightCloseBtn" onclick="closeHighlightOverlay()" title="Cerrar resaltado">✕</button>
+        </div>
         <div class="btn-row">
             <button class="btn-primary" onclick="analyze()">&#128269; Analizar</button>
             <button class="btn-secondary" onclick="clearAll()">Limpiar</button>
@@ -1682,6 +1765,8 @@ HTML = """
 </div>
 
 <script>
+let _lastCommercialData = null;
+
 async function analyze() {
     const text = document.getElementById('textInput').value.trim();
     if (!text) return;
@@ -1699,6 +1784,7 @@ async function analyze() {
             body: JSON.stringify({ text, year: parseInt(year), month: parseInt(month) })
         });
         const data = await response.json();
+        _lastCommercialData = data.commercial || null;
         renderResults(data, text);
     } catch (e) {
         document.getElementById('results').innerHTML =
@@ -1712,6 +1798,8 @@ async function analyze() {
 function clearAll() {
     document.getElementById('textInput').value = '';
     document.getElementById('results').style.display = 'none';
+    closeHighlightOverlay();
+    _lastCommercialData = null;
 }
 
 function confBar(value) {
@@ -2315,13 +2403,13 @@ function renderCommercial(c) {
     const fillClass = pct > 70 ? 'prob-fill-hot' : pct > 40 ? 'prob-fill-warm' : 'prob-fill-cold';
 
     const indicators = [
-        { key: 'palabras_positivas',    label: 'Palabras Positivas',     value: c.palabras_positivas,    cls: c.palabras_positivas > 0 ? 'positive' : '' },
-        { key: 'respuestas_afirmativas',label: 'Respuestas Afirmativas', value: c.respuestas_afirmativas, cls: c.respuestas_afirmativas > 0 ? 'positive' : '' },
-        { key: 'indicios_cierre',       label: 'Indicios de Cierre',     value: c.indicios_cierre,       cls: c.indicios_cierre > 0 ? 'positive' : '' },
-        { key: 'escasez_comercial',     label: 'Escasez Comercial',      value: c.escasez_comercial,     cls: '' },
-        { key: 'pedidos_referidos',     label: 'Pedidos de Referidos',   value: c.pedidos_referidos,     cls: '' },
-        { key: 'objeciones',            label: 'Objeciones',             value: c.objeciones,            cls: c.objeciones > 2 ? 'highlight' : '' },
-        { key: 'indicios_prospeccion',  label: 'Prospeccion',            value: c.indicios_prospeccion,  cls: '' },
+        { key: 'palabras_positivas',    label: 'Palabras Positivas',     value: c.palabras_positivas,    cls: c.palabras_positivas > 0 ? 'positive' : '', color: '#5bf5a3' },
+        { key: 'respuestas_afirmativas',label: 'Respuestas Afirmativas', value: c.respuestas_afirmativas, cls: c.respuestas_afirmativas > 0 ? 'positive' : '', color: '#7b9cff' },
+        { key: 'indicios_cierre',       label: 'Indicios de Cierre',     value: c.indicios_cierre,       cls: c.indicios_cierre > 0 ? 'positive' : '', color: '#f5d75b' },
+        { key: 'escasez_comercial',     label: 'Escasez Comercial',      value: c.escasez_comercial,     cls: '', color: '#f5a35b' },
+        { key: 'pedidos_referidos',     label: 'Pedidos de Referidos',   value: c.pedidos_referidos,     cls: '', color: '#b38bff' },
+        { key: 'objeciones',            label: 'Objeciones',             value: c.objeciones,            cls: c.objeciones > 2 ? 'highlight' : '', color: '#f55b5b' },
+        { key: 'indicios_prospeccion',  label: 'Prospeccion',            value: c.indicios_prospeccion,  cls: '', color: '#5bd4f5' },
     ];
 
     const indicatorsHtml = indicators.map((ind, idx) => {
@@ -2334,7 +2422,7 @@ function renderCommercial(c) {
             const rows = Object.entries(detail)
                 .sort((a, b) => b[1] - a[1])
                 .map(([word, count]) =>
-                    `<div class="detail-word-row">
+                    `<div class="detail-word-row detail-word-clickable" onclick="event.stopPropagation(); highlightSingleWord('${word.replace(/'/g, "\\\\'")}', '${ind.key}');">
                         <span class="detail-word">${word}</span>
                         <span class="detail-count">${count}x</span>
                     </div>`
@@ -2347,7 +2435,8 @@ function renderCommercial(c) {
         return `
         <div>
             <div class="indicator-item ${hasDetail ? 'has-detail' : ''}"
-                 onclick="toggleDetail('${detailId}', this)">
+                 style="border-top: 2px solid ${ind.color};"
+                 onclick="toggleDetail('${detailId}', this); highlightInText('${ind.key}');">
                 <div class="indicator-label">${ind.label}</div>
                 <div class="indicator-value ${ind.cls}">${ind.value}</div>
             </div>
@@ -2388,7 +2477,7 @@ function renderCommercial(c) {
         </div>
 
         <div style="font-size:0.7rem; color:#555; margin-bottom:8px;">
-            Haz clic en cada indicador para ver el detalle de palabras detectadas.
+            Haz clic en cada indicador para ver el detalle y resaltar las palabras en el texto.
         </div>
 
         <div class="indicators-grid">${indicatorsHtml}</div>
@@ -2889,6 +2978,111 @@ function renderRealEstateConceptsDetail(concepts) {
     return html;
 }
 
+function highlightSingleWord(word, indicatorKey) {
+    const textarea = document.getElementById('textInput');
+    const overlay = document.getElementById('highlightOverlay');
+    const closeBtn = document.getElementById('highlightCloseBtn');
+    const text = textarea.value;
+
+    if (!text) return;
+
+    // Build highlighted HTML for just this one word
+    const highlightedHtml = buildHighlightedText(text, [word], indicatorKey);
+
+    overlay.innerHTML = highlightedHtml;
+    overlay.classList.add('active');
+    closeBtn.classList.add('active');
+
+    // Scroll to the textarea area
+    const wrapper = document.getElementById('textareaWrapper');
+    wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function highlightInText(indicatorKey) {
+    const textarea = document.getElementById('textInput');
+    const overlay = document.getElementById('highlightOverlay');
+    const closeBtn = document.getElementById('highlightCloseBtn');
+    const text = textarea.value;
+
+    if (!text || !_lastCommercialData || !_lastCommercialData.detalle) return;
+
+    const detail = _lastCommercialData.detalle[indicatorKey];
+    if (!detail || Object.keys(detail).length === 0) return;
+
+    // Get the words to highlight for this indicator
+    const words = Object.keys(detail);
+
+    // Build highlighted HTML
+    const highlightedHtml = buildHighlightedText(text, words, indicatorKey);
+
+    overlay.innerHTML = highlightedHtml;
+    overlay.classList.add('active');
+    closeBtn.classList.add('active');
+
+    // Scroll to the textarea area
+    const wrapper = document.getElementById('textareaWrapper');
+    wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function buildHighlightedText(text, words, indicatorKey) {
+    // Normalize function to remove accents for matching
+    function normalize(str) {
+        return str.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase();
+    }
+
+    const normalizedText = normalize(text);
+    const hlClass = 'hl-' + indicatorKey;
+
+    // Find all match positions
+    let matches = [];
+    for (const word of words) {
+        const normalizedWord = normalize(word);
+        // Use word boundary matching
+        const escapedWord = normalizedWord.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
+        const regex = new RegExp('(?<![a-z])' + escapedWord + '(?![a-z])', 'gi');
+        let match;
+        while ((match = regex.exec(normalizedText)) !== null) {
+            matches.push({ start: match.index, end: match.index + match[0].length });
+        }
+    }
+
+    // Sort by position and merge overlapping
+    matches.sort((a, b) => a.start - b.start);
+    const merged = [];
+    for (const m of matches) {
+        if (merged.length > 0 && m.start <= merged[merged.length - 1].end) {
+            merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, m.end);
+        } else {
+            merged.push({ ...m });
+        }
+    }
+
+    // Build HTML with highlights using original text characters
+    let result = '';
+    let lastIdx = 0;
+    for (const m of merged) {
+        // Add text before this match
+        result += escapeHtml(text.substring(lastIdx, m.start));
+        // Add highlighted match (use original text casing)
+        result += `<span class="${hlClass}">${escapeHtml(text.substring(m.start, m.end))}</span>`;
+        lastIdx = m.end;
+    }
+    result += escapeHtml(text.substring(lastIdx));
+
+    return result;
+}
+
+function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function closeHighlightOverlay() {
+    const overlay = document.getElementById('highlightOverlay');
+    const closeBtn = document.getElementById('highlightCloseBtn');
+    overlay.classList.remove('active');
+    closeBtn.classList.remove('active');
+}
+
 function toggleDetail(detailId, cardEl) {
     const panel = document.getElementById(detailId);
     if (!panel) return;
@@ -2910,6 +3104,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     textarea.addEventListener('input', () => {
+        closeHighlightOverlay();
         clearTimeout(debounceTimer);
         const text = textarea.value.trim();
         if (text.length >= 10) {
