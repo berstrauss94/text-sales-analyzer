@@ -736,6 +736,69 @@ HTML = """
             font-weight: 500;
         }
 
+        /* Concepts detail panel styles */
+        .concepts-detail-panel {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #1e2130;
+        }
+        .concepts-detail-title {
+            font-size: 0.7rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        .concept-detail-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #0a0c14;
+            border-radius: 8px;
+            border: 1px solid #1a1d2e;
+            border-left: 3px solid #4a6cf7;
+        }
+        .concept-detail-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+            font-size: 0.8rem;
+            color: #e0e0e0;
+        }
+        .concept-conf {
+            font-size: 0.7rem;
+            color: #4a6cf7;
+            background: #111828;
+            padding: 2px 8px;
+            border-radius: 10px;
+            border: 1px solid #1e2a40;
+        }
+        .concept-detail-desc {
+            font-size: 0.73rem;
+            color: #aaa;
+            margin-bottom: 4px;
+        }
+        .concept-detail-source {
+            font-size: 0.7rem;
+            color: #777;
+            margin-bottom: 6px;
+            padding: 4px 8px;
+            background: #0d1018;
+            border-radius: 4px;
+        }
+        .concept-detail-source em {
+            color: #999;
+        }
+        .concept-detail-tip {
+            font-size: 0.73rem;
+            color: #5bf5a3;
+            padding: 6px 8px;
+            background: #0a140a;
+            border-radius: 4px;
+            border-left: 2px solid #5bf5a3;
+        }
+
         .full-width { grid-column: 1 / -1; }
 
         .error-card {
@@ -1922,6 +1985,7 @@ function renderResults(data, inputText) {
                 <div class="card-collapsible-content" id="sentimiento-content">
                     <span class="badge badge-${data.sentiment}">${sentimentEs}</span>
                     ${confBar(data.sentiment_confidence)}
+                    ${renderSentimentDetail(data.sentiment)}
                 </div>
             </div>
             <div class="card">
@@ -1930,6 +1994,7 @@ function renderResults(data, inputText) {
                 </div>
                 <div class="card-collapsible-content" id="ventas-content">
                     ${salesHtml}
+                    ${renderSalesConceptsDetail(data.sales_concepts)}
                 </div>
             </div>
             <div class="card">
@@ -1938,6 +2003,7 @@ function renderResults(data, inputText) {
                 </div>
                 <div class="card-collapsible-content" id="bienes-raices-content">
                     ${reHtml}
+                    ${renderRealEstateConceptsDetail(data.real_estate_concepts)}
                 </div>
             </div>
             <div class="card full-width">
@@ -2236,6 +2302,123 @@ function toggleCardContent(contentId) {
     content.classList.toggle('open');
     const arrow = document.getElementById(contentId.replace('-content', '-arrow'));
     if (arrow) arrow.classList.toggle('open');
+}
+
+function renderSentimentDetail(sentiment) {
+    const details = {
+        'POSITIVE': {
+            icon: '😊',
+            desc: 'El tono del texto es positivo. El emisor expresa satisfaccion, entusiasmo o aprobacion.',
+            meaning: 'Un sentimiento positivo indica que el cliente esta contento, interesado o satisfecho con la propuesta. Es el mejor momento para avanzar.',
+            forSeller: 'El cliente esta receptivo. Aprovecha este momento para proponer el siguiente paso: visita, oferta formal o cierre.',
+            tips: ['Reforzar los puntos que generan entusiasmo', 'Proponer accion inmediata mientras el animo es alto', 'No sobre-vender: el cliente ya esta convencido', 'Solicitar referidos aprovechando la buena disposicion'],
+            risk: 'Bajo. El cliente esta en buena disposicion.'
+        },
+        'NEUTRAL': {
+            icon: '😐',
+            desc: 'El tono del texto es neutral. No hay emociones fuertes ni positivas ni negativas.',
+            meaning: 'Un sentimiento neutral puede indicar que el cliente esta evaluando friamente, es profesional en su comunicacion, o aun no se ha formado una opinion.',
+            forSeller: 'El cliente no esta ni entusiasmado ni molesto. Necesitas generar emocion positiva: mostrar beneficios, crear urgencia o conectar emocionalmente.',
+            tips: ['Hacer preguntas para descubrir motivaciones emocionales', 'Presentar beneficios que conecten con sus necesidades', 'Usar testimonios o casos de exito similares', 'No asumir desinteres: neutral no es negativo'],
+            risk: 'Medio. Puede ir hacia cualquier lado. Necesita estimulo.'
+        },
+        'NEGATIVE': {
+            icon: '😟',
+            desc: 'El tono del texto es negativo. El emisor expresa insatisfaccion, preocupacion o rechazo.',
+            meaning: 'Un sentimiento negativo indica problemas: objeciones no resueltas, expectativas no cumplidas o mala experiencia previa.',
+            forSeller: 'Atencion: el cliente esta insatisfecho. Antes de vender, necesitas resolver el problema. Escucha activamente y valida sus preocupaciones.',
+            tips: ['Escuchar sin interrumpir ni justificar', 'Validar la preocupacion: "Entiendo su frustracion"', 'Ofrecer solucion concreta al problema planteado', 'No presionar la venta hasta resolver la objecion', 'Si es necesario, ofrecer alternativas o compensaciones'],
+            risk: 'Alto. Riesgo de perder al cliente si no se maneja bien.'
+        }
+    };
+    const d = details[sentiment] || details['NEUTRAL'];
+    return `
+        <div class="intent-detail-panel">
+            <div class="intent-detail-header">${d.icon} Sentimiento: ${sentiment}</div>
+            <div class="intent-detail-desc">${d.desc}</div>
+            <div class="intent-detail-section">
+                <div class="intent-section-title">Que significa para la venta</div>
+                <div class="intent-section-text">${d.meaning}</div>
+            </div>
+            <div class="intent-detail-section intent-seller-box">
+                <div class="intent-section-title">👤 Para el vendedor</div>
+                <div class="intent-section-text">${d.forSeller}</div>
+            </div>
+            <div class="intent-detail-section">
+                <div class="intent-section-title">💡 Tips practicos</div>
+                <ul class="intent-tips-list">
+                    ${d.tips.map(t => `<li>${t}</li>`).join('')}
+                </ul>
+            </div>
+            <div class="intent-detail-section" style="border-left:3px solid ${sentiment === 'NEGATIVE' ? '#f55b5b' : sentiment === 'POSITIVE' ? '#5bf5a3' : '#f5a35b'}">
+                <div class="intent-section-title">⚠️ Nivel de riesgo</div>
+                <div class="intent-section-text">${d.risk}</div>
+            </div>
+        </div>
+    `;
+}
+
+function renderSalesConceptsDetail(concepts) {
+    if (!concepts || concepts.length === 0) return '';
+    const conceptInfo = {
+        'offer': { icon: '🏷️', label: 'Oferta', desc: 'Se detecto una oferta comercial activa.', tip: 'Asegurate de que la oferta sea clara, con precio y condiciones. Facilita el siguiente paso.' },
+        'discount': { icon: '🔖', label: 'Descuento', desc: 'Se menciona un descuento o reduccion de precio.', tip: 'Los descuentos crean urgencia. Establece un plazo limite para maximizar el efecto.' },
+        'commission': { icon: '💼', label: 'Comision', desc: 'Se habla de comisiones o honorarios del agente.', tip: 'Transparencia en comisiones genera confianza. Deja claro quien paga que.' },
+        'closing': { icon: '✅', label: 'Cierre', desc: 'Hay indicios de cierre de operacion.', tip: 'No agregues friccion. Facilita la firma y coordina todos los pasos finales.' },
+        'prospect': { icon: '🎯', label: 'Prospecto', desc: 'Se menciona un prospecto o comprador potencial.', tip: 'Califica al prospecto: presupuesto, plazo, necesidades. No pierdas tiempo con no calificados.' },
+        'objection': { icon: '🚫', label: 'Objecion', desc: 'Se detecto una objecion o preocupacion del cliente.', tip: 'Escucha la objecion completa, valida y responde con datos. Nunca ignores una objecion.' },
+        'follow_up': { icon: '📞', label: 'Seguimiento', desc: 'Se menciona seguimiento o contacto futuro.', tip: 'El seguimiento es clave. Programa recordatorios y cumple siempre lo prometido.' },
+        'negotiation': { icon: '⚖️', label: 'Negociacion', desc: 'Se estan negociando terminos o condiciones.', tip: 'Negocia con margen. Ten claro tu precio minimo y ofrece valor en vez de solo bajar precio.' }
+    };
+    let html = '<div class="concepts-detail-panel">';
+    html += '<div class="concepts-detail-title">Detalle de conceptos detectados</div>';
+    concepts.forEach(c => {
+        const info = conceptInfo[c.concept] || { icon: '📎', label: c.concept, desc: 'Concepto detectado.', tip: 'Evaluar en contexto.' };
+        const confPct = (c.confidence * 100).toFixed(0);
+        html += `<div class="concept-detail-item">
+            <div class="concept-detail-head">
+                <span>${info.icon} <strong>${info.label}</strong></span>
+                <span class="concept-conf">${confPct}%</span>
+            </div>
+            <div class="concept-detail-desc">${info.desc}</div>
+            <div class="concept-detail-source">Fragmento: <em>"${c.source_text}"</em></div>
+            <div class="concept-detail-tip">💡 ${info.tip}</div>
+        </div>`;
+    });
+    html += '</div>';
+    return html;
+}
+
+function renderRealEstateConceptsDetail(concepts) {
+    if (!concepts || concepts.length === 0) return '';
+    const conceptInfo = {
+        'property_type': { icon: '🏠', label: 'Tipo de propiedad', desc: 'Se identifica el tipo de inmueble.', tip: 'Adapta tu discurso al tipo de propiedad. Un apartamento se vende diferente a un terreno.' },
+        'price': { icon: '💰', label: 'Precio', desc: 'Se menciona precio o valor del inmueble.', tip: 'Justifica el precio con comparables del mercado. Ten datos listos para respaldar.' },
+        'area_sqm': { icon: '📐', label: 'Metraje', desc: 'Se menciona el area o superficie.', tip: 'Relaciona el metraje con el precio por m2 de la zona para mostrar valor.' },
+        'bedrooms': { icon: '🛏️', label: 'Habitaciones', desc: 'Se menciona cantidad de habitaciones.', tip: 'Las habitaciones definen el perfil del comprador. Adapta tu pitch al tipo de familia.' },
+        'bathrooms': { icon: '🚿', label: 'Banos', desc: 'Se menciona cantidad de banos.', tip: 'Banos adicionales agregan valor. Destaca si tiene bano en suite o de servicio.' },
+        'location': { icon: '📍', label: 'Ubicacion', desc: 'Se menciona la ubicacion del inmueble.', tip: 'La ubicacion es el factor #1. Destaca cercanias: colegios, transporte, comercios.' },
+        'amenities': { icon: '🏊', label: 'Amenidades', desc: 'Se mencionan amenidades o servicios.', tip: 'Las amenidades justifican precio premium. Calcula el ahorro vs. pagar gym/pool aparte.' },
+        'zoning': { icon: '📋', label: 'Zonificacion', desc: 'Se menciona zonificacion o uso de suelo.', tip: 'La zonificacion define el potencial. Comercial = mas valor. Verifica restricciones.' },
+        'condition': { icon: '🔧', label: 'Estado', desc: 'Se menciona el estado o condicion del inmueble.', tip: 'Se honesto con el estado. Si necesita arreglos, presenta presupuesto y descuenta del precio.' }
+    };
+    let html = '<div class="concepts-detail-panel">';
+    html += '<div class="concepts-detail-title">Detalle de conceptos detectados</div>';
+    concepts.forEach(c => {
+        const info = conceptInfo[c.concept] || { icon: '📎', label: c.concept, desc: 'Concepto detectado.', tip: 'Evaluar en contexto.' };
+        const confPct = (c.confidence * 100).toFixed(0);
+        html += `<div class="concept-detail-item">
+            <div class="concept-detail-head">
+                <span>${info.icon} <strong>${info.label}</strong></span>
+                <span class="concept-conf">${confPct}%</span>
+            </div>
+            <div class="concept-detail-desc">${info.desc}</div>
+            <div class="concept-detail-source">Fragmento: <em>"${c.source_text}"</em></div>
+            <div class="concept-detail-tip">💡 ${info.tip}</div>
+        </div>`;
+    });
+    html += '</div>';
+    return html;
 }
 
 function toggleDetail(detailId, cardEl) {
