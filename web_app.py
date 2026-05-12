@@ -283,6 +283,40 @@ HTML = """
 
         textarea::placeholder { color: #555; }
 
+        /* Date selectors */
+        .date-selectors {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        .date-select-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .date-select-group label {
+            font-size: 0.7rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-weight: 600;
+        }
+        .date-select-group select {
+            background: #0d0f18;
+            color: #e0e0e0;
+            border: 1px solid #2a2d3e;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            outline: none;
+            min-width: 120px;
+            appearance: auto;
+        }
+        .date-select-group select:focus {
+            border-color: #4a6cf7;
+        }
+
         .btn-row {
             display: flex;
             gap: 10px;
@@ -1376,6 +1410,35 @@ HTML = """
     </div>
 
     <div class="input-section">
+        <div class="date-selectors">
+            <div class="date-select-group">
+                <label for="selectYear">Año</label>
+                <select id="selectYear">
+                    <option value="2026" selected>2026</option>
+                    <option value="2027">2027</option>
+                    <option value="2028">2028</option>
+                    <option value="2029">2029</option>
+                    <option value="2030">2030</option>
+                </select>
+            </div>
+            <div class="date-select-group">
+                <label for="selectMonth">Mes</label>
+                <select id="selectMonth">
+                    <option value="1">Enero</option>
+                    <option value="2">Febrero</option>
+                    <option value="3">Marzo</option>
+                    <option value="4">Abril</option>
+                    <option value="5">Mayo</option>
+                    <option value="6">Junio</option>
+                    <option value="7">Julio</option>
+                    <option value="8">Agosto</option>
+                    <option value="9">Septiembre</option>
+                    <option value="10">Octubre</option>
+                    <option value="11">Noviembre</option>
+                    <option value="12">Diciembre</option>
+                </select>
+            </div>
+        </div>
         <textarea id="textInput"
             placeholder="O escribe / pega aqui el texto que quieres analizar...&#10;&#10;Ejemplo: Ofrezco apartamento de 3 habitaciones en USD 180,000 negociable, zona norte, 95 m2."></textarea>
         <div class="btn-row">
@@ -1404,6 +1467,9 @@ async function analyze() {
     const text = document.getElementById('textInput').value.trim();
     if (!text) return;
 
+    const year = document.getElementById('selectYear').value;
+    const month = document.getElementById('selectMonth').value;
+
     document.getElementById('loading').style.display = 'block';
     document.getElementById('results').style.display = 'none';
 
@@ -1411,7 +1477,7 @@ async function analyze() {
         const response = await fetch('/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text })
+            body: JSON.stringify({ text, year: parseInt(year), month: parseInt(month) })
         });
         const data = await response.json();
         renderResults(data, text);
@@ -3133,17 +3199,23 @@ def analyze():
     }
 
     # Save to history
+    year = data.get("year")
+    month = data.get("month")
     add_entry(
         username=session["username"],
         text=data["text"],
         analysis=analysis_dict,
         source="text",
+        year=year,
+        month=month,
     )
 
     return jsonify({
         "error": False,
         "input_text": result.input_text,
         "analyzed_at": result.analyzed_at,
+        "year": year,
+        "month": month,
         **analysis_dict,
     })
 
