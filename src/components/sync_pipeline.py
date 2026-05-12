@@ -83,12 +83,6 @@ class SyncPipeline:
             from src.components.mpc_scraper import MPCScraper
             scraper = MPCScraper()
             scraper.login()
-
-            if historical:
-                records = scraper.fetch_all_records(from_year=2026, from_month=1)
-            else:
-                records = scraper.fetch_records()
-
         except EnvironmentError as exc:
             msg = f"Credenciales no configuradas: {exc}"
             logger.error(msg)
@@ -107,6 +101,42 @@ class SyncPipeline:
 
         dedup = self._load_dedup()
 
+        # Process month by month to save results incrementally
+        if historical:
+            import time
+            now = datetime.now()
+            y, m = 2026, 1
+            while (y, m) <= (now.year, now.month):
+                try:
+                    logger.info(f"Sync: extrayendo {m}/{y}...")
+                    records = scraper.fetch_records(month=m, year=y)
+                    logger.info(f"Sync: {len(records)} registros en {m}/{y}, procesando...")
+                    self._process_records(records, mapping, dedup, scraper, summary)
+                    self._save_dedup(dedup)
+                    logger.info(f"Sync: {m}/{y} completado. Procesados hasta ahora: {summary['processed']}")
+                except Exception as exc:
+                    logger.warning(f"Sync: error en {m}/{y}: {exc}")
+                m += 1
+                if m > 12:
+                    m = 1
+                    y += 1
+                time.sleep(5)
+        else:
+            try:
+                records = scraper.fetch_records()
+                self._process_records(records, mapping, dedup, scraper, summary)
+            except Exception as exc:
+                msg = f"Error en scraping: {exc}"
+                logger.error(msg)
+
+        self._save_dedup(dedup)
+        summary["finished_at"] = datetime.now(timezone.utc).isoformat()
+        self._log_run(summary)
+        logger.info(f"Sync completado: {summary}")
+        return summary
+
+    def _process_records(self, records: list, mapping: dict, dedup: set, scraper, summary: dict) -> None:
+        """Process a list of records, updating summary in place."""
         for record in records:
             try:
                 result = self._process_record(record, mapping, dedup, scraper)
@@ -124,12 +154,6 @@ class SyncPipeline:
             except Exception as exc:
                 logger.error(f"Error procesando registro {record.get('id')}: {exc}")
                 summary["errors"] += 1
-
-        self._save_dedup(dedup)
-        summary["finished_at"] = datetime.now(timezone.utc).isoformat()
-        self._log_run(summary)
-        logger.info(f"Sync completado: {summary}")
-        return summary
 
     # ------------------------------------------------------------------
     # Procesamiento de un registro
