@@ -253,12 +253,16 @@ class MPCScraper:
         records: list[dict] = []
         hidden_after_filter = self._extract_hidden_fields(soup)
 
+        import time
         for idx, meta in enumerate(rows_meta):
             if "transcripta" not in meta.get("estado", "").lower():
                 # Sin transcripción disponible — incluir sin texto
                 meta["transcripcion"] = None
                 records.append(meta)
                 continue
+
+            # Delay entre requests para no saturar el servidor
+            time.sleep(2)
 
             transcripcion = self._fetch_transcripcion(
                 session_soup_hidden=hidden_after_filter,
@@ -270,16 +274,37 @@ class MPCScraper:
 
             # Refrescar hidden fields después de cada postback
             # (el ViewState cambia con cada request)
-            resp_refresh = self._session.get(LIST_URL, timeout=30)
-            soup_refresh = BeautifulSoup(resp_refresh.text, "html.parser")
-            payload_refresh = self._extract_hidden_fields(soup_refresh)
-            payload_refresh[_F_PERIODO]        = periodo_id
-            payload_refresh[_F_VENDEDOR]       = "0"
-            payload_refresh["__EVENTTARGET"]   = _F_PERIODO
-            payload_refresh["__EVENTARGUMENT"] = ""
-            resp_filter = self._session.post(LIST_URL, data=payload_refresh, timeout=30)
-            soup_filter = BeautifulSoup(resp_filter.text, "html.parser")
-            hidden_after_filter = self._extract_hidden_fields(soup_filter)
+            try:
+                time.sleep(1)
+                resp_refresh = self._session.get(LIST_URL, timeout=60)
+                soup_refresh = BeautifulSoup(resp_refresh.text, "html.parser")
+                payload_refresh = self._extract_hidden_fields(soup_refresh)
+                payload_refresh[_F_PERIODO]        = periodo_id
+                payload_refresh[_F_VENDEDOR]       = "0"
+                payload_refresh["__EVENTTARGET"]   = _F_PERIODO
+                payload_refresh["__EVENTARGUMENT"] = ""
+                resp_filter = self._session.post(LIST_URL, data=payload_refresh, timeout=60)
+                soup_filter = BeautifulSoup(resp_filter.text, "html.parser")
+                hidden_after_filter = self._extract_hidden_fields(soup_filter)
+            except Exception as exc:
+                logger.warning(f"Error refrescando ViewState después de fila {idx}: {exc}")
+                # Intentar re-login y continuar
+                try:
+                    time.sleep(5)
+                    self.login()
+                    resp_re = self._session.get(LIST_URL, timeout=60)
+                    soup_re = BeautifulSoup(resp_re.text, "html.parser")
+                    payload_re = self._extract_hidden_fields(soup_re)
+                    payload_re[_F_PERIODO]        = periodo_id
+                    payload_re[_F_VENDEDOR]       = "0"
+                    payload_re["__EVENTTARGET"]   = _F_PERIODO
+                    payload_re["__EVENTARGUMENT"] = ""
+                    resp_re2 = self._session.post(LIST_URL, data=payload_re, timeout=60)
+                    soup_re2 = BeautifulSoup(resp_re2.text, "html.parser")
+                    hidden_after_filter = self._extract_hidden_fields(soup_re2)
+                except Exception:
+                    logger.error(f"Re-login fallido. Abortando mes {month}/{year}.")
+                    break
 
         logger.info(f"Periodo {month}/{year}: {sum(1 for r in records if r.get('transcripcion'))} con transcripción.")
         return records
@@ -292,26 +317,34 @@ class MPCScraper:
     ) -> Optional[str]:
         """
         Hace el postback Select$N para abrir una fila y extrae la transcripción.
+        Incluye un reintento con backoff en caso de error.
         """
-        try:
-            payload = dict(session_soup_hidden)
-            payload[_F_PERIODO]        = periodo_id
-            payload[_F_VENDEDOR]       = "0"
-            payload["__EVENTTARGET"]   = _F_GRIDVIEW
-            payload["__EVENTARGUMENT"] = f"Select${row_index}"
+        import time
+        for attempt in range(2):
+            try:
+                payload = dict(session_soup_hidden)
+                payload[_F_PERIODO]        = periodo_id
+                payload[_F_VENDEDOR]       = "0"
+                payload["__EVENTTARGET"]   = _F_GRIDVIEW
+                payload["__EVENTARGUMENT"] = f"Select${row_index}"
 
-            resp = self._session.post(LIST_URL, data=payload, timeout=60)
-            resp.raise_for_status()
-            soup = BeautifulSoup(resp.text, "html.parser")
+                resp = self._session.post(LIST_URL, data=payload, timeout=90)
+                resp.raise_for_status()
+                soup = BeautifulSoup(resp.text, "html.parser")
 
-            ta = soup.find("textarea", {"id": _F_TRANSCR}) or \
-                 soup.find("textarea", {"name": lambda n: n and "otxtTranscripcion" in n})
-            if ta:
-                text = ta.get_text(separator=" ", strip=True)
-                if len(text) > 10:
-                    return text
-        except Exception as exc:
-            logger.warning(f"Error obteniendo transcripción fila {row_index}: {exc}")
+                ta = soup.find("textarea", {"id": _F_TRANSCR}) or \
+                     soup.find("textarea", {"name": lambda n: n and "otxtTranscripcion" in n})
+                if ta:
+                    text = ta.get_text(separator=" ", strip=True)
+                    if len(text) > 10:
+                        return text
+                return None
+            except Exception as exc:
+                if attempt == 0:
+                    logger.warning(f"Error obteniendo transcripción fila {row_index} (reintentando): {exc}")
+                    time.sleep(5)
+                else:
+                    logger.warning(f"Error obteniendo transcripción fila {row_index}: {exc}")
         return None
 
     # ------------------------------------------------------------------
@@ -349,6 +382,10 @@ class MPCScraper:
                     logger.warning(f"  Error extrayendo {m}/{y}: {exc}")
             else:
                 logger.info(f"  Periodo {m}/{y} no disponible en el dropdown, omitiendo.")
+
+            # Delay entre meses para no saturar el servidor
+            import time
+            time.sleep(5)
 
             m += 1
             if m > 12:
