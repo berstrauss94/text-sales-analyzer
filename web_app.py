@@ -417,6 +417,39 @@ HTML = """
 
         .entity-numeric { color: #5bf5a3; font-size: 0.8rem; }
 
+        /* Grouped entity styles */
+        .entity-group {
+            padding: 8px 0;
+            border-bottom: 1px solid #1e2130;
+        }
+        .entity-group:last-child { border-bottom: none; }
+        .entity-group-header {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            color: #4a6cf7;
+            letter-spacing: 0.04em;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        .entity-group-values {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .entity-value-chip {
+            display: inline-block;
+            background: #111828;
+            border: 1px solid #1e2a40;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 0.78rem;
+            color: #e0e0e0;
+        }
+        .entity-value-chip .entity-numeric {
+            color: #5bf5a3;
+            font-size: 0.78rem;
+        }
+
         /* Extended data extraction styles */
         .ext-data-grid {
             display: grid;
@@ -1290,8 +1323,30 @@ const ENTITY_ES = {
     'price': 'Precio',
     'area_sqm': 'Metraje',
     'bedrooms': 'Habitaciones',
-    'bathrooms': 'Banos',
-    'location': 'Ubicacion'
+    'bathrooms': 'Baños',
+    'location': 'Ubicacion',
+    'date': 'Fecha/Plazo',
+    'schedule': 'Horario/Disponibilidad',
+    'percentage': 'Porcentaje',
+    'contact': 'Contacto',
+    'action': 'Accion comprometida',
+    'role': 'Persona/Rol',
+    'condition': 'Condicion/Requisito'
+};
+
+const ENTITY_ICONS = {
+    'price': '💰',
+    'area_sqm': '📐',
+    'bedrooms': '🛏️',
+    'bathrooms': '🚿',
+    'location': '📍',
+    'date': '📅',
+    'schedule': '🕐',
+    'percentage': '📊',
+    'contact': '📞',
+    'action': '✅',
+    'role': '👤',
+    'condition': '📋'
 };
 
 function translateConcept(key, map) {
@@ -1346,14 +1401,34 @@ function renderResults(data, inputText) {
 
     let entitiesHtml = '';
     if (data.entities && data.entities.length > 0) {
-        entitiesHtml = data.entities.map(e => {
-            let numStr = '';
-            if (e.numeric_value !== null) {
-                numStr = ` &rarr; <span class="entity-numeric">${e.numeric_value.toLocaleString()}${e.unit ? ' ' + e.unit : ''}</span>`;
-            }
-            return `<div class="entity-item">
-                <div class="entity-concept">${translateConcept(e.concept, ENTITY_ES)}</div>
-                <div class="entity-value">"${e.raw_value}"${numStr}</div>
+        // Group entities by concept
+        const grouped = {};
+        data.entities.forEach(e => {
+            if (!grouped[e.concept]) grouped[e.concept] = [];
+            grouped[e.concept].push(e);
+        });
+
+        // Render order: core first, then extended
+        const order = ['price', 'area_sqm', 'bedrooms', 'bathrooms', 'location', 'date', 'schedule', 'percentage', 'contact', 'action', 'role', 'condition'];
+        const sortedKeys = Object.keys(grouped).sort((a, b) => {
+            const ia = order.indexOf(a), ib = order.indexOf(b);
+            return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        });
+
+        entitiesHtml = sortedKeys.map(concept => {
+            const items = grouped[concept];
+            const icon = ENTITY_ICONS[concept] || '📎';
+            const label = translateConcept(concept, ENTITY_ES);
+            const valuesHtml = items.map(e => {
+                let numStr = '';
+                if (e.numeric_value !== null) {
+                    numStr = ` → <span class="entity-numeric">${e.numeric_value.toLocaleString()}${e.unit ? ' ' + e.unit : ''}</span>`;
+                }
+                return `<span class="entity-value-chip">"${e.raw_value}"${numStr}</span>`;
+            }).join('');
+            return `<div class="entity-group">
+                <div class="entity-group-header">${icon} ${label}</div>
+                <div class="entity-group-values">${valuesHtml}</div>
             </div>`;
         }).join('');
     } else {
