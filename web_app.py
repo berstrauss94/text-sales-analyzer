@@ -35,6 +35,48 @@ user_manager = UserManager()
 audio_transcriber = AudioTranscriber(model_name="base")
 
 
+def _dedup_transcription(text: str) -> str:
+    """
+    Remove consecutive repeated words/phrases that transcription systems produce.
+
+    Examples:
+        "bueno bueno bueno entonces" → "bueno entonces"
+        "si si si claro" → "si claro"
+        "vamos a vamos a ver" → "vamos a ver"
+
+    Handles:
+        - Single word repetitions: "bueno bueno bueno" → "bueno"
+        - Two-word phrase repetitions: "vamos a vamos a" → "vamos a"
+        - Three-word phrase repetitions: "lo que pasa lo que pasa" → "lo que pasa"
+        - Case insensitive matching but preserves original case
+    """
+    import re
+
+    if not text or len(text) < 5:
+        return text
+
+    # Remove consecutive repeated single words (3+ repetitions → 1)
+    # e.g., "bueno bueno bueno" → "bueno"
+    result = re.sub(r'\b(\w+)(?:\s+\1){2,}\b', r'\1', text, flags=re.IGNORECASE)
+
+    # Remove consecutive repeated single words (2 repetitions → 1)
+    # e.g., "bueno bueno" → "bueno"
+    result = re.sub(r'\b(\w+)\s+\1\b', r'\1', result, flags=re.IGNORECASE)
+
+    # Remove consecutive repeated two-word phrases
+    # e.g., "vamos a vamos a" → "vamos a"
+    result = re.sub(r'\b(\w+\s+\w+)\s+\1\b', r'\1', result, flags=re.IGNORECASE)
+
+    # Remove consecutive repeated three-word phrases
+    # e.g., "lo que pasa lo que pasa" → "lo que pasa"
+    result = re.sub(r'\b(\w+\s+\w+\s+\w+)\s+\1\b', r'\1', result, flags=re.IGNORECASE)
+
+    # Clean up multiple spaces
+    result = re.sub(r'  +', ' ', result)
+
+    return result.strip()
+
+
 def _build_commercial_dict(ca) -> dict:
     """Build the commercial analysis dictionary for JSON response."""
     return {
@@ -3779,7 +3821,10 @@ def analyze():
         return jsonify({"error": True, "error_code": "BAD_REQUEST",
                         "error_message": "No text provided"}), 400
 
-    result = analyzer.analyze(data["text"])
+    # Filter out consecutive repeated words/phrases from transcription artifacts
+    clean_text = _dedup_transcription(data["text"])
+
+    result = analyzer.analyze(clean_text)
 
     if isinstance(result, AnalysisError):
         print(f"[ANALYSIS_ERROR] code={result.error_code} msg={result.error_message}")
@@ -3790,7 +3835,7 @@ def analyze():
         })
 
     # Run commercial analysis in parallel
-    ca = commercial_analyzer.analyze(data["text"])
+    ca = commercial_analyzer.analyze(clean_text)
 
     analysis_dict = {
         "intent": result.intent,
@@ -3819,7 +3864,7 @@ def analyze():
     entry_name = data.get("entry_name", "")
     add_entry(
         username=session["username"],
-        text=data["text"],
+        text=clean_text,
         analysis=analysis_dict,
         source="text",
         year=year,
