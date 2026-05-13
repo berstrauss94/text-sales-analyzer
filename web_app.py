@@ -3953,13 +3953,24 @@ def saved_texts():
     year = request.args.get("year", type=int)
     month = request.args.get("month", type=int)
 
-    entries = get_flat_entries(session["username"], limit=100)
+    entries = get_flat_entries(session["username"], limit=200)
 
-    # Filter by year/month
+    # Filter by year/month — compare using timestamp if year/month fields missing
     filtered = []
     for e in entries:
         e_year = e.get("year")
         e_month = e.get("month")
+
+        # Fallback: extract from timestamp string if year/month not set
+        if e_year is None and e.get("timestamp"):
+            try:
+                from datetime import datetime as _dt
+                ts = _dt.fromisoformat(e["timestamp"].replace("Z", "+00:00"))
+                e_year = ts.year
+                e_month = ts.month
+            except Exception:
+                pass
+
         if e_year == year and e_month == month:
             filtered.append({
                 "id": e.get("id", ""),
@@ -3967,6 +3978,7 @@ def saved_texts():
                 "text": (e.get("text", "") or "")[:60],
                 "intent": e.get("intent", ""),
                 "timestamp": e.get("timestamp", "")[:10],
+                "source": e.get("source", ""),
             })
 
     return jsonify({"entries": filtered})
