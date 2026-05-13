@@ -212,14 +212,14 @@ def add_entry(
     Returns the entry dict that was saved.
     """
     now = datetime.now(timezone.utc)
-    # If year/month provided, use them for categorization but keep real timestamp
+    # If year/month provided, use that date for the entry timestamp
     if year and month:
-        cat_date = datetime(year, month, now.day if now.day <= 28 else 28,
+        cat_date = datetime(year, month, min(now.day, 28),
                            now.hour, now.minute, now.second, tzinfo=timezone.utc)
     else:
         cat_date = now
 
-    entry = _build_entry(username, text, analysis, source, audio_filename, now)
+    entry = _build_entry(username, text, analysis, source, audio_filename, cat_date)
     # Add year/month/name metadata to entry
     if year:
         entry["year"] = year
