@@ -1187,3 +1187,159 @@ REAL_ESTATE_CONCEPT_DATA += [
     ("300 m2.", "area_sqm"),
     ("1200 sqm.", "area_sqm"),
 ]
+
+# ---------------------------------------------------------------------------
+# Extended Real Estate Concepts v4 — Argentine real estate domain
+# Covers: loteos, financiamiento directo, documentación, tipos de operación,
+# vocabulario de vendedores inmobiliarios argentinos
+# ---------------------------------------------------------------------------
+
+REAL_ESTATE_CONCEPT_DATA += [
+    # property_type — Argentine vocabulary
+    ("Loteo en zona sur con servicios.", "property_type"),
+    ("Lote de 300 m2 en barrio cerrado.", "property_type"),
+    ("Terreno en loteo nuevo con financiamiento.", "property_type"),
+    ("Departamento de 2 ambientes en Palermo.", "property_type"),
+    ("Monoambiente en zona centrica.", "property_type"),
+    ("PH de 3 ambientes con patio.", "property_type"),
+    ("Duplex en country con pileta.", "property_type"),
+    ("Chalet en barrio residencial.", "property_type"),
+    ("Galpon industrial con oficinas.", "property_type"),
+    ("Cochera cubierta en edificio.", "property_type"),
+    ("Quinta con casa principal y pileta.", "property_type"),
+    ("Campo de 50 hectareas productivo.", "property_type"),
+    ("Fondo de comercio en zona comercial.", "property_type"),
+    ("Oficina en torre corporativa.", "property_type"),
+    ("Salon comercial sobre avenida.", "property_type"),
+    ("Lote esquina ideal para desarrollo.", "property_type"),
+    ("Propiedad horizontal en planta baja.", "property_type"),
+    ("Departamento en pozo, entrega 2027.", "property_type"),
+    ("Casa prefabricada en terreno propio.", "property_type"),
+    ("Nave industrial con playa de maniobras.", "property_type"),
+
+    # price — Argentine formats and vocabulary
+    ("El lote sale 50,000 dolares.", "price"),
+    ("La cuota es de 200,000 pesos mensuales.", "price"),
+    ("Precio de contado: USD 35,000.", "price"),
+    ("Financiado en 120 cuotas de 150,000 pesos.", "price"),
+    ("El valor del terreno es de 40,000 USD.", "price"),
+    ("Anticipo de 10,000 dolares y cuotas.", "price"),
+    ("Precio de lista 180,000 USD, negociable.", "price"),
+    ("La reserva es de 2,000 dolares.", "price"),
+    ("Costo total financiado: 60,000 USD.", "price"),
+    ("Valor de la propiedad segun tasacion: 250,000.", "price"),
+    ("Expensas de 80,000 pesos mensuales.", "price"),
+    ("Precio por metro cuadrado: 1,500 USD.", "price"),
+    ("El boleto se firma con 30% de anticipo.", "price"),
+    ("Cuota mensual accesible de 100,000 pesos.", "price"),
+    ("Precio promocional por lanzamiento.", "price"),
+
+    # location — Argentine cities and neighborhoods
+    ("Ubicado en barrio Secoto, zona sur.", "location"),
+    ("Propiedad en Villa Maria, Cordoba.", "location"),
+    ("Terreno en Palmar, excelente acceso.", "location"),
+    ("Lote en zona de Fotheringham.", "location"),
+    ("Casa en barrio cerrado Los Alamos.", "location"),
+    ("Departamento en centro de Rosario.", "location"),
+    ("Terreno sobre ruta 9, acceso directo.", "location"),
+    ("Propiedad en zona norte de la ciudad.", "location"),
+    ("Lote cerca del cementerio municipal.", "location"),
+    ("Casa en barrio residencial Las Rosas.", "location"),
+    ("Ubicacion privilegiada sobre avenida principal.", "location"),
+    ("A 5 minutos del centro comercial.", "location"),
+    ("Zona con todos los servicios: agua, luz, gas, cloacas.", "location"),
+    ("Barrio en crecimiento con buena plusvalia.", "location"),
+    ("Cerca de colegios y centros de salud.", "location"),
+    ("Propiedad frente a espacio verde.", "location"),
+    ("Terreno en zona habilitada para construccion.", "location"),
+    ("A metros de la autopista.", "location"),
+    ("En zona de quintas y countries.", "location"),
+    ("Barrio con calles asfaltadas y alumbrado.", "location"),
+
+    # condition — Argentine vocabulary
+    ("Terreno limpio, listo para construir.", "condition"),
+    ("Propiedad a estrenar, nunca habitada.", "condition"),
+    ("Casa en muy buen estado, recien pintada.", "condition"),
+    ("Lote con mejoras: cerco perimetral y pozo.", "condition"),
+    ("Propiedad para refaccionar, buen potencial.", "condition"),
+    ("Departamento reciclado a nuevo.", "condition"),
+    ("Terreno nivelado con servicios al frente.", "condition"),
+    ("Casa antigua con estructura solida.", "condition"),
+    ("Inmueble en condiciones de habitar.", "condition"),
+    ("Propiedad con escritura al dia.", "condition"),
+    ("Lote con planos aprobados para construccion.", "condition"),
+    ("Casa con techo nuevo y instalaciones renovadas.", "condition"),
+
+    # amenities — Argentine vocabulary
+    ("Barrio con pileta comunitaria y SUM.", "amenities"),
+    ("Country con cancha de golf y tenis.", "amenities"),
+    ("Edificio con pileta, parrilla y solarium.", "amenities"),
+    ("Loteo con seguridad privada 24 horas.", "amenities"),
+    ("Barrio cerrado con club house y laguna.", "amenities"),
+    ("Complejo con areas verdes y juegos infantiles.", "amenities"),
+    ("Edificio con cochera, baulera y amenities.", "amenities"),
+    ("Urbanizacion con acceso controlado.", "amenities"),
+    ("Barrio con calles internas pavimentadas.", "amenities"),
+    ("Complejo con vigilancia y camaras de seguridad.", "amenities"),
+
+    # zoning — Argentine vocabulary
+    ("Terreno con aptitud para uso residencial.", "zoning"),
+    ("Lote habilitado para construccion en altura.", "zoning"),
+    ("Zona habilitada para comercio y vivienda.", "zoning"),
+    ("Terreno con factibilidad de servicios.", "zoning"),
+    ("Uso de suelo mixto, comercial y residencial.", "zoning"),
+    ("Zona apta para desarrollo inmobiliario.", "zoning"),
+    ("Terreno con codigo urbanistico aprobado.", "zoning"),
+    ("Lote en zona de expansion urbana.", "zoning"),
+
+    # area_sqm — Argentine formats
+    ("Lote de 10 x 30 metros.", "area_sqm"),
+    ("Terreno de 300 m2, 10 de frente.", "area_sqm"),
+    ("Superficie cubierta: 120 m2.", "area_sqm"),
+    ("Superficie total del lote: 450 m2.", "area_sqm"),
+    ("Departamento de 65 m2 cubiertos.", "area_sqm"),
+    ("Terreno de media hectarea.", "area_sqm"),
+    ("Lote de 15 x 40, total 600 m2.", "area_sqm"),
+    ("Casa de 180 m2 en terreno de 500 m2.", "area_sqm"),
+    ("Galpon de 800 m2 cubiertos.", "area_sqm"),
+    ("Oficina de 45 m2 con bano privado.", "area_sqm"),
+]
+
+# Additional sales concepts for Argentine real estate conversations
+SALES_CONCEPT_DATA += [
+    # closing — Argentine vocabulary
+    ("Firmamos el boleto de compraventa.", "closing"),
+    ("Vamos a escriturar la semana que viene.", "closing"),
+    ("El escribano ya tiene los papeles listos.", "closing"),
+    ("Hacemos la reserva y bloqueamos el lote.", "closing"),
+    ("Te paso el CBU para la transferencia.", "closing"),
+    ("Firmamos ante escribano publico.", "closing"),
+    ("La escritura se hace en 30 dias.", "closing"),
+    ("Reservamos con 2,000 dolares y firmamos.", "closing"),
+
+    # prospect — Argentine vocabulary
+    ("Tengo un cliente que quiere ver el terreno.", "prospect"),
+    ("Hay una familia interesada en el lote.", "prospect"),
+    ("El matrimonio quiere volver a ver la casa.", "prospect"),
+    ("Tengo varios interesados en ese loteo.", "prospect"),
+
+    # objection — Argentine vocabulary
+    ("El cliente dice que la cuota es muy alta.", "objection"),
+    ("Le parece lejos del centro.", "objection"),
+    ("Tiene dudas sobre la escrituracion.", "objection"),
+    ("No le convence la zona.", "objection"),
+    ("Dice que tiene que consultarlo con la familia.", "objection"),
+    ("Le preocupa la seguridad del barrio.", "objection"),
+
+    # negotiation — Argentine vocabulary
+    ("Si pago de contado me haces un descuento?", "negotiation"),
+    ("Podemos arreglar las cuotas en dolares?", "negotiation"),
+    ("Que pasa si adelanto cuotas?", "negotiation"),
+    ("Puedo pagar el anticipo en dos partes?", "negotiation"),
+
+    # follow_up — Argentine vocabulary
+    ("Te llamo para ver como va la decision.", "follow_up"),
+    ("Queria saber si pudiste hablar con tu marido.", "follow_up"),
+    ("Te mando las fotos que me pediste.", "follow_up"),
+    ("Paso a buscarte para ir a ver el terreno.", "follow_up"),
+]
