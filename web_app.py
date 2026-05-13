@@ -314,7 +314,7 @@ HTML = """
 
         textarea {
             width: 100%;
-            height: 325px;
+            height: 650px;
             background: #0f1117;
             border: 1px solid #2a2d3a;
             border-radius: 8px;
@@ -344,7 +344,7 @@ HTML = """
             top: 0;
             left: 0;
             right: 0;
-            min-height: 325px;
+            min-height: 650px;
             height: 100%;
             background: #0f1117;
             border: 2px solid #4a6cf7;
