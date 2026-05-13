@@ -4179,6 +4179,28 @@ def admin_sync_log():
         return jsonify(_json.load(f))
 
 
+@app.route("/debug-entries")
+def debug_entries():
+    """Temporary debug endpoint to see what's in the database for a user."""
+    if not session.get("username"):
+        return jsonify({"error": "not logged in"}), 401
+    username = session["username"]
+    entries = get_flat_entries(username, limit=10)
+    # Return raw entry data for debugging
+    debug_data = []
+    for e in entries:
+        debug_data.append({
+            "id": e.get("id", "")[:20],
+            "timestamp": e.get("timestamp", ""),
+            "year": e.get("year"),
+            "month": e.get("month"),
+            "source": e.get("source", ""),
+            "text_preview": (e.get("text", "") or "")[:50],
+            "intent": e.get("intent", ""),
+        })
+    return jsonify({"username": username, "total_returned": len(entries), "entries": debug_data})
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print("\n" + "=" * 50)
