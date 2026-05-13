@@ -805,6 +805,15 @@ HTML = """
             color: #5bf5a3;
             font-size: 0.78rem;
         }
+        .entity-count-badge {
+            background: #4a6cf7;
+            color: #fff;
+            font-size: 0.6rem;
+            font-weight: 700;
+            padding: 1px 5px;
+            border-radius: 8px;
+            margin-left: 4px;
+        }
 
         /* Extended data extraction styles */
         .ext-data-grid {
@@ -2001,12 +2010,24 @@ function renderResults(data, inputText) {
             const items = grouped[concept];
             const icon = ENTITY_ICONS[concept] || '📎';
             const label = translateConcept(concept, ENTITY_ES);
-            const valuesHtml = items.map(e => {
+
+            // Group duplicate raw_values and count them
+            const valueCounts = {};
+            items.forEach(e => {
+                const key = e.raw_value.toLowerCase().trim();
+                if (!valueCounts[key]) {
+                    valueCounts[key] = { entity: e, count: 0 };
+                }
+                valueCounts[key].count++;
+            });
+
+            const valuesHtml = Object.values(valueCounts).map(({entity: e, count}) => {
                 let numStr = '';
                 if (e.numeric_value !== null) {
                     numStr = ` → <span class="entity-numeric">${e.numeric_value.toLocaleString()}${e.unit ? ' ' + e.unit : ''}</span>`;
                 }
-                return `<span class="entity-value-chip">"${e.raw_value}"${numStr}</span>`;
+                const countBadge = count > 1 ? ` <span class="entity-count-badge">${count}x</span>` : '';
+                return `<span class="entity-value-chip">"${e.raw_value}"${numStr}${countBadge}</span>`;
             }).join('');
             return `<div class="entity-group">
                 <div class="entity-group-header">${icon} ${label}</div>
