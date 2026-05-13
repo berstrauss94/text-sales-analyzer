@@ -42,34 +42,42 @@ def _dedup_transcription(text: str) -> str:
     Examples:
         "bueno bueno bueno entonces" → "bueno entonces"
         "si si si claro" → "si claro"
+        "CVU CVU CVU CVU CVU" → "CVU"
         "vamos a vamos a ver" → "vamos a ver"
 
-    Handles:
-        - Single word repetitions: "bueno bueno bueno" → "bueno"
-        - Two-word phrase repetitions: "vamos a vamos a" → "vamos a"
-        - Three-word phrase repetitions: "lo que pasa lo que pasa" → "lo que pasa"
-        - Case insensitive matching but preserves original case
+    Handles repeated words and phrases regardless of case.
     """
     import re
 
     if not text or len(text) < 5:
         return text
 
-    # Remove consecutive repeated single words (3+ repetitions → 1)
-    # e.g., "bueno bueno bueno" → "bueno"
-    result = re.sub(r'\b(\w+)(?:\s+\1){2,}\b', r'\1', text, flags=re.IGNORECASE)
+    result = text
 
-    # Remove consecutive repeated single words (2 repetitions → 1)
-    # e.g., "bueno bueno" → "bueno"
-    result = re.sub(r'\b(\w+)\s+\1\b', r'\1', result, flags=re.IGNORECASE)
+    # Pass 1: Remove consecutive repeated single words (any number of repetitions)
+    # Handles: "CVU CVU CVU CVU" → "CVU", "bueno bueno bueno" → "bueno"
+    # Run multiple times to catch nested repetitions
+    for _ in range(3):
+        prev = result
+        result = re.sub(r'\b(\w+)(\s+\1)+\b', r'\1', result, flags=re.IGNORECASE)
+        if result == prev:
+            break
 
-    # Remove consecutive repeated two-word phrases
-    # e.g., "vamos a vamos a" → "vamos a"
-    result = re.sub(r'\b(\w+\s+\w+)\s+\1\b', r'\1', result, flags=re.IGNORECASE)
+    # Pass 2: Remove consecutive repeated two-word phrases
+    # Handles: "vamos a vamos a" → "vamos a"
+    for _ in range(3):
+        prev = result
+        result = re.sub(r'\b(\w+\s+\w+)(\s+\1)+\b', r'\1', result, flags=re.IGNORECASE)
+        if result == prev:
+            break
 
-    # Remove consecutive repeated three-word phrases
-    # e.g., "lo que pasa lo que pasa" → "lo que pasa"
-    result = re.sub(r'\b(\w+\s+\w+\s+\w+)\s+\1\b', r'\1', result, flags=re.IGNORECASE)
+    # Pass 3: Remove consecutive repeated three-word phrases
+    # Handles: "lo que pasa lo que pasa" → "lo que pasa"
+    for _ in range(2):
+        prev = result
+        result = re.sub(r'\b(\w+\s+\w+\s+\w+)(\s+\1)+\b', r'\1', result, flags=re.IGNORECASE)
+        if result == prev:
+            break
 
     # Clean up multiple spaces
     result = re.sub(r'  +', ' ', result)
