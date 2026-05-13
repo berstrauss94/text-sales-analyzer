@@ -473,6 +473,11 @@ def _pg_get_flat(username: str, limit: int = 50) -> list[dict]:
     if conn is None:
         return []
     try:
+        # Ensure any pending transaction is committed before reading
+        try:
+            conn.commit()
+        except Exception:
+            pass
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT id, username, timestamp, source, audio_filename,
@@ -488,6 +493,10 @@ def _pg_get_flat(username: str, limit: int = 50) -> list[dict]:
         return [_pg_row_to_entry(r) for r in rows]
     except Exception as exc:
         logger.error(f"Error leyendo flat PG: {exc}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         return []
 
 
