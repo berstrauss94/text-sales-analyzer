@@ -367,8 +367,11 @@ class SyncPipeline:
                 year=timestamp.year,
                 month=timestamp.month,
             )
+            logger.info(f"Entrada guardada OK: {username}, year={timestamp.year}, month={timestamp.month}")
         except Exception as exc:
-            logger.error(f"Error guardando entrada para {username}: {exc}")
+            logger.error(f"FALLO guardando entrada para {username}: {exc}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     # ------------------------------------------------------------------
     # Persistencia de dedup y log
