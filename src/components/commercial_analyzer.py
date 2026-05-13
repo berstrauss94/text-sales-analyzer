@@ -252,6 +252,42 @@ def _count_keyword(text: str, keyword: str) -> int:
     return len(re.findall(pattern, text))
 
 
+def _count_as_response(text: str, keyword: str) -> int:
+    """
+    Count a keyword only when it appears as an independent response/expression,
+    NOT as part of a larger phrase.
+
+    A word is considered a "response" when:
+    - At the start of the text
+    - After sentence-ending punctuation (. ! ? newline)
+    - Followed by comma, period, exclamation, question mark, or end of text
+    - Standalone (surrounded by punctuation/boundaries on both sides)
+
+    This prevents counting "no se puede" as "no se" (objection),
+    or "claro que no" as "claro" (affirmative).
+    """
+    normalized = text.lower()
+    nfkd = unicodedata.normalize("NFKD", normalized)
+    normalized = "".join(c for c in nfkd if not unicodedata.combining(c))
+
+    escaped = re.escape(keyword)
+
+    # Pattern: keyword at sentence start/after punctuation AND followed by
+    # comma, period, exclamation, question, newline, or end of string
+    patterns = [
+        # After sentence boundary (. ! ? newline or start) + optional space, then keyword + punctuation/end
+        r'(?:^|[.!?\n]\s*)' + escaped + r'(?:\s*[,.:;!?\n]|\s*$)',
+        # Keyword followed by comma (very common in responses: "claro, ...")
+        r'(?:^|[.!?\n]\s*)' + escaped + r',\s',
+    ]
+
+    count = 0
+    for pattern in patterns:
+        count += len(re.findall(pattern, normalized, re.MULTILINE))
+
+    return count
+
+
 def _count_affirmative_si(text: str) -> int:
     """
     Count "si" only when it's a genuine affirmative response, NOT conditional.
@@ -351,17 +387,25 @@ class CommercialAnalyzer:
         ca.detalle = {}
 
         # Count each indicator group and collect word-level detail
+        # Keywords that should only be counted as standalone responses (not part of phrases)
+        _RESPONSE_ONLY_KEYWORDS = {
+            "respuestas_afirmativas": {"si", "claro", "ok", "dale", "listo", "correcto",
+                                       "exacto", "afirmativo", "yes", "sure", "absolutely", "agreed"},
+            "objeciones": {"no se", "no estoy", "esperar", "despues", "pensar", "pensarlo",
+                           "wait", "later", "think"},
+        }
+
         for group, keywords in _KEYWORDS.items():
             word_counts: dict[str, int] = {}
             total = 0
+            response_only = _RESPONSE_ONLY_KEYWORDS.get(group, set())
             for kw in keywords:
                 # Special handling for "si" in respuestas_afirmativas:
                 # Only count when it's a genuine affirmative response
                 if group == "respuestas_afirmativas" and kw == "si":
                     count = _count_affirmative_si(text)
-                elif group == "respuestas_afirmativas" and kw == "yes":
-                    # "yes" is almost always affirmative in this context
-                    count = _count_keyword(normalized, kw)
+                elif kw in response_only:
+                    count = _count_as_response(text, kw)
                 else:
                     count = _count_keyword(normalized, kw)
                 if count > 0:
