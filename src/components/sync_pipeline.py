@@ -343,11 +343,10 @@ class SyncPipeline:
         timestamp: Optional[datetime],
     ) -> None:
         """
-        Llama a add_entry con el timestamp original de grabación,
-        pasando year/month para que el filtro de la UI funcione.
+        Saves an entry directly, using the original recording timestamp.
+        No mocking — builds the entry manually and calls add_entry with year/month.
         """
         if timestamp is None:
-            # Sin timestamp original → usar ahora
             self._add_entry(
                 username=username,
                 text=text,
@@ -357,22 +356,8 @@ class SyncPipeline:
             )
             return
 
-        # Pasar year/month explícitamente para que el filtro de la UI funcione
-        import src.users.history_manager as hm
-        from unittest.mock import patch
-
-        mock_dt = datetime(
-            timestamp.year, timestamp.month, timestamp.day,
-            timestamp.hour, timestamp.minute, timestamp.second,
-            tzinfo=timezone.utc
-        )
-
-        class _MockDatetime(datetime):
-            @classmethod
-            def now(cls, tz=None):
-                return mock_dt
-
-        with patch.object(hm, "datetime", _MockDatetime):
+        # Call add_entry with explicit year/month from the recording timestamp
+        try:
             self._add_entry(
                 username=username,
                 text=text,
@@ -382,6 +367,8 @@ class SyncPipeline:
                 year=timestamp.year,
                 month=timestamp.month,
             )
+        except Exception as exc:
+            logger.error(f"Error guardando entrada para {username}: {exc}")
 
     # ------------------------------------------------------------------
     # Persistencia de dedup y log
