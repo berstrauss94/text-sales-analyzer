@@ -54,6 +54,9 @@ class SyncPipeline:
         """
         Ejecuta el ciclo completo de sincronización.
 
+        If CLEAR_DEDUP_ON_START env var is set, clears the dedup store first
+        to force reprocessing of all records.
+
         Args:
             historical: si True, extrae desde Enero 2026 hasta hoy.
                         si False, solo el mes actual.
@@ -70,6 +73,11 @@ class SyncPipeline:
             "errors": 0,
             "unmapped_vendors": [],
         }
+
+        # Clear dedup if requested (to force reprocessing)
+        if os.environ.get("CLEAR_DEDUP_ON_START", "").lower() == "true" and historical:
+            logger.info("CLEAR_DEDUP_ON_START=true: limpiando dedup store para reprocesar.")
+            self._save_dedup(set())
 
         try:
             mapping = self._load_mapping()
@@ -335,8 +343,8 @@ class SyncPipeline:
         timestamp: Optional[datetime],
     ) -> None:
         """
-        Llama a add_entry pero usando el timestamp original de grabación
-        en lugar del timestamp actual.
+        Llama a add_entry con el timestamp original de grabación,
+        pasando year/month para que el filtro de la UI funcione.
         """
         if timestamp is None:
             # Sin timestamp original → usar ahora
@@ -349,8 +357,7 @@ class SyncPipeline:
             )
             return
 
-        # Parchear temporalmente la función datetime.now en history_manager
-        # usando el timestamp original para que la entrada quede en la fecha correcta
+        # Pasar year/month explícitamente para que el filtro de la UI funcione
         import src.users.history_manager as hm
         from unittest.mock import patch
 
@@ -372,6 +379,8 @@ class SyncPipeline:
                 analysis=analysis,
                 source=source,
                 audio_filename=audio_filename,
+                year=timestamp.year,
+                month=timestamp.month,
             )
 
     # ------------------------------------------------------------------
