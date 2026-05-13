@@ -380,9 +380,25 @@ def _pg_row_to_entry(row) -> dict:
 
     ts_str = ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
 
+    # Extract year/month from timestamp for UI filtering
+    entry_year = None
+    entry_month = None
+    if hasattr(ts, "year"):
+        entry_year = ts.year
+        entry_month = ts.month
+    else:
+        try:
+            parsed_ts = datetime.fromisoformat(ts_str)
+            entry_year = parsed_ts.year
+            entry_month = parsed_ts.month
+        except Exception:
+            pass
+
     return {
         "id": eid,
         "timestamp": ts_str,
+        "year": entry_year,
+        "month": entry_month,
         "source": source,
         "audio_filename": audio_fn or "",
         "text": text_short,
