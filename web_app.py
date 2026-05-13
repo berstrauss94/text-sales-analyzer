@@ -4205,66 +4205,76 @@ def debug_entries():
 def debug_sync_one():
     """
     Debug endpoint: saves ONE test entry directly to verify DB works.
-    Visit: /debug-sync-one
+    Uses raw SQL to bypass any abstraction issues.
     """
     if not session.get("username"):
         return jsonify({"error": "not logged in"}), 401
 
     username = session["username"]
-    test_text = "Este es un texto de prueba para verificar que el guardado en base de datos funciona correctamente."
+    import traceback
 
     try:
-        # Analyze
-        result = analyzer.analyze(test_text)
-        if isinstance(result, AnalysisError):
-            return jsonify({"error": f"Analysis failed: {result.error_message}"})
+        # Try direct PostgreSQL access
+        import psycopg2
+        db_url = os.environ.get("DATABASE_URL", "")
+        if not db_url:
+            return jsonify({"success": False, "error": "DATABASE_URL not set"})
 
-        # Build analysis dict
-        analysis_dict = {
-            "intent": result.intent,
-            "intent_confidence": result.intent_confidence,
-            "sentiment": result.sentiment,
-            "sentiment_confidence": result.sentiment_confidence,
-            "sales_concepts": [
-                {"concept": c.concept, "confidence": c.confidence, "source_text": c.source_text}
-                for c in result.sales_concepts
-            ],
-            "real_estate_concepts": [
-                {"concept": c.concept, "confidence": c.confidence, "source_text": c.source_text}
-                for c in result.real_estate_concepts
-            ],
-            "entities": [
-                {"concept": e.concept, "raw_value": e.raw_value,
-                 "numeric_value": e.numeric_value, "unit": e.unit}
-                for e in result.entities
-            ],
-            "commercial": None,
-        }
+        if db_url.startswith("postgres://"):
+            db_url = "postgresql://" + db_url[len("postgres://"):]
 
-        # Save with year=2026, month=1
-        entry = add_entry(
-            username=username,
-            text=test_text,
-            analysis=analysis_dict,
-            source="sync",
-            audio_filename="debug-test",
-            year=2026,
-            month=1,
-        )
+        conn = psycopg2.connect(db_url)
+        conn.autocommit = True
 
-        # Now read back
-        entries = get_flat_entries(username, limit=5)
+        with conn.cursor() as cur:
+            # Check if table exists
+            cur.execute("SELECT COUNT(*) FROM analysis_history WHERE username = %s", (username,))
+            count_before = cur.fetchone()[0]
+
+            # Insert a test row
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc)
+            test_id = now.strftime("%Y%m%d%H%M%S%f") + "_debug"
+
+            cur.execute("""
+                INSERT INTO analysis_history
+                    (id, username, timestamp, source, audio_filename,
+                     text_short, text_full, intent, intent_conf,
+                     sentiment, sentiment_conf, sales_concepts, re_concepts,
+                     entities, commercial, day_label)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (
+                test_id, username, now, "sync", "debug-test",
+                "Texto de prueba debug", "Texto de prueba debug completo para verificar guardado",
+                "DESCRIPTION", 0.8, "NEUTRAL", 0.9,
+                "[]", "[]", "[]", None, now.strftime("%d/%m/%Y"),
+            ))
+
+            # Read back
+            cur.execute("SELECT COUNT(*) FROM analysis_history WHERE username = %s", (username,))
+            count_after = cur.fetchone()[0]
+
+            # Get the row we just inserted
+            cur.execute("""
+                SELECT id, timestamp, source, text_short
+                FROM analysis_history
+                WHERE username = %s
+                ORDER BY timestamp DESC LIMIT 3
+            """, (username,))
+            rows = cur.fetchall()
+
+        conn.close()
 
         return jsonify({
             "success": True,
-            "message": f"Entry saved for {username} with id={entry.get('id', '?')[:20]}",
-            "entry_year": entry.get("year"),
-            "entry_month": entry.get("month"),
-            "readback_count": len(entries),
-            "readback_first": entries[0] if entries else None,
+            "username": username,
+            "count_before": count_before,
+            "count_after": count_after,
+            "inserted_id": test_id,
+            "recent_rows": [{"id": r[0][:20], "ts": str(r[1]), "source": r[2], "text": r[3][:40]} for r in rows],
         })
+
     except Exception as exc:
-        import traceback
         return jsonify({
             "success": False,
             "error": str(exc),
