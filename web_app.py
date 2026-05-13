@@ -814,6 +814,14 @@ HTML = """
             border-radius: 8px;
             margin-left: 4px;
         }
+        .entity-clickable {
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .entity-clickable:hover {
+            border-color: #4a6cf7;
+            background: #1a2a4a;
+        }
 
         /* Extended data extraction styles */
         .ext-data-grid {
@@ -2027,7 +2035,8 @@ function renderResults(data, inputText) {
                     numStr = ` → <span class="entity-numeric">${e.numeric_value.toLocaleString()}${e.unit ? ' ' + e.unit : ''}</span>`;
                 }
                 const countBadge = count > 1 ? ` <span class="entity-count-badge">${count}x</span>` : '';
-                return `<span class="entity-value-chip">"${e.raw_value}"${numStr}${countBadge}</span>`;
+                const safeValue = e.raw_value.replace(/'/g, "\\\\'");
+                return `<span class="entity-value-chip entity-clickable" onclick="highlightEntityInText('${safeValue}')">"${e.raw_value}"${numStr}${countBadge}</span>`;
             }).join('');
             return `<div class="entity-group">
                 <div class="entity-group-header">${icon} ${label}</div>
@@ -3069,6 +3078,26 @@ function highlightSingleWord(word, indicatorKey) {
     closeBtn.classList.add('active');
 
     // Scroll to the textarea area only when clicking a specific word
+    const wrapper = document.getElementById('textareaWrapper');
+    wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function highlightEntityInText(rawValue) {
+    const textarea = document.getElementById('textInput');
+    const overlay = document.getElementById('highlightOverlay');
+    const closeBtn = document.getElementById('highlightCloseBtn');
+    const text = textarea.value;
+
+    if (!text) return;
+
+    // Use a generic entity highlight class
+    const highlightedHtml = buildHighlightedText(text, [rawValue], 'indicios_cierre');
+
+    overlay.innerHTML = highlightedHtml;
+    overlay.classList.add('active');
+    closeBtn.classList.add('active');
+
+    // Scroll to the textarea area
     const wrapper = document.getElementById('textareaWrapper');
     wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
