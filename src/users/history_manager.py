@@ -228,10 +228,16 @@ def add_entry(
     if entry_name:
         entry["entry_name"] = entry_name
 
-    if _is_pg_available():
-        _pg_add_entry(entry, username)
-    else:
-        _json_add_entry(username, entry, cat_date, users_dir)
+    try:
+        if _is_pg_available():
+            _pg_add_entry(entry, username)
+            logger.info(f"PG: entrada guardada para {username} (id={entry['id'][:12]})")
+        else:
+            _json_add_entry(username, entry, cat_date, users_dir)
+            logger.info(f"JSON: entrada guardada para {username}")
+    except Exception as exc:
+        logger.error(f"ERROR guardando entrada para {username}: {exc}")
+        raise
 
     return entry
 
