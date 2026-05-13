@@ -4201,6 +4201,77 @@ def debug_entries():
     return jsonify({"username": username, "total_returned": len(entries), "entries": debug_data})
 
 
+@app.route("/debug-sync-one")
+def debug_sync_one():
+    """
+    Debug endpoint: saves ONE test entry directly to verify DB works.
+    Visit: /debug-sync-one
+    """
+    if not session.get("username"):
+        return jsonify({"error": "not logged in"}), 401
+
+    username = session["username"]
+    test_text = "Este es un texto de prueba para verificar que el guardado en base de datos funciona correctamente."
+
+    try:
+        # Analyze
+        result = analyzer.analyze(test_text)
+        if isinstance(result, AnalysisError):
+            return jsonify({"error": f"Analysis failed: {result.error_message}"})
+
+        # Build analysis dict
+        analysis_dict = {
+            "intent": result.intent,
+            "intent_confidence": result.intent_confidence,
+            "sentiment": result.sentiment,
+            "sentiment_confidence": result.sentiment_confidence,
+            "sales_concepts": [
+                {"concept": c.concept, "confidence": c.confidence, "source_text": c.source_text}
+                for c in result.sales_concepts
+            ],
+            "real_estate_concepts": [
+                {"concept": c.concept, "confidence": c.confidence, "source_text": c.source_text}
+                for c in result.real_estate_concepts
+            ],
+            "entities": [
+                {"concept": e.concept, "raw_value": e.raw_value,
+                 "numeric_value": e.numeric_value, "unit": e.unit}
+                for e in result.entities
+            ],
+            "commercial": None,
+        }
+
+        # Save with year=2026, month=1
+        entry = add_entry(
+            username=username,
+            text=test_text,
+            analysis=analysis_dict,
+            source="sync",
+            audio_filename="debug-test",
+            year=2026,
+            month=1,
+        )
+
+        # Now read back
+        entries = get_flat_entries(username, limit=5)
+
+        return jsonify({
+            "success": True,
+            "message": f"Entry saved for {username} with id={entry.get('id', '?')[:20]}",
+            "entry_year": entry.get("year"),
+            "entry_month": entry.get("month"),
+            "readback_count": len(entries),
+            "readback_first": entries[0] if entries else None,
+        })
+    except Exception as exc:
+        import traceback
+        return jsonify({
+            "success": False,
+            "error": str(exc),
+            "traceback": traceback.format_exc(),
+        })
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print("\n" + "=" * 50)
