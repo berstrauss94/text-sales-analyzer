@@ -1835,7 +1835,11 @@ async function analyze() {
         });
         const data = await response.json();
         _lastCommercialData = data.commercial || null;
-        renderResults(data, text);
+        // Update textarea with cleaned text (deduped)
+        if (!data.error && data.input_text) {
+            document.getElementById('textInput').value = data.input_text;
+        }
+        renderResults(data, data.input_text || text);
     } catch (e) {
         document.getElementById('results').innerHTML =
             '<div class="error-card">Error de conexion: ' + e.message + '</div>';
@@ -3882,7 +3886,7 @@ def analyze():
 
     return jsonify({
         "error": False,
-        "input_text": result.input_text,
+        "input_text": clean_text,
         "analyzed_at": result.analyzed_at,
         "year": year,
         "month": month,
