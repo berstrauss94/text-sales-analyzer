@@ -336,5 +336,12 @@ class ConceptExtractor:
                         fragment = fragment[space_idx+1:]
                 return fragment
 
-        # Fallback: return empty string instead of beginning of text
+        # Fallback: find first meaningful sentence (skip timestamps and role labels)
+        import re as _re
+        sentences = _re.split(r'[.!?]\s+', text)
+        for sent in sentences:
+            # Skip short fragments, timestamps, and role labels
+            cleaned = sent.strip()
+            if len(cleaned) > 20 and not _re.match(r'^(Vendedor|Cliente|Speaker)\s*\(', cleaned):
+                return cleaned[:80]
         return ""
