@@ -148,6 +148,7 @@ def _build_commercial_dict(ca) -> dict:
         "keywords": ca.keywords,
         "resumen": ca.resumen,
         "accion_siguiente": ca.accion_siguiente,
+        "prospeccion_detalle": ca.prospeccion_detalle,
     }
 
 # Load analyzer once at startup
@@ -2665,6 +2666,23 @@ function renderCommercial(c) {
         </div>
 
         <div class="indicators-grid">${indicatorsHtml}</div>
+
+        ${c.prospeccion_detalle && Object.keys(c.prospeccion_detalle).length > 0 ? `
+        <div style="margin-bottom:14px; padding:10px; background:#0a0c14; border:1px solid #1e2a40; border-radius:8px; border-left:3px solid #5bd4f5;">
+            <div style="font-size:0.7rem; color:#5bd4f5; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:8px; font-weight:600;">Detalle de Prospeccion por Categoria</div>
+            ${Object.entries(c.prospeccion_detalle).map(([cat, phrases]) => {
+                const catLabels = {
+                    'apertura': '1. Apertura y deteccion de necesidad',
+                    'interes': '2. Deteccion de interes e intencion',
+                    'situacion': '3. Situacion habitacional y laboral',
+                    'familia': '4. Informacion familiar',
+                    'objetivo': '5. Objetivo de compra',
+                    'ubicacion_barrio': '6. Presentacion de barrios y ubicacion',
+                    'modalidad_pago': '7. Modalidad de pago y capacidad',
+                };
+                return '<div style="margin-bottom:6px;"><div style="font-size:0.68rem; color:#aaa; font-weight:600; margin-bottom:3px;">' + (catLabels[cat] || cat) + ' (' + phrases.length + ')</div><div style="display:flex; flex-wrap:wrap; gap:4px;">' + phrases.map(p => '<span style="background:#0d1a2a; border:1px solid #1a3a5c; color:#5bd4f5; padding:2px 8px; border-radius:10px; font-size:0.65rem;">' + p + '</span>').join('') + '</div></div>';
+            }).join('')}
+        </div>` : ''}
 
         <div style="font-size:0.75rem; color:#555; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.06em;">Recomendacion</div>
         <div class="recomendacion-box">${c.recomendacion}</div>

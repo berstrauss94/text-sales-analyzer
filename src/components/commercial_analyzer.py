@@ -60,6 +60,8 @@ class CommercialAnalysis:
     keywords: list = field(default_factory=list)
     resumen: str = ""
     accion_siguiente: str = ""
+    # Prospección detallada por categoría
+    prospeccion_detalle: dict = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -109,6 +111,101 @@ _KEYWORDS: dict[str, list[str]] = {
 }
 
 # --- Extended keyword dictionaries ---
+
+# Prospección detallada por categorías
+_PROSPECCION_CATEGORIAS: dict[str, list[str]] = {
+    "apertura": [
+        "en que lo puedo ayudar", "en que puedo ayudar",
+        "como puedo asesorar", "que informacion esta buscando",
+        "como puedo orientar", "que estas buscando",
+        "que te gustaria conocer", "en que te doy una mano",
+        "que tipo de inversion", "que andas buscando",
+        "que te interesa ver", "que necesitas saber",
+        "como te puedo ayudar", "como conocio la empresa",
+        "como supo de la empresa", "como nos conociste",
+        "por donde viste", "quien te recomendo",
+        "como llegaste a nosotros", "donde viste nuestros terrenos",
+        "te aparecio una publicidad", "te recomendaron",
+        "como llego hasta nosotros",
+    ],
+    "interes": [
+        "esta interesado en invertir", "interesado en invertir",
+        "asegurar su capital", "resguardar su capital",
+        "inversion inmobiliaria", "inversion segura",
+        "invertir y hacer crecer", "invertir en algo seguro",
+        "asegurar tu capital", "poner tu plata en algo seguro",
+        "pensando en invertir", "tener algo propio",
+        "hace cuanto busca invertir", "viene evaluando",
+        "tiene pensado realizar", "viene analizando",
+        "hace cuanto venis buscando", "hace tiempo estas viendo",
+        "cuando empezo tu interes", "andas viendo terrenos",
+        "recien empezas a buscar", "tenes ganas de invertir",
+    ],
+    "situacion": [
+        "es propietario o alquila", "vivienda propia o alquilada",
+        "cuenta con vivienda propia", "situacion habitacional",
+        "la casa donde vivis es propia", "estan alquilando",
+        "como estan viviendo", "pagando alquiler",
+        "la casa es de ustedes", "tenes vivienda propia",
+        "a que se dedica", "cual es su ocupacion",
+        "en que rubro trabaja", "en que trabajas",
+        "a que te dedicas", "que actividad realizas",
+        "que haces laboralmente", "de que trabajas",
+    ],
+    "familia": [
+        "como se compone su familia", "tiene pareja o hijos",
+        "como esta conformada su familia", "convive con su familia",
+        "tenes familia formada", "vivis con pareja",
+        "como se compone tu familia", "tenes chicos",
+        "estas en pareja", "con quien vivis",
+        "como se llama su pareja", "a que se dedica tu pareja",
+        "como se llama tu hija", "como le va en el colegio",
+        "como se llama la nena", "cuantos anos tiene",
+    ],
+    "objetivo": [
+        "busca invertir a futuro", "posesion inmediata",
+        "invertir a futuro o construir", "inversion patrimonial",
+        "resguardo de capital", "comenzar a construir",
+        "la idea es invertir o ya construir",
+        "guardar el terreno o empezar a edificar",
+        "algo para el futuro", "queres invertir o ya hacer tu casa",
+        "construir rapido o guardar", "algo para vivir o como inversion",
+    ],
+    "ubicacion_barrio": [
+        "barrios en promocion", "cual le gustaria saber",
+        "que proyecto le gustaria", "que barrio llamo su atencion",
+        "cual te gustaria conocer", "que barrio te interesa",
+        "sobre cual queres que te cuente",
+        "cual de estos barrios", "que zona te interesa",
+        "por cual queres arrancar",
+        "lotes sobre avenida", "mitad de barrio",
+        "ubicacion sobre avenida", "dentro del barrio",
+        "preferis sobre avenida", "mas visible o mas tranquilo",
+        "avenida o media cuadra", "mas tranquilo o con mas movimiento",
+        "donde te imaginas mejor",
+    ],
+    "modalidad_pago": [
+        "cuotas fijas y cuotas variables", "cuotas fijas o variables",
+        "modalidad de financiacion", "cuotas fijas o actualizables",
+        "preferis cuotas fijas", "que opcion te resulta mas comoda",
+        "se adapta mejor a tu economia",
+        "te sirven mas cuotas fijas", "que modalidad preferis",
+        "alguna dimension en especial", "dimension especifica",
+        "que tamano de lote", "que medida te interesa",
+        "tenemos varias dimensiones", "algo grande o mas estandar",
+        "que tamano te gusta", "lote mas chico o mas amplio",
+        "que medida tenias en mente",
+        "esquina o un lote a mitad", "lote en esquina o interno",
+        "ubicacion en esquina", "esquina o mitad de cuadra",
+        "mas visibilidad o algo mas reservado",
+        "capacidad de pago mensual", "cuanto se permite pagar",
+        "presupuesto mensual", "valor de cuota",
+        "monto mensual", "cuota te sentirias comodo",
+        "cuanto pensas destinar", "presupuesto mensual manejas",
+        "cuanto te gustaria pagar", "cuota te queda comoda",
+        "cuanto podes invertir mensualmente",
+    ],
+}
 
 _BUYING_SIGNALS: list[str] = [
     "cuando podemos", "cuando firmamos", "me interesa mucho",
@@ -476,6 +573,7 @@ class CommercialAnalyzer:
         ca.tecnicas_persuasion = self._detect_persuasion(normalized)
         ca.preguntas_abiertas = _extract_questions(text)
         ca.keywords = _extract_keywords(text)
+        ca.prospeccion_detalle = self._analyze_prospeccion(normalized)
 
         # Recommendation (uses extended data)
         ca.recomendacion = self._build_recommendation(ca)
@@ -636,6 +734,21 @@ class CommercialAnalyzer:
             parts.append(f"Objeciones: {', '.join(ca.objeciones_especificas).lower()}.")
 
         return " ".join(parts)
+
+    def _analyze_prospeccion(self, normalized: str) -> dict:
+        """
+        Analyze prospection phrases by category.
+        Returns dict: {category: [list of detected phrases]}
+        """
+        result: dict[str, list[str]] = {}
+        for category, phrases in _PROSPECCION_CATEGORIAS.items():
+            found = []
+            for phrase in phrases:
+                if _count_keyword(normalized, phrase) > 0:
+                    found.append(phrase)
+            if found:
+                result[category] = found
+        return result
 
     def _build_next_action(self, ca: CommercialAnalysis) -> str:
         """Determine the recommended next action for the salesperson."""
