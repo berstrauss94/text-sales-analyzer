@@ -683,6 +683,57 @@ HTML = """
             letter-spacing: 0.08em;
             color: #666;
             margin-bottom: 10px;
+            position: relative;
+        }
+
+        .card-info-icon {
+            position: absolute;
+            top: -2px;
+            right: 0;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: transparent;
+            border: 1px solid #7b5bf5;
+            color: #7b5bf5;
+            font-size: 0.6rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0.6;
+            transition: opacity 0.2s, background 0.2s;
+        }
+        .card-info-icon:hover {
+            opacity: 1;
+            background: #7b5bf520;
+        }
+        .card-info-tooltip {
+            display: none;
+            position: absolute;
+            top: 22px;
+            right: 0;
+            background: #1a1d27;
+            border: 1px solid #7b5bf5;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 0.75rem;
+            color: #ccc;
+            font-weight: 400;
+            text-transform: none;
+            letter-spacing: 0;
+            line-height: 1.5;
+            width: 260px;
+            z-index: 20;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .card-info-icon:hover + .card-info-tooltip,
+        .card-info-tooltip:hover {
+            display: block;
+        }
+        @media (max-width: 600px) {
+            .card-info-tooltip { width: 200px; right: -10px; }
         }
 
         .badge {
@@ -2443,6 +2494,8 @@ function renderResults(data, inputText) {
             <div class="card">
                 <div class="card-title card-title-collapsible" onclick="toggleCardContent('intencion-content')">
                     Intencion del Texto &nbsp;<span class="card-arrow" id="intencion-arrow">&#9660;</span>
+                    <span class="card-info-icon" onclick="event.stopPropagation()">!</span>
+                    <div class="card-info-tooltip">Clasifica la intencion principal del texto: si es una oferta, consulta, negociacion, cierre o descripcion. Ayuda a entender en que etapa de la venta esta la conversacion.</div>
                 </div>
                 <div class="card-collapsible-content" id="intencion-content">
                     <span class="badge badge-${data.intent}">${intentEs}</span>
@@ -2474,6 +2527,8 @@ function renderResults(data, inputText) {
             <div class="card">
                 <div class="card-title card-title-collapsible" onclick="toggleCardContent('sentimiento-content')">
                     Sentimiento &nbsp;<span class="card-arrow" id="sentimiento-arrow">&#9660;</span>
+                    <span class="card-info-icon" onclick="event.stopPropagation()">!</span>
+                    <div class="card-info-tooltip">Evalua el tono emocional del texto: positivo, neutral o negativo. Indica si el cliente esta contento, indiferente o insatisfecho con la propuesta.</div>
                 </div>
                 <div class="card-collapsible-content" id="sentimiento-content">
                     <span class="badge badge-${data.sentiment}">${sentimentEs}</span>
@@ -2484,6 +2539,8 @@ function renderResults(data, inputText) {
             <div class="card">
                 <div class="card-title card-title-collapsible" onclick="toggleCardContent('ventas-content')">
                     Conceptos de Ventas Detectados &nbsp;<span class="card-arrow" id="ventas-arrow">&#9660;</span>
+                    <span class="card-info-icon" onclick="event.stopPropagation()">!</span>
+                    <div class="card-info-tooltip">Detecta conceptos del proceso de venta: ofertas, descuentos, comisiones, cierres, prospectos, objeciones, seguimiento y negociacion. Muestra los fragmentos del texto donde se identificaron.</div>
                 </div>
                 <div class="card-collapsible-content" id="ventas-content">
                     ${salesHtml}
@@ -2493,6 +2550,8 @@ function renderResults(data, inputText) {
             <div class="card">
                 <div class="card-title card-title-collapsible" onclick="toggleCardContent('bienes-raices-content')">
                     Conceptos de Bienes Raices Detectados &nbsp;<span class="card-arrow" id="bienes-raices-arrow">&#9660;</span>
+                    <span class="card-info-icon" onclick="event.stopPropagation()">!</span>
+                    <div class="card-info-tooltip">Identifica conceptos inmobiliarios: tipo de propiedad, precio, metraje, habitaciones, ubicacion, amenidades, zonificacion y estado. Extrae los fragmentos relevantes del texto.</div>
                 </div>
                 <div class="card-collapsible-content" id="bienes-raices-content">
                     ${reHtml}
@@ -2502,6 +2561,8 @@ function renderResults(data, inputText) {
             <div class="card full-width">
                 <div class="card-title card-title-collapsible" onclick="toggleCardContent('datos-extraidos-content')">
                     Datos Extraidos del Texto &nbsp;<span class="card-arrow" id="datos-extraidos-arrow">&#9660;</span>
+                    <span class="card-info-icon" onclick="event.stopPropagation()">!</span>
+                    <div class="card-info-tooltip">Extrae datos concretos del texto: precios, metrajes, ubicaciones, fechas, horarios, porcentajes, acciones comprometidas y personas mencionadas. Haz clic en cada dato para verlo resaltado en el texto.</div>
                 </div>
                 <div class="card-collapsible-content" id="datos-extraidos-content">
                     ${entitiesHtml}
@@ -2566,7 +2627,10 @@ function renderCommercial(c) {
 
     return `
     <div class="commercial-section">
-        <div class="commercial-title">Analisis Comercial Inmobiliario</div>
+        <div class="commercial-title" style="position:relative;">Analisis Comercial Inmobiliario
+            <span class="card-info-icon" style="position:absolute; top:2px; right:0;">!</span>
+            <div class="card-info-tooltip" style="top:22px; right:0;">Analiza indicadores comerciales de la conversacion: palabras positivas, respuestas afirmativas, indicios de cierre, objeciones y mas. Calcula la probabilidad de cierre y clasifica el lead.</div>
+        </div>
 
         <div style="margin-bottom:4px;">
             <span class="lead-badge lead-${c.tipo_lead}" style="cursor:pointer;"
