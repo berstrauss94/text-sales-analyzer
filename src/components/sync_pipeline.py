@@ -119,7 +119,7 @@ class SyncPipeline:
                     logger.info(f"Sync: extrayendo {m}/{y}...")
                     records = scraper.fetch_records(month=m, year=y)
                     logger.info(f"Sync: {len(records)} registros en {m}/{y}, procesando...")
-                    self._process_records(records, mapping, dedup, scraper, summary)
+                    self._process_records(records, mapping, dedup, scraper, summary, period_month=m, period_year=y)
                     self._save_dedup(dedup)
                     logger.info(f"Sync: {m}/{y} completado. Procesados hasta ahora: {summary['processed']}")
                 except Exception as exc:
@@ -143,11 +143,11 @@ class SyncPipeline:
         logger.info(f"Sync completado: {summary}")
         return summary
 
-    def _process_records(self, records: list, mapping: dict, dedup: set, scraper, summary: dict) -> None:
+    def _process_records(self, records: list, mapping: dict, dedup: set, scraper, summary: dict, period_month: int = None, period_year: int = None) -> None:
         """Process a list of records, updating summary in place."""
         for record in records:
             try:
-                result = self._process_record(record, mapping, dedup, scraper)
+                result = self._process_record(record, mapping, dedup, scraper, period_month=period_month, period_year=period_year)
                 if result == "processed":
                     summary["processed"] += 1
                 elif result == "dedup":
@@ -173,6 +173,8 @@ class SyncPipeline:
         mapping: dict,
         dedup: set,
         scraper,
+        period_month: int = None,
+        period_year: int = None,
     ) -> str:
         """Procesa un registro individual. Retorna el resultado."""
 
@@ -210,22 +212,38 @@ class SyncPipeline:
         # Determinar timestamp original de grabación
         timestamp = self._parse_fecha(record.get("fecha_grabacion", ""))
 
+        # Determinar year/month: usar fecha de grabación, o fallback al periodo
+        if timestamp:
+            entry_year = timestamp.year
+            entry_month = timestamp.month
+        elif period_year and period_month:
+            entry_year = period_year
+            entry_month = period_month
+        else:
+            now = datetime.now(timezone.utc)
+            entry_year = now.year
+            entry_month = now.month
+
         # Título del cliente extraído del archivo local
         archivo_local = record.get("archivo_local", "")
         client_title  = self._extract_client_title(archivo_local)
 
-        # Guardar en historial con timestamp original
-        self._add_entry_with_timestamp(
-            username=username,
-            text=transcription_text,
-            analysis=analysis_dict,
-            source="sync",
-            audio_filename=client_title,
-            timestamp=timestamp,
-        )
+        # Guardar en historial con year/month correcto
+        try:
+            self._add_entry(
+                username=username,
+                text=transcription_text,
+                analysis=analysis_dict,
+                source="sync",
+                audio_filename=client_title,
+                year=entry_year,
+                month=entry_month,
+            )
+            logger.info(f"Procesado: vendedor='{vendedor}' → usuario='{username}', mes={entry_month}/{entry_year}")
+        except Exception as exc:
+            logger.error(f"FALLO guardando entrada para {username}: {exc}")
 
         dedup.add(dedup_key)
-        logger.info(f"Procesado: vendedor='{vendedor}' → usuario='{username}', cliente='{client_title}'")
         return "processed"
 
     # ------------------------------------------------------------------
