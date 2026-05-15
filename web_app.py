@@ -3850,6 +3850,19 @@ def analyze():
     # Filter out consecutive repeated words/phrases from transcription artifacts
     clean_text = _dedup_transcription(data["text"])
 
+    # Prevent duplicate saves (same user + same text within 10 seconds)
+    import hashlib
+    _text_hash = hashlib.md5(f"{session['username']}:{clean_text[:200]}".encode()).hexdigest()
+    _now_ts = __import__('time').time()
+    if not hasattr(app, '_last_save_cache'):
+        app._last_save_cache = {}
+    if _text_hash in app._last_save_cache and (_now_ts - app._last_save_cache[_text_hash]) < 10:
+        # Skip save, just return the analysis
+        pass
+    else:
+        app._last_save_cache[_text_hash] = _now_ts
+    _should_save = _text_hash not in app._last_save_cache or app._last_save_cache[_text_hash] == _now_ts
+
     result = analyzer.analyze(clean_text)
 
     if isinstance(result, AnalysisError):
@@ -3888,15 +3901,17 @@ def analyze():
     year = data.get("year")
     month = data.get("month")
     entry_name = data.get("entry_name", "")
-    add_entry(
-        username=session["username"],
-        text=clean_text,
-        analysis=analysis_dict,
-        source="text",
-        year=year,
-        month=month,
-        entry_name=entry_name,
-    )
+    if _should_save:
+        add_entry(
+            username=session["username"],
+            text=clean_text,
+            analysis=analysis_dict,
+            source="text",
+            audio_filename=entry_name,
+            year=year,
+            month=month,
+            entry_name=entry_name,
+        )
 
     return jsonify({
         "error": False,
@@ -3938,7 +3953,7 @@ def saved_texts():
         if e_year == year and e_month == month:
             filtered.append({
                 "id": e.get("id", ""),
-                "entry_name": e.get("entry_name", ""),
+                "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
                 "text": (e.get("text", "") or "")[:60],
                 "intent": e.get("intent", ""),
                 "timestamp": e.get("timestamp", "")[:10],
