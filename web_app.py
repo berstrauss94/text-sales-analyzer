@@ -172,14 +172,13 @@ else:
         print("Models trained and loaded.")
 
 # ---------------------------------------------------------------------------
-# Sync Pipeline + Scheduler
+# Sync Pipeline + Scheduler — DESACTIVADO temporalmente
 # ---------------------------------------------------------------------------
 import logging
 logging.basicConfig(level=logging.INFO)
 
-from src.components.sync_pipeline import SyncPipeline
-
-sync_pipeline = SyncPipeline(analyzer=analyzer, add_entry_fn=add_entry)
+# Sync desactivado hasta resolver los problemas de asignación de fechas
+print("Info: Sync automático DESACTIVADO temporalmente.")
 
 # ---------------------------------------------------------------------------
 # Auto-migrate JSON history files → PostgreSQL (runs once at startup)
@@ -194,7 +193,8 @@ except Exception as _mig_exc:
     print(f"Warning: migración JSON→PG falló: {_mig_exc}")
 
 # Solo iniciar el scheduler si las credenciales están configuradas
-_mpc_configured = bool(os.environ.get("MPC_USERNAME") and os.environ.get("MPC_PASSWORD"))
+# DESACTIVADO TEMPORALMENTE — sync automático apagado
+_mpc_configured = False  # Forzar desactivado
 
 if _mpc_configured:
     try:
@@ -225,44 +225,12 @@ if _mpc_configured:
     except Exception as _exc:
         print(f"Warning: No se pudo iniciar el scheduler: {_exc}")
 else:
-    print("Info: MPC_USERNAME/MPC_PASSWORD no configurados — scheduler de sync desactivado.")
+    print("Info: Sync automático DESACTIVADO.")
 
 # ---------------------------------------------------------------------------
-# Historical sync on startup (triggered by RUN_HISTORICAL_SYNC_ON_START=true)
+# Historical sync — DESACTIVADO
 # ---------------------------------------------------------------------------
-# Set this env var in Railway to process all recordings from 01/01/2026 to today.
-# It runs once in a background thread and self-disables after completion
-# (Railway will not re-trigger it on subsequent restarts unless the var is set again).
-if _mpc_configured and os.environ.get("RUN_HISTORICAL_SYNC_ON_START", "").lower() == "true":
-    import threading
-
-    def _run_historical_sync():
-        print("=" * 60)
-        print("  SYNC HISTÓRICO: iniciando procesamiento desde 01/01/2026...")
-        print("=" * 60)
-        try:
-            summary = sync_pipeline.run(historical=True)
-            print("=" * 60)
-            print(f"  SYNC HISTÓRICO COMPLETADO:")
-            print(f"    Procesados:          {summary.get('processed', 0)}")
-            print(f"    Omitidos (dedup):    {summary.get('skipped_dedup', 0)}")
-            print(f"    Sin mapeo:           {summary.get('skipped_no_mapping', 0)}")
-            print(f"    Sin transcripción:   {summary.get('skipped_no_transcription', 0)}")
-            print(f"    Errores:             {summary.get('errors', 0)}")
-            if summary.get("unmapped_vendors"):
-                print(f"    Vendedores sin mapeo: {summary['unmapped_vendors']}")
-            print("=" * 60)
-            print("  Tip: desactivá RUN_HISTORICAL_SYNC_ON_START en Railway para")
-            print("  evitar que se repita en el próximo restart.")
-            print("=" * 60)
-        except Exception as _exc:
-            print(f"ERROR en sync histórico: {_exc}")
-
-    _hist_thread = threading.Thread(target=_run_historical_sync, daemon=True, name="historical-sync")
-    _hist_thread.start()
-    print("Info: Sync histórico iniciado en background thread.")
-elif not _mpc_configured and os.environ.get("RUN_HISTORICAL_SYNC_ON_START", "").lower() == "true":
-    print("Warning: RUN_HISTORICAL_SYNC_ON_START=true pero MPC_USERNAME/MPC_PASSWORD no configurados — sync omitido.")
+# Desactivado hasta resolver problemas de asignación de fechas
 
 # ---------------------------------------------------------------------------
 # HTML Template
@@ -4204,17 +4172,14 @@ def debug_entries():
 @app.route("/debug-sync-one")
 def debug_sync_one():
     """
-    Debug endpoint: saves ONE test entry directly to verify DB works.
-    Uses raw SQL to bypass any abstraction issues.
+    Debug endpoint: cleans all sync entries from DB to allow fresh reprocessing.
     """
     if not session.get("username"):
         return jsonify({"error": "not logged in"}), 401
 
-    username = session["username"]
     import traceback
 
     try:
-        # Try direct PostgreSQL access
         import psycopg2
         db_url = os.environ.get("DATABASE_URL", "")
         if not db_url:
@@ -4227,51 +4192,27 @@ def debug_sync_one():
         conn.autocommit = True
 
         with conn.cursor() as cur:
-            # Check if table exists
-            cur.execute("SELECT COUNT(*) FROM analysis_history WHERE username = %s", (username,))
-            count_before = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM analysis_history")
+            total = cur.fetchone()[0]
 
-            # Insert a test row
-            from datetime import datetime, timezone
-            now = datetime.now(timezone.utc)
-            test_id = now.strftime("%Y%m%d%H%M%S%f") + "_debug"
+            cur.execute("SELECT COUNT(*) FROM analysis_history WHERE source = 'sync'")
+            sync_count = cur.fetchone()[0]
 
-            cur.execute("""
-                INSERT INTO analysis_history
-                    (id, username, timestamp, source, audio_filename,
-                     text_short, text_full, intent, intent_conf,
-                     sentiment, sentiment_conf, sales_concepts, re_concepts,
-                     entities, commercial, day_label)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            """, (
-                test_id, username, now, "sync", "debug-test",
-                "Texto de prueba debug", "Texto de prueba debug completo para verificar guardado",
-                "DESCRIPTION", 0.8, "NEUTRAL", 0.9,
-                "[]", "[]", "[]", None, now.strftime("%d/%m/%Y"),
-            ))
+            # Delete ALL sync entries to start fresh
+            cur.execute("DELETE FROM analysis_history WHERE source = 'sync'")
+            deleted = cur.rowcount
 
-            # Read back
-            cur.execute("SELECT COUNT(*) FROM analysis_history WHERE username = %s", (username,))
-            count_after = cur.fetchone()[0]
-
-            # Get the row we just inserted
-            cur.execute("""
-                SELECT id, timestamp, source, text_short
-                FROM analysis_history
-                WHERE username = %s
-                ORDER BY timestamp DESC LIMIT 3
-            """, (username,))
-            rows = cur.fetchall()
+            cur.execute("SELECT COUNT(*) FROM analysis_history")
+            remaining = cur.fetchone()[0]
 
         conn.close()
 
         return jsonify({
             "success": True,
-            "username": username,
-            "count_before": count_before,
-            "count_after": count_after,
-            "inserted_id": test_id,
-            "recent_rows": [{"id": r[0][:20], "ts": str(r[1]), "source": r[2], "text": r[3][:40]} for r in rows],
+            "message": f"Limpieza completada. Eliminadas {deleted} entradas sync.",
+            "total_before": total,
+            "sync_entries_deleted": deleted,
+            "remaining_after": remaining,
         })
 
     except Exception as exc:
