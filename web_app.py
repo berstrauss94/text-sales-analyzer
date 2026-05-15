@@ -43,9 +43,11 @@ def _dedup_transcription(text: str) -> str:
         "bueno bueno bueno entonces" → "bueno entonces"
         "si si si claro" → "si claro"
         "CVU CVU CVU CVU CVU" → "CVU"
+        "Si, si. Si, si. Si, si." → "Si, si."
         "vamos a vamos a ver" → "vamos a ver"
 
-    Handles repeated words and phrases regardless of case.
+    Handles repeated words and phrases regardless of case,
+    including repetitions separated by punctuation.
     """
     import re
 
@@ -55,8 +57,6 @@ def _dedup_transcription(text: str) -> str:
     result = text
 
     # Pass 1: Remove consecutive repeated single words (any number of repetitions)
-    # Handles: "CVU CVU CVU CVU" → "CVU", "bueno bueno bueno" → "bueno"
-    # Run multiple times to catch nested repetitions
     for _ in range(3):
         prev = result
         result = re.sub(r'\b(\w+)(\s+\1)+\b', r'\1', result, flags=re.IGNORECASE)
@@ -64,7 +64,6 @@ def _dedup_transcription(text: str) -> str:
             break
 
     # Pass 2: Remove consecutive repeated two-word phrases
-    # Handles: "vamos a vamos a" → "vamos a"
     for _ in range(3):
         prev = result
         result = re.sub(r'\b(\w+\s+\w+)(\s+\1)+\b', r'\1', result, flags=re.IGNORECASE)
@@ -72,15 +71,40 @@ def _dedup_transcription(text: str) -> str:
             break
 
     # Pass 3: Remove consecutive repeated three-word phrases
-    # Handles: "lo que pasa lo que pasa" → "lo que pasa"
     for _ in range(2):
         prev = result
         result = re.sub(r'\b(\w+\s+\w+\s+\w+)(\s+\1)+\b', r'\1', result, flags=re.IGNORECASE)
         if result == prev:
             break
 
-    # Clean up multiple spaces
+    # Pass 4: Remove repeated short sentences/phrases separated by punctuation
+    # Handles: "Si, si. Si, si. Si, si." → "Si, si."
+    # Handles: "Ah, ese modelo, sí. Si, si. Si, si." repeated patterns
+    for _ in range(3):
+        prev = result
+        # Match a short phrase (up to ~30 chars) followed by itself with optional space/punctuation
+        result = re.sub(
+            r'((?:\w+[,.]?\s*){1,5}[.!?])\s*(\1\s*)+',
+            r'\1 ',
+            result,
+            flags=re.IGNORECASE
+        )
+        if result == prev:
+            break
+
+    # Pass 5: Remove repeated lines (entire lines that are identical)
+    lines = result.split('\n')
+    deduped_lines = []
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if i > 0 and stripped and stripped == lines[i-1].strip():
+            continue
+        deduped_lines.append(line)
+    result = '\n'.join(deduped_lines)
+
+    # Clean up multiple spaces and trailing spaces
     result = re.sub(r'  +', ' ', result)
+    result = re.sub(r' +\n', '\n', result)
 
     return result.strip()
 
