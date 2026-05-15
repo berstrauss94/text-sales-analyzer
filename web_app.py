@@ -627,6 +627,7 @@ HTML = """
 
         .btn-primary { background: #4a6cf7; color: white; }
         .btn-secondary { background: #2a2d3a; color: #aaa; }
+        .btn-save { background: #2a8a4a; color: white; white-space: nowrap; }
 
         .loading { display: none; color: #888; font-size: 0.85rem; margin-top: 10px; }
 
@@ -1781,6 +1782,8 @@ HTML = """
         <div class="btn-row">
             <button class="btn-primary" onclick="analyze()">&#128269; Analizar</button>
             <button class="btn-secondary" onclick="clearAll()">Limpiar</button>
+            <input type="text" id="entryNameInput" class="save-name-input" placeholder="Titulo del texto (obligatorio para guardar)..." style="flex:1; margin-left:8px;">
+            <button class="btn-save" onclick="saveEntry()">&#128190; Guardar</button>
         </div>
         <div class="loading" id="loading" style="margin-top:10px;">Analizando texto...</div>
     </div>
@@ -1825,6 +1828,47 @@ async function analyze() {
             document.getElementById('textInput').value = data.input_text;
         }
         renderResults(data, data.input_text || text);
+    } catch (e) {
+        document.getElementById('results').innerHTML =
+            '<div class="error-card">Error de conexion: ' + e.message + '</div>';
+        document.getElementById('results').style.display = 'block';
+    }
+
+    document.getElementById('loading').style.display = 'none';
+}
+
+async function saveEntry() {
+    const text = document.getElementById('textInput').value.trim();
+    const entryName = document.getElementById('entryNameInput').value.trim();
+
+    if (!text) { alert('Pega o escribe un texto primero.'); return; }
+    if (!entryName) { alert('El titulo es obligatorio para guardar.'); return; }
+
+    const year = document.getElementById('selectYear').value;
+    const month = document.getElementById('selectMonth').value;
+
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('results').style.display = 'none';
+
+    try {
+        const response = await fetch('/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, year: parseInt(year), month: parseInt(month), entry_name: entryName })
+        });
+        const data = await response.json();
+        _lastCommercialData = data.commercial || null;
+        if (!data.error && data.input_text) {
+            document.getElementById('textInput').value = data.input_text;
+        }
+        renderResults(data, data.input_text || text);
+
+        // Scroll to top after saving
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        // Clear the title input
+        document.getElementById('entryNameInput').value = '';
+        // Refresh saved texts count
+        loadSavedTexts();
     } catch (e) {
         document.getElementById('results').innerHTML =
             '<div class="error-card">Error de conexion: ' + e.message + '</div>';
