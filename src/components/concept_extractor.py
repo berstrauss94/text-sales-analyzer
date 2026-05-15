@@ -301,23 +301,23 @@ class ConceptExtractor:
     def _find_source(self, concept: str, text: str) -> str:
         """Find a representative text fragment for a concept."""
         keyword_map: dict[str, list[str]] = {
-            'offer': ['ofrezco', 'oferta', 'offer', 'offering', 'vendo', 'selling'],
-            'discount': ['descuento', 'rebaja', 'discount', 'reduction'],
+            'offer': ['ofrezco', 'oferta', 'offer', 'offering', 'vendo', 'selling', 'pongo en venta'],
+            'discount': ['descuento', 'rebaja', 'discount', 'reduction', 'promocion'],
             'commission': ['comision', 'commission', 'fee', 'honorario'],
-            'closing': ['cierre', 'closing', 'firmamos', 'precio final', 'final price'],
-            'prospect': ['prospecto', 'prospect', 'buyer', 'comprador', 'cliente'],
-            'objection': ['objeta', 'objection', 'concern', 'duda'],
-            'follow_up': ['seguimiento', 'follow up', 'follow-up', 'contactar'],
-            'negotiation': ['negociacion', 'negotiation', 'negociar', 'negotiate'],
-            'property_type': ['apartamento', 'casa', 'house', 'condo', 'terreno', 'local'],
-            'price': ['precio', 'price', 'usd', 'dolares', 'dollars'],
-            'area_sqm': ['m2', 'metros', 'sqm', 'square', 'metraje'],
-            'bedrooms': ['habitaciones', 'cuartos', 'bedrooms', 'dormitorios'],
+            'closing': ['cierre', 'closing', 'firmamos', 'precio final', 'final price', 'reserva', 'escritura', 'boleto'],
+            'prospect': ['prospecto', 'prospect', 'buyer', 'comprador', 'cliente', 'interesado'],
+            'objection': ['objeta', 'objection', 'concern', 'duda', 'caro', 'costoso', 'lejos'],
+            'follow_up': ['seguimiento', 'follow up', 'follow-up', 'contactar', 'llamar'],
+            'negotiation': ['negociacion', 'negotiation', 'negociar', 'negotiate', 'contraoferta', 'precio'],
+            'property_type': ['apartamento', 'casa', 'house', 'condo', 'terreno', 'local', 'lote', 'departamento', 'duplex', 'ph'],
+            'price': ['precio', 'price', 'usd', 'dolares', 'dollars', 'cuota', 'pesos', 'contado', 'financ'],
+            'area_sqm': ['m2', 'metros', 'sqm', 'square', 'metraje', 'superficie', 'hectarea'],
+            'bedrooms': ['habitaciones', 'cuartos', 'bedrooms', 'dormitorios', 'ambientes'],
             'bathrooms': ['banos', 'bathrooms', 'baths'],
-            'location': ['zona', 'ubicado', 'located', 'sector', 'ciudad'],
-            'amenities': ['piscina', 'gimnasio', 'pool', 'gym', 'amenidades', 'amenities'],
-            'zoning': ['zonificacion', 'zoning', 'zona comercial', 'residencial'],
-            'condition': ['estado', 'condition', 'remodelado', 'renovated', 'nuevo'],
+            'location': ['zona', 'ubicado', 'located', 'sector', 'ciudad', 'barrio', 'avenida', 'calle'],
+            'amenities': ['piscina', 'gimnasio', 'pool', 'gym', 'amenidades', 'amenities', 'pileta', 'seguridad'],
+            'zoning': ['zonificacion', 'zoning', 'zona comercial', 'residencial', 'habilitado'],
+            'condition': ['estado', 'condition', 'remodelado', 'renovated', 'nuevo', 'estrenar', 'construir'],
         }
 
         keywords = keyword_map.get(concept, [])
@@ -325,8 +325,16 @@ class ConceptExtractor:
         for kw in keywords:
             idx = text_lower.find(kw.lower())
             if idx != -1:
-                start = max(0, idx)
-                end = min(len(text), idx + len(kw) + 20)
-                return text[start:end].strip()
+                # Show context around the keyword (40 chars before, 60 after)
+                start = max(0, idx - 40)
+                end = min(len(text), idx + len(kw) + 60)
+                fragment = text[start:end].strip()
+                # Clean up: don't start/end mid-word
+                if start > 0:
+                    space_idx = fragment.find(' ')
+                    if space_idx > 0 and space_idx < 15:
+                        fragment = fragment[space_idx+1:]
+                return fragment
 
-        return text[:50].strip()
+        # Fallback: return empty string instead of beginning of text
+        return ""
