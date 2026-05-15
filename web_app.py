@@ -3900,8 +3900,10 @@ def analyze():
     # Save to history
     year = data.get("year")
     month = data.get("month")
-    entry_name = data.get("entry_name", "")
-    if _should_save:
+    entry_name = data.get("entry_name", "").strip()
+
+    # Only save if entry_name is provided (mandatory)
+    if entry_name and _should_save:
         add_entry(
             username=session["username"],
             text=clean_text,
