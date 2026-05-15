@@ -3195,11 +3195,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     textarea.addEventListener('input', () => {
         closeHighlightOverlay();
-        clearTimeout(debounceTimer);
-        const text = textarea.value.trim();
-        if (text.length >= 10) {
-            debounceTimer = setTimeout(() => analyze(), 2000);
-        }
+        // Auto-analyze disabled — only analyze when user clicks the button
     });
 
     loadHistory();
@@ -4172,11 +4168,12 @@ def debug_entries():
 @app.route("/debug-sync-one")
 def debug_sync_one():
     """
-    Debug endpoint: cleans all sync entries from DB to allow fresh reprocessing.
+    Debug endpoint: cleans ALL entries for the logged-in user.
     """
     if not session.get("username"):
         return jsonify({"error": "not logged in"}), 401
 
+    username = session["username"]
     import traceback
 
     try:
@@ -4192,27 +4189,21 @@ def debug_sync_one():
         conn.autocommit = True
 
         with conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM analysis_history")
-            total = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM analysis_history WHERE username = %s", (username,))
+            count_before = cur.fetchone()[0]
 
-            cur.execute("SELECT COUNT(*) FROM analysis_history WHERE source = 'sync'")
-            sync_count = cur.fetchone()[0]
-
-            # Delete ALL sync entries to start fresh
-            cur.execute("DELETE FROM analysis_history WHERE source = 'sync'")
+            # Delete ALL entries for this user
+            cur.execute("DELETE FROM analysis_history WHERE username = %s", (username,))
             deleted = cur.rowcount
-
-            cur.execute("SELECT COUNT(*) FROM analysis_history")
-            remaining = cur.fetchone()[0]
 
         conn.close()
 
         return jsonify({
             "success": True,
-            "message": f"Limpieza completada. Eliminadas {deleted} entradas sync.",
-            "total_before": total,
-            "sync_entries_deleted": deleted,
-            "remaining_after": remaining,
+            "message": f"Eliminadas {deleted} entradas para {username}.",
+            "username": username,
+            "entries_before": count_before,
+            "entries_deleted": deleted,
         })
 
     except Exception as exc:
