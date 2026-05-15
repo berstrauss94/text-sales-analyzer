@@ -3058,7 +3058,7 @@ function renderSalesConceptsDetail(concepts) {
                 <span class="concept-conf">${confPct}%</span>
             </div>
             <div class="concept-detail-desc">${info.desc}</div>
-            <div class="concept-detail-source">Fragmento: <em>"${c.source_text}"</em></div>
+            <div class="concept-detail-source">${c.source_text ? c.source_text.split(' /// ').map(f => '<div style="margin:3px 0; padding:3px 8px; background:#0a0c14; border-left:2px solid #4a6cf7; border-radius:3px;"><em>"' + f + '"</em></div>').join('') : '<em>Sin fragmento</em>'}</div>
             <div class="concept-detail-tip">💡 ${info.tip}</div>
         </div>`;
     });
@@ -3090,7 +3090,7 @@ function renderRealEstateConceptsDetail(concepts) {
                 <span class="concept-conf">${confPct}%</span>
             </div>
             <div class="concept-detail-desc">${info.desc}</div>
-            <div class="concept-detail-source">Fragmento: <em>"${c.source_text}"</em></div>
+            <div class="concept-detail-source">${c.source_text ? c.source_text.split(' /// ').map(f => '<div style="margin:3px 0; padding:3px 8px; background:#0a0c14; border-left:2px solid #4a6cf7; border-radius:3px;"><em>"' + f + '"</em></div>').join('') : '<em>Sin fragmento</em>'}</div>
             <div class="concept-detail-tip">💡 ${info.tip}</div>
         </div>`;
     });
