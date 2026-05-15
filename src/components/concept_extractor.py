@@ -299,49 +299,147 @@ class ConceptExtractor:
             return []
 
     def _find_source(self, concept: str, text: str) -> str:
-        """Find a representative text fragment for a concept."""
+        """
+        Find ALL representative text fragments for a concept.
+        Returns multiple fragments separated by ' /// ' if more than one is found.
+        """
+        import re as _re
+
         keyword_map: dict[str, list[str]] = {
-            'offer': ['ofrezco', 'oferta', 'offer', 'offering', 'vendo', 'selling', 'pongo en venta'],
-            'discount': ['descuento', 'rebaja', 'discount', 'reduction', 'promocion'],
-            'commission': ['comision', 'commission', 'fee', 'honorario'],
-            'closing': ['cierre', 'closing', 'firmamos', 'precio final', 'final price', 'reserva', 'escritura', 'boleto'],
-            'prospect': ['prospecto', 'prospect', 'buyer', 'comprador', 'cliente', 'interesado'],
-            'objection': ['objeta', 'objection', 'concern', 'duda', 'caro', 'costoso', 'lejos'],
-            'follow_up': ['seguimiento', 'follow up', 'follow-up', 'contactar', 'llamar'],
-            'negotiation': ['negociacion', 'negotiation', 'negociar', 'negotiate', 'contraoferta', 'precio'],
-            'property_type': ['apartamento', 'casa', 'house', 'condo', 'terreno', 'local', 'lote', 'departamento', 'duplex', 'ph'],
-            'price': ['precio', 'price', 'usd', 'dolares', 'dollars', 'cuota', 'pesos', 'contado', 'financ'],
-            'area_sqm': ['m2', 'metros', 'sqm', 'square', 'metraje', 'superficie', 'hectarea'],
-            'bedrooms': ['habitaciones', 'cuartos', 'bedrooms', 'dormitorios', 'ambientes'],
-            'bathrooms': ['banos', 'bathrooms', 'baths'],
-            'location': ['zona', 'ubicado', 'located', 'sector', 'ciudad', 'barrio', 'avenida', 'calle'],
-            'amenities': ['piscina', 'gimnasio', 'pool', 'gym', 'amenidades', 'amenities', 'pileta', 'seguridad'],
-            'zoning': ['zonificacion', 'zoning', 'zona comercial', 'residencial', 'habilitado'],
-            'condition': ['estado', 'condition', 'remodelado', 'renovated', 'nuevo', 'estrenar', 'construir'],
+            'offer': [
+                'ofrezco', 'oferta', 'offer', 'offering', 'vendo', 'selling',
+                'pongo en venta', 'te ofrezco', 'disponible', 'tenemos',
+                'te presento', 'te muestro', 'te cuento', 'propuesta',
+                'oportunidad', 'te interesa', 'queres ver', 'te gustaria',
+            ],
+            'discount': [
+                'descuento', 'rebaja', 'discount', 'reduction', 'promocion',
+                'bonificacion', 'precio especial', 'oferta especial',
+                'precio reducido', 'baja el precio', 'te hago precio',
+            ],
+            'commission': [
+                'comision', 'commission', 'fee', 'honorario', 'porcentaje',
+            ],
+            'closing': [
+                'cierre', 'closing', 'firmamos', 'precio final', 'final price',
+                'reserva', 'escritura', 'boleto', 'cerramos', 'trato hecho',
+                'de acuerdo', 'confirmamos', 'procedemos', 'avanzamos',
+                'bloqueamos', 'separamos', 'te lo separo', 'queda reservado',
+            ],
+            'prospect': [
+                'prospecto', 'prospect', 'buyer', 'comprador', 'cliente',
+                'interesado', 'interesada', 'quiere ver', 'quiere saber',
+                'consulta', 'pregunta', 'busca', 'necesita',
+            ],
+            'objection': [
+                'objeta', 'objection', 'concern', 'duda', 'caro', 'costoso',
+                'lejos', 'no me convence', 'tengo que pensar', 'no estoy seguro',
+                'es mucho', 'no puedo', 'no tengo', 'problema', 'preocupa',
+            ],
+            'follow_up': [
+                'seguimiento', 'follow up', 'follow-up', 'contactar', 'llamar',
+                'te llamo', 'te escribo', 'te mando', 'te paso', 'te envio',
+                'nos vemos', 'coordinamos', 'agendamos', 'quedamos',
+            ],
+            'negotiation': [
+                'negociacion', 'negotiation', 'negociar', 'negotiate',
+                'contraoferta', 'precio', 'condiciones', 'terminos',
+                'podemos arreglar', 'que te parece', 'te parece bien',
+                'llegamos a un acuerdo', 'nos ponemos de acuerdo',
+            ],
+            'property_type': [
+                'apartamento', 'casa', 'house', 'condo', 'terreno', 'local',
+                'lote', 'departamento', 'duplex', 'ph', 'chalet', 'quinta',
+                'galpon', 'oficina', 'cochera', 'campo', 'propiedad',
+                'inmueble', 'unidad', 'parcela', 'fraccion',
+            ],
+            'price': [
+                'precio', 'price', 'usd', 'dolares', 'dollars', 'cuota',
+                'pesos', 'contado', 'financ', 'valor', 'cuesta', 'sale',
+                'anticipo', 'entrada', 'mensual', 'monto', 'inversion',
+                '000', 'mil', 'plata',
+            ],
+            'area_sqm': [
+                'm2', 'metros', 'sqm', 'square', 'metraje', 'superficie',
+                'hectarea', 'frente', 'fondo', 'medidas', 'dimension',
+            ],
+            'bedrooms': [
+                'habitaciones', 'cuartos', 'bedrooms', 'dormitorios',
+                'ambientes', 'pieza', 'recamara',
+            ],
+            'bathrooms': ['banos', 'bathrooms', 'baths', 'toilette'],
+            'location': [
+                'zona', 'ubicado', 'located', 'sector', 'ciudad', 'barrio',
+                'avenida', 'calle', 'esquina', 'ruta', 'acceso', 'cerca',
+                'frente a', 'sobre', 'entre', 'altura', 'manzana',
+            ],
+            'amenities': [
+                'piscina', 'gimnasio', 'pool', 'gym', 'amenidades', 'amenities',
+                'pileta', 'seguridad', 'sum', 'parrilla', 'cancha', 'club house',
+                'areas verdes', 'juegos', 'estacionamiento',
+            ],
+            'zoning': [
+                'zonificacion', 'zoning', 'zona comercial', 'residencial',
+                'habilitado', 'uso de suelo', 'aptitud', 'codigo urbano',
+            ],
+            'condition': [
+                'estado', 'condition', 'remodelado', 'renovated', 'nuevo',
+                'estrenar', 'construir', 'listo', 'terminado', 'en obra',
+                'a refaccionar', 'impecable', 'buen estado',
+            ],
         }
 
         keywords = keyword_map.get(concept, [])
         text_lower = text.lower()
-        for kw in keywords:
-            idx = text_lower.find(kw.lower())
-            if idx != -1:
-                # Show context around the keyword (40 chars before, 60 after)
-                start = max(0, idx - 40)
-                end = min(len(text), idx + len(kw) + 60)
-                fragment = text[start:end].strip()
-                # Clean up: don't start/end mid-word
-                if start > 0:
-                    space_idx = fragment.find(' ')
-                    if space_idx > 0 and space_idx < 15:
-                        fragment = fragment[space_idx+1:]
-                return fragment
+        fragments: list[str] = []
+        seen_positions: set[int] = set()
 
-        # Fallback: find first meaningful sentence (skip timestamps and role labels)
-        import re as _re
+        for kw in keywords:
+            # Find ALL occurrences of this keyword
+            start_search = 0
+            while True:
+                idx = text_lower.find(kw.lower(), start_search)
+                if idx == -1:
+                    break
+
+                # Skip if too close to an already-found fragment
+                if any(abs(idx - pos) < 50 for pos in seen_positions):
+                    start_search = idx + len(kw)
+                    continue
+
+                seen_positions.add(idx)
+
+                # Extract context around the keyword
+                frag_start = max(0, idx - 30)
+                frag_end = min(len(text), idx + len(kw) + 50)
+                fragment = text[frag_start:frag_end].strip()
+
+                # Clean up: don't start mid-word
+                if frag_start > 0:
+                    space_idx = fragment.find(' ')
+                    if 0 < space_idx < 12:
+                        fragment = fragment[space_idx+1:]
+
+                # Don't include fragments that are just timestamps/roles
+                if not _re.match(r'^(Vendedor|Cliente|Speaker)\s*\(\d', fragment):
+                    if len(fragment) > 15:
+                        fragments.append(fragment)
+
+                start_search = idx + len(kw)
+
+                # Limit to 3 fragments per concept
+                if len(fragments) >= 3:
+                    break
+            if len(fragments) >= 3:
+                break
+
+        if fragments:
+            return " /// ".join(fragments)
+
+        # Fallback: find first meaningful sentence
         sentences = _re.split(r'[.!?]\s+', text)
         for sent in sentences:
-            # Skip short fragments, timestamps, and role labels
             cleaned = sent.strip()
             if len(cleaned) > 20 and not _re.match(r'^(Vendedor|Cliente|Speaker)\s*\(', cleaned):
-                return cleaned[:80]
+                return cleaned[:100]
         return ""
