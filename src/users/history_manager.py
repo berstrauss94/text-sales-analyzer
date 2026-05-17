@@ -815,7 +815,15 @@ def migrate_json_to_pg(users_dir: str = USERS_DIR) -> dict:
             logger.info(f"Migrado {username}: {user_count} entradas")
 
     # Pattern 2: usuarios/{username}/history.json (subdirectory format)
-    for item in os.listdir(users_dir):
+    logger.info(f"Migración Pattern 2: buscando subdirectorios en {users_dir}")
+    try:
+        all_items = os.listdir(users_dir)
+        logger.info(f"Migración Pattern 2: items encontrados: {all_items}")
+    except Exception as exc:
+        logger.warning(f"Migración Pattern 2: error listando {users_dir}: {exc}")
+        all_items = []
+
+    for item in all_items:
         subdir = os.path.join(users_dir, item)
         if not os.path.isdir(subdir):
             continue
@@ -823,6 +831,7 @@ def migrate_json_to_pg(users_dir: str = USERS_DIR) -> dict:
         if not os.path.exists(history_path):
             continue
 
+        logger.info(f"Migración Pattern 2: encontrado {history_path}")
         username = item
         try:
             with open(history_path, "r", encoding="utf-8") as f:
