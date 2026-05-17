@@ -4147,48 +4147,90 @@ def saved_texts():
     year = request.args.get("year", type=int)
     month = request.args.get("month", type=int)
 
-    entries = get_flat_entries(session["username"], limit=200)
+    username = session["username"]
 
-    # Filter by year/month — try multiple strategies
-    filtered = []
-    for e in entries:
-        e_year = e.get("year")
-        e_month = e.get("month")
+    # Direct JSON file read — bypasses PG to ensure data is always available
+    # This reads from the committed JSON files in the repo
+    import json as _json
+    users_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "usuarios")
 
-        # Strategy 1: explicit year/month fields
-        if e_year is not None and e_month is not None:
-            if e_year == year and e_month == month:
-                filtered.append(e)
-                continue
+    entries_found = []
 
-        # Strategy 2: extract from timestamp
-        ts_str = str(e.get("timestamp", ""))
-        if ts_str and "T" in ts_str:
-            try:
-                from datetime import datetime as _dt
-                ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
-                if ts.year == year and ts.month == month:
-                    filtered.append(e)
-                    continue
-            except Exception:
-                pass
+    # Try subdirectory format: usuarios/{username}/history.json
+    subdir_path = os.path.join(users_dir, username, "history.json")
+    if os.path.exists(subdir_path):
+        try:
+            with open(subdir_path, "r", encoding="utf-8") as f:
+                history = _json.load(f)
+            # Navigate to the requested year/month
+            year_key = str(year) if year else None
+            month_key = f"{month:02d}-" if month else None
 
-        # Strategy 3: extract from audio_filename (format "DD/M/YYYY HH:MM:SS")
-        af = e.get("audio_filename", "") or ""
-        if "/" in af:
-            try:
-                parts = af.split(" ")[0].split("/")
-                if len(parts) == 3:
-                    af_month = int(parts[1])
-                    af_year = int(parts[2])
-                    if af_year == year and af_month == month:
-                        filtered.append(e)
+            if year_key and year_key in history:
+                for mk, month_data in history[year_key].items():
+                    if month_key and not mk.startswith(month_key):
                         continue
-            except (ValueError, IndexError):
-                pass
+                    if not isinstance(month_data, dict):
+                        continue
+                    for week_data in month_data.values():
+                        if not isinstance(week_data, dict):
+                            continue
+                        for day_data in week_data.values():
+                            if not isinstance(day_data, dict):
+                                continue
+                            entries_found.extend(day_data.get("entries", []))
+        except Exception as exc:
+            print(f"[WARN] Error reading {subdir_path}: {exc}")
 
+    # Also try legacy format: usuarios/{username}_historial.json
+    if not entries_found:
+        legacy_path = os.path.join(users_dir, f"{username}_historial.json")
+        if os.path.exists(legacy_path):
+            try:
+                with open(legacy_path, "r", encoding="utf-8") as f:
+                    history = _json.load(f)
+                year_key = str(year) if year else None
+                month_key = f"{month:02d}-" if month else None
+
+                if year_key and year_key in history:
+                    for mk, month_data in history[year_key].items():
+                        if month_key and not mk.startswith(month_key):
+                            continue
+                        if not isinstance(month_data, dict):
+                            continue
+                        for week_data in month_data.values():
+                            if not isinstance(week_data, dict):
+                                continue
+                            for day_data in week_data.values():
+                                if not isinstance(day_data, dict):
+                                    continue
+                                entries_found.extend(day_data.get("entries", []))
+            except Exception as exc:
+                print(f"[WARN] Error reading {legacy_path}: {exc}")
+
+    # Also check PG as additional source
+    if not entries_found:
+        try:
+            pg_entries = get_flat_entries(username, limit=200)
+            for e in pg_entries:
+                e_year = e.get("year")
+                e_month = e.get("month")
+                if e_year is None and e.get("timestamp"):
+                    try:
+                        from datetime import datetime as _dt
+                        ts = _dt.fromisoformat(str(e["timestamp"]).replace("Z", "+00:00"))
+                        e_year = ts.year
+                        e_month = ts.month
+                    except Exception:
+                        pass
+                if e_year == year and e_month == month:
+                    entries_found.append(e)
+        except Exception:
+            pass
+
+    # Format response
     result = []
-    for e in filtered:
+    for e in entries_found:
         result.append({
             "id": e.get("id", ""),
             "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
