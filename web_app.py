@@ -149,6 +149,8 @@ def _build_commercial_dict(ca) -> dict:
         "resumen": ca.resumen,
         "accion_siguiente": ca.accion_siguiente,
         "prospeccion_detalle": ca.prospeccion_detalle,
+        "indicadores_detalle_categorias": ca.indicadores_detalle_categorias,
+        "indicadores_total_frases": ca.indicadores_total_frases,
     }
 
 # Load analyzer once at startup
@@ -260,6 +262,13 @@ else:
 # ---------------------------------------------------------------------------
 # HTML Template
 # ---------------------------------------------------------------------------
+
+import json as _json_mod
+from src.components.commercial_analyzer import _INDICADOR_CATEGORIAS, _PROSPECCION_CATEGORIAS
+_INDICADOR_CATEGORIAS_JSON = _json_mod.dumps(
+    {**_INDICADOR_CATEGORIAS, "indicios_prospeccion": _PROSPECCION_CATEGORIAS},
+    ensure_ascii=False
+)
 
 HTML = """
 <!DOCTYPE html>
@@ -1879,6 +1888,7 @@ HTML = """
 </div>
 
 <script>
+const INDICADOR_CATEGORIAS = {{ indicador_categorias_json | safe }};
 let _lastCommercialData = null;
 
 async function analyze() {
@@ -2598,29 +2608,70 @@ function renderCommercial(c) {
         const detail = c.detalle ? c.detalle[ind.key] : {};
         const hasDetail = detail && Object.keys(detail).length > 0;
         const detailId = 'detail-' + idx;
+        const tooltipId = 'tooltip-' + idx;
 
+        // Pie chart data
+        const totalFrases = (c.indicadores_total_frases || {})[ind.key] || 0;
+        const catDetail = (c.indicadores_detalle_categorias || {})[ind.key] || {};
+        const detectedCount = Object.values(catDetail).reduce((sum, arr) => sum + arr.length, 0);
+
+        // Pie chart HTML
+        let pieHtml = '';
+        if (totalFrases > 0) {
+            const piePct = Math.round((detectedCount / totalFrases) * 100);
+            const deg = Math.round((piePct / 100) * 360);
+            pieHtml = '<div style="position:relative;width:40px;height:40px;border-radius:50%;background:conic-gradient(' + ind.color + ' 0deg ' + deg + 'deg, #2a2a2a ' + deg + 'deg 360deg);display:flex;align-items:center;justify-content:center;margin:4px auto;"><div style="width:26px;height:26px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;"><span style="font-size:0.55rem;color:#fff;font-weight:600;">' + piePct + '%</span></div></div>';
+        }
+
+        // Category detail panel
         let detailHtml = '';
-        if (hasDetail) {
+        if (Object.keys(catDetail).length > 0) {
+            const catRows = Object.entries(catDetail).map(([cat, phrases]) =>
+                '<div style="margin-bottom:5px;"><div style="font-size:0.65rem;color:#aaa;font-weight:600;margin-bottom:2px;">' + cat.replace(/_/g, ' ') + ' (' + phrases.length + ')</div><div style="display:flex;flex-wrap:wrap;gap:3px;">' + phrases.map(p => '<span style="background:#0d1a2a;border:1px solid #1a3a5c;color:' + ind.color + ';padding:1px 6px;border-radius:8px;font-size:0.6rem;">' + p + '</span>').join('') + '</div></div>'
+            ).join('');
+            detailHtml = '<div class="indicator-detail" id="' + detailId + '" style="border-left:3px solid ' + ind.color + ';">' + catRows + '</div>';
+        } else if (hasDetail) {
             const rows = Object.entries(detail)
                 .sort((a, b) => b[1] - a[1])
-                .map(([word, count]) =>
-                    `<div class="detail-word-row detail-word-clickable" onclick="event.stopPropagation(); highlightSingleWord('${word.replace(/'/g, "\\\\'")}', '${ind.key}');">
-                        <span class="detail-word">${word}</span>
-                        <span class="detail-count">${count}x</span>
-                    </div>`
-                ).join('');
-            detailHtml = `<div class="indicator-detail" id="${detailId}">${rows}</div>`;
+                .map(([word, count]) => {
+                    const safeWord = word.replace(/'/g, "\\\\'");
+                    return '<div class="detail-word-row detail-word-clickable" onclick="event.stopPropagation(); highlightSingleWord(\\'' + safeWord + '\\', \\'' + ind.key + '\\');"><span class="detail-word">' + word + '</span><span class="detail-count">' + count + 'x</span></div>';
+                }).join('');
+            detailHtml = '<div class="indicator-detail" id="' + detailId + '" style="border-left:3px solid ' + ind.color + ';">' + rows + '</div>';
         } else {
-            detailHtml = `<div class="indicator-detail" id="${detailId}"><span class="detail-empty">Ninguna detectada</span></div>`;
+            detailHtml = '<div class="indicator-detail" id="' + detailId + '"><span class="detail-empty">Ninguna detectada</span></div>';
         }
+
+        // Missing phrases tooltip
+        const allCats = INDICADOR_CATEGORIAS[ind.key] || {};
+        let missingHtml = '';
+        let totalMissing = 0;
+        Object.entries(allCats).forEach(([cat, allPhrases]) => {
+            const found = catDetail[cat] || [];
+            const missing = allPhrases.filter(p => !found.includes(p));
+            if (missing.length > 0) {
+                totalMissing += missing.length;
+                missingHtml += '<div style="margin-bottom:4px;"><div style="font-size:0.58rem;color:#888;font-weight:600;">' + cat.replace(/_/g, ' ') + '</div><div style="font-size:0.55rem;color:#aaa;">' + missing.join(', ') + '</div></div>';
+            }
+        });
+        if (totalMissing === 0) {
+            missingHtml = '<div style="font-size:0.6rem;color:#5bf5a3;">Todas las frases detectadas</div>';
+        }
+        const scrollStyle = totalMissing > 15 ? 'max-height:200px;overflow-y:auto;' : '';
 
         return `
         <div>
-            <div class="indicator-item ${hasDetail ? 'has-detail' : ''}"
-                 style="border-top: 2px solid ${ind.color};"
+            <div class="indicator-item has-detail"
+                 style="border-top: 2px solid ${ind.color}; position:relative;"
                  onclick="toggleDetail('${detailId}', this); highlightInText('${ind.key}');">
+                <span class="ind-missing-icon" style="position:absolute;top:3px;right:3px;width:14px;height:14px;border-radius:50%;border:1px solid ${ind.color};color:${ind.color};font-size:0.5rem;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0.6;" onmouseenter="document.getElementById('${tooltipId}').style.display='block'" onmouseleave="document.getElementById('${tooltipId}').style.display='none'" onclick="event.stopPropagation();">!</span>
+                <div id="${tooltipId}" style="display:none;position:absolute;z-index:1000;top:20px;right:0;background:#1a1a2e;border:1px solid #2a3a5c;border-radius:8px;padding:8px;min-width:180px;max-width:280px;${scrollStyle}box-shadow:0 4px 12px rgba(0,0,0,0.5);">
+                    <div style="font-size:0.6rem;color:${ind.color};font-weight:600;margin-bottom:4px;">Frases no detectadas (${totalMissing})</div>
+                    ${missingHtml}
+                </div>
                 <div class="indicator-label">${ind.label}</div>
                 <div class="indicator-value ${ind.cls}">${ind.value}</div>
+                ${pieHtml}
             </div>
             ${detailHtml}
         </div>`;
@@ -2666,23 +2717,6 @@ function renderCommercial(c) {
         </div>
 
         <div class="indicators-grid">${indicatorsHtml}</div>
-
-        ${c.prospeccion_detalle && Object.keys(c.prospeccion_detalle).length > 0 ? `
-        <div style="margin-bottom:14px; padding:10px; background:#0a0c14; border:1px solid #1e2a40; border-radius:8px; border-left:3px solid #5bd4f5;">
-            <div style="font-size:0.7rem; color:#5bd4f5; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:8px; font-weight:600;">Detalle de Prospeccion por Categoria</div>
-            ${Object.entries(c.prospeccion_detalle).map(([cat, phrases]) => {
-                const catLabels = {
-                    'apertura': '1. Apertura y deteccion de necesidad',
-                    'interes': '2. Deteccion de interes e intencion',
-                    'situacion': '3. Situacion habitacional y laboral',
-                    'familia': '4. Informacion familiar',
-                    'objetivo': '5. Objetivo de compra',
-                    'ubicacion_barrio': '6. Presentacion de barrios y ubicacion',
-                    'modalidad_pago': '7. Modalidad de pago y capacidad',
-                };
-                return '<div style="margin-bottom:6px;"><div style="font-size:0.68rem; color:#aaa; font-weight:600; margin-bottom:3px;">' + (catLabels[cat] || cat) + ' (' + phrases.length + ')</div><div style="display:flex; flex-wrap:wrap; gap:4px;">' + phrases.map(p => '<span style="background:#0d1a2a; border:1px solid #1a3a5c; color:#5bd4f5; padding:2px 8px; border-radius:10px; font-size:0.65rem;">' + p + '</span>').join('') + '</div></div>';
-            }).join('')}
-        </div>` : ''}
 
         <div style="font-size:0.75rem; color:#555; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.06em;">Recomendacion</div>
         <div class="recomendacion-box">${c.recomendacion}</div>
@@ -3984,7 +4018,7 @@ def logout():
 def index():
     if not session.get("username"):
         return redirect(url_for("login_page"))
-    return render_template_string(HTML, username=session["username"])
+    return render_template_string(HTML, username=session["username"], indicador_categorias_json=_INDICADOR_CATEGORIAS_JSON)
 
 
 @app.route("/analyze", methods=["POST"])

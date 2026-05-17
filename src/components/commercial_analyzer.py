@@ -62,6 +62,10 @@ class CommercialAnalysis:
     accion_siguiente: str = ""
     # Prospección detallada por categoría
     prospeccion_detalle: dict = field(default_factory=dict)
+    # Detalle por categoría para cada indicador comercial
+    indicadores_detalle_categorias: dict = field(default_factory=dict)
+    # Totales de frases por indicador (para calcular % del pie chart)
+    indicadores_total_frases: dict = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -205,6 +209,116 @@ _PROSPECCION_CATEGORIAS: dict[str, list[str]] = {
         "cuanto te gustaria pagar", "cuota te queda comoda",
         "cuanto podes invertir mensualmente",
     ],
+}
+
+# Indicadores comerciales detallados por categorías
+# Cada indicador tiene ≥3 subcategorías con ≥10 frases cada una.
+# Incluye TODAS las palabras de _KEYWORDS más frases adicionales.
+_INDICADOR_CATEGORIAS: dict[str, dict[str, list[str]]] = {
+    "palabras_positivas": {
+        "entusiasmo": [
+            "excelente", "excelentes", "genial", "fantastico", "fantastica",
+            "increible", "espectacular", "barbaro", "impecable", "extraordinario",
+            "fenomenal", "brillante", "maravilloso", "maravillosa", "estupendo",
+        ],
+        "aprobacion": [
+            "bueno", "buena", "buenos", "buenas", "perfecto", "perfecta",
+            "perfectos", "perfectas", "bien", "muy bien", "esta bien",
+            "me gusta", "me encanta", "ideal", "justo lo que buscaba",
+        ],
+        "satisfaccion": [
+            "great", "perfect", "excellent", "wonderful", "amazing",
+            "contento", "contenta", "satisfecho", "satisfecha", "conforme",
+            "encantado", "encantada", "feliz", "comodo", "comoda",
+        ],
+    },
+    "respuestas_afirmativas": {
+        "confirmacion_directa": [
+            "si", "claro", "ok", "dale", "listo", "correcto",
+            "exacto", "afirmativo", "yes", "sure", "absolutely",
+            "agreed", "asi es", "tal cual", "efectivamente",
+        ],
+        "acuerdo": [
+            "por supuesto", "con gusto", "of course", "sin problema",
+            "como no", "desde luego", "naturalmente", "obvio",
+            "sin duda", "totalmente", "completamente de acuerdo",
+        ],
+        "disposicion": [
+            "me parece bien", "estoy de acuerdo", "vamos", "hagamoslo",
+            "cuando quieras", "estoy listo", "estoy lista", "adelante",
+            "perfecto dale", "buenisimo", "genial dale", "va",
+        ],
+    },
+    "indicios_cierre": {
+        "accion_inmediata": [
+            "reservar", "reserva", "bloquear", "bloqueo", "firmar",
+            "firma", "cerrar", "cierre", "reserve", "book",
+            "close", "sign", "quiero reservar", "vamos a firmar",
+        ],
+        "compromiso": [
+            "confirmar", "confirmamos", "acordamos", "trato", "deal",
+            "confirm", "cerramos", "lo tomo", "me quedo con",
+            "acepto", "lo compro", "es mio", "quiero ese",
+        ],
+        "avance": [
+            "avanzar", "proceder", "proceed", "seguir adelante",
+            "dar el siguiente paso", "como seguimos", "que sigue",
+            "cuando empezamos", "como arrancamos", "vamos adelante",
+            "quiero avanzar", "sigamos", "continuemos",
+        ],
+    },
+    "escasez_comercial": {
+        "disponibilidad": [
+            "disponible", "disponibles", "available", "quedan pocos",
+            "quedan pocas", "hay pocos", "hay pocas", "solo quedan",
+            "unidades disponibles", "lotes disponibles", "todavia hay",
+        ],
+        "urgencia_temporal": [
+            "ultimos", "ultima", "ultimo", "last", "urgent", "urgente",
+            "se termina", "se acaba", "no va a durar", "por tiempo limitado",
+            "hasta agotar stock", "oferta por hoy", "solo hoy",
+        ],
+        "limitacion": [
+            "limitado", "limitada", "pocas", "pocos", "only", "limited",
+            "exclusivo", "exclusiva", "unico", "unica", "escaso",
+            "pocas unidades", "edicion limitada", "cupos limitados",
+        ],
+    },
+    "pedidos_referidos": {
+        "solicitud_directa": [
+            "conoces", "conoce", "alguien", "know", "someone",
+            "tenes alguien", "sabes de alguien", "conoces a alguien",
+            "hay alguien que", "alguien mas", "alguien interesado",
+        ],
+        "recomendacion": [
+            "recomendar", "recomiendas", "recommend", "referral",
+            "nos recomiendes", "pasanos el contacto", "compartir",
+            "decile que", "contale a", "avisale a", "mencionanos",
+        ],
+        "red_contactos": [
+            "referido", "referidos", "contacto", "familiar",
+            "amigo", "vecino", "companero", "conocido",
+            "colega", "socio", "pareja", "hermano",
+        ],
+    },
+    "objeciones": {
+        "precio": [
+            "precio", "caro", "cara", "costoso", "costosa", "cuota",
+            "expensive", "price", "muy caro", "fuera de presupuesto",
+            "no me alcanza", "es mucho", "no puedo pagar", "sale mucho",
+        ],
+        "indecision": [
+            "duda", "dudas", "pensar", "pensarlo", "doubt", "think",
+            "no se", "no estoy", "tengo que consultarlo", "no estoy seguro",
+            "no estoy segura", "dejame pensarlo", "lo tengo que evaluar",
+        ],
+        "postergacion": [
+            "esperar", "despues", "wait", "later", "mas adelante",
+            "otro momento", "la semana que viene", "el mes que viene",
+            "ahora no puedo", "no es el momento", "todavia no",
+            "cuando pueda", "en otro momento",
+        ],
+    },
 }
 
 _BUYING_SIGNALS: list[str] = [
@@ -575,6 +689,12 @@ class CommercialAnalyzer:
         ca.keywords = _extract_keywords(text)
         ca.prospeccion_detalle = self._analyze_prospeccion(normalized)
 
+        # Analyze indicators by category (pie chart + detail)
+        indicadores_cat, indicadores_tot = self._analyze_indicador_categorias(normalized)
+        indicadores_cat["indicios_prospeccion"] = ca.prospeccion_detalle
+        ca.indicadores_detalle_categorias = indicadores_cat
+        ca.indicadores_total_frases = indicadores_tot
+
         # Recommendation (uses extended data)
         ca.recomendacion = self._build_recommendation(ca)
         ca.resumen = self._build_summary(ca)
@@ -749,6 +869,40 @@ class CommercialAnalyzer:
             if found:
                 result[category] = found
         return result
+
+    def _analyze_indicador_categorias(self, normalized: str) -> tuple[dict, dict]:
+        """
+        Analyze phrases by category for each commercial indicator.
+
+        Returns:
+            tuple: (detalle_categorias, totales)
+                - detalle_categorias: {indicador: {categoria: [frases_detectadas]}}
+                - totales: {indicador: total_frases_en_diccionario}
+        """
+        detalle: dict[str, dict[str, list[str]]] = {}
+        totales: dict[str, int] = {}
+
+        for indicador, categorias in _INDICADOR_CATEGORIAS.items():
+            indicador_detalle: dict[str, list[str]] = {}
+            total_frases = 0
+            for categoria, frases in categorias.items():
+                total_frases += len(frases)
+                encontradas = []
+                for frase in frases:
+                    if _count_keyword(normalized, frase) > 0:
+                        encontradas.append(frase)
+                if encontradas:
+                    indicador_detalle[categoria] = encontradas
+            if indicador_detalle:
+                detalle[indicador] = indicador_detalle
+            totales[indicador] = total_frases
+
+        # Include prospección total
+        totales["indicios_prospeccion"] = sum(
+            len(frases) for frases in _PROSPECCION_CATEGORIAS.values()
+        )
+
+        return detalle, totales
 
     def _build_next_action(self, ca: CommercialAnalysis) -> str:
         """Determine the recommended next action for the salesperson."""
