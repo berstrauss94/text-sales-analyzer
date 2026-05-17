@@ -4149,35 +4149,56 @@ def saved_texts():
 
     entries = get_flat_entries(session["username"], limit=200)
 
-    # Filter by year/month
+    # Filter by year/month — try multiple strategies
     filtered = []
     for e in entries:
         e_year = e.get("year")
         e_month = e.get("month")
 
-        # Fallback: extract from timestamp string if year/month not set
-        if e_year is None and e.get("timestamp"):
+        # Strategy 1: explicit year/month fields
+        if e_year is not None and e_month is not None:
+            if e_year == year and e_month == month:
+                filtered.append(e)
+                continue
+
+        # Strategy 2: extract from timestamp
+        ts_str = str(e.get("timestamp", ""))
+        if ts_str and "T" in ts_str:
             try:
                 from datetime import datetime as _dt
-                ts_str = str(e["timestamp"])
-                if "T" in ts_str:
-                    ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
-                    e_year = ts.year
-                    e_month = ts.month
+                ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
+                if ts.year == year and ts.month == month:
+                    filtered.append(e)
+                    continue
             except Exception:
                 pass
 
-        if e_year == year and e_month == month:
-            filtered.append({
-                "id": e.get("id", ""),
-                "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
-                "text": (e.get("text", "") or "")[:60],
-                "intent": e.get("intent", ""),
-                "timestamp": (str(e.get("timestamp", "")) or "")[:10],
-                "source": e.get("source", ""),
-            })
+        # Strategy 3: extract from audio_filename (format "DD/M/YYYY HH:MM:SS")
+        af = e.get("audio_filename", "") or ""
+        if "/" in af:
+            try:
+                parts = af.split(" ")[0].split("/")
+                if len(parts) == 3:
+                    af_month = int(parts[1])
+                    af_year = int(parts[2])
+                    if af_year == year and af_month == month:
+                        filtered.append(e)
+                        continue
+            except (ValueError, IndexError):
+                pass
 
-    return jsonify({"entries": filtered})
+    result = []
+    for e in filtered:
+        result.append({
+            "id": e.get("id", ""),
+            "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
+            "text": (e.get("text", "") or "")[:60],
+            "intent": e.get("intent", ""),
+            "timestamp": (str(e.get("timestamp", "")) or "")[:10],
+            "source": e.get("source", ""),
+        })
+
+    return jsonify({"entries": result})
 
 
 @app.route("/delete-last-entry", methods=["POST"])
