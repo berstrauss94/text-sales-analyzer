@@ -397,6 +397,46 @@ def _pg_add_entry(entry: dict, username: str) -> None:
         raise exc
 
 
+def _pg_upsert_entry(entry: dict, username: str) -> None:
+    """Insert or update an entry — used by migration to fix timestamps."""
+    import psycopg2.extras
+    conn = _get_pg_conn()
+    if conn is None:
+        raise RuntimeError("PostgreSQL connection lost")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO analysis_history
+                    (id, username, timestamp, source, audio_filename,
+                     text_short, text_full, intent, intent_conf,
+                     sentiment, sentiment_conf, sales_concepts, re_concepts,
+                     entities, commercial, day_label)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (id, username) DO UPDATE SET timestamp = EXCLUDED.timestamp
+            """, (
+                entry["id"],
+                username,
+                entry["timestamp"],
+                entry["source"],
+                entry.get("audio_filename", ""),
+                entry["text"],
+                entry.get("text_full", entry["text"]),
+                entry["intent"],
+                entry.get("intent_confidence", 0.0),
+                entry["sentiment"],
+                entry.get("sentiment_confidence", 0.0),
+                json.dumps(entry.get("sales_concepts", []), ensure_ascii=False),
+                json.dumps(entry.get("real_estate_concepts", []), ensure_ascii=False),
+                json.dumps(entry.get("entities", []), ensure_ascii=False),
+                json.dumps(entry.get("commercial"), ensure_ascii=False) if entry.get("commercial") else None,
+                entry.get("day_label", ""),
+            ))
+        conn.commit()
+    except Exception as exc:
+        conn.rollback()
+        raise exc
+
+
 def _pg_row_to_entry(row) -> dict:
     """Convert a DB row (tuple) to an entry dict."""
     (eid, username, ts, source, audio_fn, text_short, text_full,
@@ -793,11 +833,21 @@ def migrate_json_to_pg(users_dir: str = USERS_DIR) -> dict:
             continue
 
         user_count = 0
-        for year_data in history.values():
+        for year_key, year_data in history.items():
             if not isinstance(year_data, dict):
                 continue
-            for month_data in year_data.values():
+            # Extract year from key (e.g. "2026")
+            try:
+                cat_year = int(year_key)
+            except (ValueError, TypeError):
+                continue
+            for month_key, month_data in year_data.items():
                 if not isinstance(month_data, dict):
+                    continue
+                # Extract month from key (e.g. "01-Enero" -> 1)
+                try:
+                    cat_month = int(month_key.split("-")[0])
+                except (ValueError, TypeError, IndexError):
                     continue
                 for week_data in month_data.values():
                     if not isinstance(week_data, dict):
@@ -806,13 +856,31 @@ def migrate_json_to_pg(users_dir: str = USERS_DIR) -> dict:
                         if not isinstance(day_data, dict):
                             continue
                         for entry in day_data.get("entries", []):
+                            # Override timestamp to match categorization year/month
+                            # so PG queries by EXTRACT(YEAR/MONTH) work correctly
+                            original_ts = entry.get("timestamp", "")
                             try:
-                                _pg_add_entry(entry, username)
+                                from datetime import datetime as _mdt
+                                if original_ts:
+                                    parsed = _mdt.fromisoformat(original_ts.replace("Z", "+00:00"))
+                                    if parsed.year != cat_year or parsed.month != cat_month:
+                                        # Fix timestamp to match categorization
+                                        fixed = parsed.replace(year=cat_year, month=cat_month, day=min(parsed.day, 28))
+                                        entry["timestamp"] = fixed.isoformat()
+                            except Exception:
+                                pass
+                            # Also set year/month metadata
+                            entry["year"] = cat_year
+                            entry["month"] = cat_month
+                            try:
+                                _pg_upsert_entry(entry, username)
                                 user_count += 1
                                 summary["migrated"] += 1
                             except Exception as exc:
                                 logger.warning(f"Error migrando entrada {entry.get('id')}: {exc}")
                                 summary["errors"] += 1
+                            # Restore original timestamp
+                            entry["timestamp"] = original_ts
 
         if user_count > 0:
             summary["users"].append({"username": username, "entries": user_count})
