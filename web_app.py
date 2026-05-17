@@ -2620,14 +2620,14 @@ function renderCommercial(c) {
         if (totalFrases > 0) {
             const piePct = Math.round((detectedCount / totalFrases) * 100);
             const deg = Math.round((piePct / 100) * 360);
-            pieHtml = '<div onclick="event.stopPropagation(); toggleMissingPanel(\\'' + missingPanelId + '\\');" style="position:relative;width:40px;height:40px;border-radius:50%;background:conic-gradient(' + ind.color + ' 0deg ' + deg + 'deg, #2a2a2a ' + deg + 'deg 360deg);display:flex;align-items:center;justify-content:center;margin:4px auto;cursor:pointer;" title="Click para ver frases faltantes"><div style="width:26px;height:26px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;"><span style="font-size:0.55rem;color:#fff;font-weight:600;">' + piePct + '%</span></div></div>';
+            pieHtml = '<div class="pie-chart-click" data-missing="' + missingPanelId + '" style="position:relative;width:40px;height:40px;border-radius:50%;background:conic-gradient(' + ind.color + ' 0deg ' + deg + 'deg, #2a2a2a ' + deg + 'deg 360deg);display:flex;align-items:center;justify-content:center;margin:4px auto;cursor:pointer;" title="Click para ver frases faltantes"><div style="width:26px;height:26px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;"><span style="font-size:0.55rem;color:#fff;font-weight:600;">' + piePct + '%</span></div></div>';
         }
 
         // Category detail panel — chips clickeables que resaltan en el texto
         let detailHtml = '';
         if (Object.keys(catDetail).length > 0) {
             const catRows = Object.entries(catDetail).map(([cat, phrases]) =>
-                '<div style="margin-bottom:5px;"><div style="font-size:0.65rem;color:#aaa;font-weight:600;margin-bottom:2px;">' + cat.replace(/_/g, ' ') + ' (' + phrases.length + ')</div><div style="display:flex;flex-wrap:wrap;gap:3px;">' + phrases.map(p => '<span onclick="event.stopPropagation(); highlightSingleWord(\\'' + p.replace(/'/g, "\\\\\\\\'") + '\\', \\'' + ind.key + '\\');" style="background:#0d1a2a;border:1px solid #1a3a5c;color:' + ind.color + ';padding:1px 6px;border-radius:8px;font-size:0.6rem;cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background=\\'#1a2a4a\\'" onmouseleave="this.style.background=\\'#0d1a2a\\'">' + p + '</span>').join('') + '</div></div>'
+                '<div style="margin-bottom:5px;"><div style="font-size:0.65rem;color:#aaa;font-weight:600;margin-bottom:2px;">' + cat.replace(/_/g, ' ') + ' (' + phrases.length + ')</div><div style="display:flex;flex-wrap:wrap;gap:3px;">' + phrases.map(p => '<span class="phrase-chip" data-word="' + p.replace(/"/g, '&quot;') + '" data-group="' + ind.key + '" style="background:#0d1a2a;border:1px solid #1a3a5c;color:' + ind.color + ';padding:1px 6px;border-radius:8px;font-size:0.6rem;cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background=\'#1a2a4a\'" onmouseleave="this.style.background=\'#0d1a2a\'">' + p + '</span>').join('') + '</div></div>'
             ).join('');
             detailHtml = '<div class="indicator-detail" id="' + detailId + '" style="border-left:3px solid ' + ind.color + ';">' + catRows + '</div>';
         } else if (hasDetail) {
@@ -3372,6 +3372,25 @@ function toggleMissingPanel(panelId) {
         panel.style.display = 'block';
     }
 }
+
+// Delegated click handler for pie charts (avoids inline onclick quote issues)
+document.addEventListener('click', function(e) {
+    const pie = e.target.closest('.pie-chart-click');
+    if (pie) {
+        e.stopPropagation();
+        const panelId = pie.getAttribute('data-missing');
+        if (panelId) toggleMissingPanel(panelId);
+        return;
+    }
+    // Delegated click for phrase chips — highlight word in text
+    const chip = e.target.closest('.phrase-chip');
+    if (chip) {
+        e.stopPropagation();
+        const word = chip.getAttribute('data-word');
+        const group = chip.getAttribute('data-group');
+        if (word && group) highlightSingleWord(word, group);
+    }
+});
 
 // Allow Ctrl+Enter to submit, and auto-analyze after 2s of inactivity
 document.addEventListener('DOMContentLoaded', () => {
