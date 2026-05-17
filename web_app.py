@@ -2608,26 +2608,26 @@ function renderCommercial(c) {
         const detail = c.detalle ? c.detalle[ind.key] : {};
         const hasDetail = detail && Object.keys(detail).length > 0;
         const detailId = 'detail-' + idx;
-        const tooltipId = 'tooltip-' + idx;
+        const missingPanelId = 'missing-' + idx;
 
         // Pie chart data
         const totalFrases = (c.indicadores_total_frases || {})[ind.key] || 0;
         const catDetail = (c.indicadores_detalle_categorias || {})[ind.key] || {};
         const detectedCount = Object.values(catDetail).reduce((sum, arr) => sum + arr.length, 0);
 
-        // Pie chart HTML
+        // Pie chart HTML — clickeable para mostrar frases faltantes
         let pieHtml = '';
         if (totalFrases > 0) {
             const piePct = Math.round((detectedCount / totalFrases) * 100);
             const deg = Math.round((piePct / 100) * 360);
-            pieHtml = '<div style="position:relative;width:40px;height:40px;border-radius:50%;background:conic-gradient(' + ind.color + ' 0deg ' + deg + 'deg, #2a2a2a ' + deg + 'deg 360deg);display:flex;align-items:center;justify-content:center;margin:4px auto;"><div style="width:26px;height:26px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;"><span style="font-size:0.55rem;color:#fff;font-weight:600;">' + piePct + '%</span></div></div>';
+            pieHtml = '<div onclick="event.stopPropagation(); toggleMissingPanel(\\'' + missingPanelId + '\\');" style="position:relative;width:40px;height:40px;border-radius:50%;background:conic-gradient(' + ind.color + ' 0deg ' + deg + 'deg, #2a2a2a ' + deg + 'deg 360deg);display:flex;align-items:center;justify-content:center;margin:4px auto;cursor:pointer;" title="Click para ver frases faltantes"><div style="width:26px;height:26px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;"><span style="font-size:0.55rem;color:#fff;font-weight:600;">' + piePct + '%</span></div></div>';
         }
 
-        // Category detail panel
+        // Category detail panel — chips clickeables que resaltan en el texto
         let detailHtml = '';
         if (Object.keys(catDetail).length > 0) {
             const catRows = Object.entries(catDetail).map(([cat, phrases]) =>
-                '<div style="margin-bottom:5px;"><div style="font-size:0.65rem;color:#aaa;font-weight:600;margin-bottom:2px;">' + cat.replace(/_/g, ' ') + ' (' + phrases.length + ')</div><div style="display:flex;flex-wrap:wrap;gap:3px;">' + phrases.map(p => '<span style="background:#0d1a2a;border:1px solid #1a3a5c;color:' + ind.color + ';padding:1px 6px;border-radius:8px;font-size:0.6rem;">' + p + '</span>').join('') + '</div></div>'
+                '<div style="margin-bottom:5px;"><div style="font-size:0.65rem;color:#aaa;font-weight:600;margin-bottom:2px;">' + cat.replace(/_/g, ' ') + ' (' + phrases.length + ')</div><div style="display:flex;flex-wrap:wrap;gap:3px;">' + phrases.map(p => '<span onclick="event.stopPropagation(); highlightSingleWord(\\'' + p.replace(/'/g, "\\\\\\\\'") + '\\', \\'' + ind.key + '\\');" style="background:#0d1a2a;border:1px solid #1a3a5c;color:' + ind.color + ';padding:1px 6px;border-radius:8px;font-size:0.6rem;cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background=\\'#1a2a4a\\'" onmouseleave="this.style.background=\\'#0d1a2a\\'">' + p + '</span>').join('') + '</div></div>'
             ).join('');
             detailHtml = '<div class="indicator-detail" id="' + detailId + '" style="border-left:3px solid ' + ind.color + ';">' + catRows + '</div>';
         } else if (hasDetail) {
@@ -2642,7 +2642,7 @@ function renderCommercial(c) {
             detailHtml = '<div class="indicator-detail" id="' + detailId + '"><span class="detail-empty">Ninguna detectada</span></div>';
         }
 
-        // Missing phrases tooltip
+        // Missing phrases panel (shown on pie chart click)
         const allCats = INDICADOR_CATEGORIAS[ind.key] || {};
         let missingHtml = '';
         let totalMissing = 0;
@@ -2651,29 +2651,26 @@ function renderCommercial(c) {
             const missing = allPhrases.filter(p => !found.includes(p));
             if (missing.length > 0) {
                 totalMissing += missing.length;
-                missingHtml += '<div style="margin-bottom:4px;"><div style="font-size:0.58rem;color:#888;font-weight:600;">' + cat.replace(/_/g, ' ') + '</div><div style="font-size:0.55rem;color:#aaa;">' + missing.join(', ') + '</div></div>';
+                missingHtml += '<div style="margin-bottom:4px;"><div style="font-size:0.6rem;color:#888;font-weight:600;">' + cat.replace(/_/g, ' ') + '</div><div style="display:flex;flex-wrap:wrap;gap:3px;">' + missing.map(p => '<span style="background:#1a0d0d;border:1px solid #3a1a1a;color:#f55b5b;padding:1px 6px;border-radius:8px;font-size:0.55rem;">' + p + '</span>').join('') + '</div></div>';
             }
         });
         if (totalMissing === 0) {
             missingHtml = '<div style="font-size:0.6rem;color:#5bf5a3;">Todas las frases detectadas</div>';
         }
         const scrollStyle = totalMissing > 15 ? 'max-height:200px;overflow-y:auto;' : '';
+        const missingPanel = '<div id="' + missingPanelId + '" style="display:none;margin-top:4px;padding:8px;background:#0a0c14;border:1px solid #2a1a1a;border-radius:8px;border-left:3px solid #f55b5b;' + scrollStyle + '"><div style="font-size:0.62rem;color:#f55b5b;font-weight:600;margin-bottom:4px;">Frases no detectadas (' + totalMissing + ')</div>' + missingHtml + '</div>';
 
         return `
         <div>
             <div class="indicator-item has-detail"
                  style="border-top: 2px solid ${ind.color}; position:relative;"
                  onclick="toggleDetail('${detailId}', this); highlightInText('${ind.key}');">
-                <span class="ind-missing-icon" style="position:absolute;top:3px;right:3px;width:14px;height:14px;border-radius:50%;border:1px solid ${ind.color};color:${ind.color};font-size:0.5rem;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0.6;" onmouseenter="document.getElementById('${tooltipId}').style.display='block'" onmouseleave="document.getElementById('${tooltipId}').style.display='none'" onclick="event.stopPropagation();">!</span>
-                <div id="${tooltipId}" style="display:none;position:absolute;z-index:1000;top:20px;right:0;background:#1a1a2e;border:1px solid #2a3a5c;border-radius:8px;padding:8px;min-width:180px;max-width:280px;${scrollStyle}box-shadow:0 4px 12px rgba(0,0,0,0.5);">
-                    <div style="font-size:0.6rem;color:${ind.color};font-weight:600;margin-bottom:4px;">Frases no detectadas (${totalMissing})</div>
-                    ${missingHtml}
-                </div>
                 <div class="indicator-label">${ind.label}</div>
                 <div class="indicator-value ${ind.cls}">${ind.value}</div>
                 ${pieHtml}
             </div>
             ${detailHtml}
+            ${missingPanel}
         </div>`;
     }).join('');
 
@@ -3363,6 +3360,17 @@ function toggleDetail(detailId, cardEl) {
     const isOpen = panel.classList.contains('open');
     panel.classList.toggle('open', !isOpen);
     cardEl.classList.toggle('expanded', !isOpen);
+}
+
+function toggleMissingPanel(panelId) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    const isVisible = panel.style.display !== 'none';
+    // Close all other missing panels first
+    document.querySelectorAll('[id^="missing-"]').forEach(p => { p.style.display = 'none'; });
+    if (!isVisible) {
+        panel.style.display = 'block';
+    }
 }
 
 // Allow Ctrl+Enter to submit, and auto-analyze after 2s of inactivity
