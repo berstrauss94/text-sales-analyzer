@@ -1818,6 +1818,7 @@ HTML = """
             <div class="date-select-group">
                 <label for="selectYear">Año</label>
                 <select id="selectYear" onchange="loadSavedTexts()">
+                    <option value="2025">2025</option>
                     <option value="2026" selected>2026</option>
                     <option value="2027">2027</option>
                     <option value="2028">2028</option>
@@ -4146,8 +4147,29 @@ def saved_texts():
     year = request.args.get("year", type=int)
     month = request.args.get("month", type=int)
 
-    from src.users.history_manager import get_entries_by_month
-    filtered_raw = get_entries_by_month(session["username"], year, month)
+    try:
+        from src.users.history_manager import get_entries_by_month
+        filtered_raw = get_entries_by_month(session["username"], year, month)
+    except Exception as exc:
+        # Fallback to old method if new function fails
+        print(f"[WARN] get_entries_by_month failed: {exc}, using fallback")
+        filtered_raw = get_flat_entries(session["username"], limit=200)
+        # Filter manually
+        result = []
+        for e in filtered_raw:
+            e_year = e.get("year")
+            e_month = e.get("month")
+            if e_year is None and e.get("timestamp"):
+                try:
+                    from datetime import datetime as _dt
+                    ts = _dt.fromisoformat(str(e["timestamp"]).replace("Z", "+00:00"))
+                    e_year = ts.year
+                    e_month = ts.month
+                except Exception:
+                    pass
+            if e_year == year and e_month == month:
+                result.append(e)
+        filtered_raw = result
 
     filtered = []
     for e in filtered_raw:
