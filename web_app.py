@@ -4147,40 +4147,35 @@ def saved_texts():
     year = request.args.get("year", type=int)
     month = request.args.get("month", type=int)
 
-    try:
-        from src.users.history_manager import get_entries_by_month
-        filtered_raw = get_entries_by_month(session["username"], year, month)
-    except Exception as exc:
-        # Fallback to old method if new function fails
-        print(f"[WARN] get_entries_by_month failed: {exc}, using fallback")
-        filtered_raw = get_flat_entries(session["username"], limit=200)
-        # Filter manually
-        result = []
-        for e in filtered_raw:
-            e_year = e.get("year")
-            e_month = e.get("month")
-            if e_year is None and e.get("timestamp"):
-                try:
-                    from datetime import datetime as _dt
-                    ts = _dt.fromisoformat(str(e["timestamp"]).replace("Z", "+00:00"))
+    entries = get_flat_entries(session["username"], limit=200)
+
+    # Filter by year/month
+    filtered = []
+    for e in entries:
+        e_year = e.get("year")
+        e_month = e.get("month")
+
+        # Fallback: extract from timestamp string if year/month not set
+        if e_year is None and e.get("timestamp"):
+            try:
+                from datetime import datetime as _dt
+                ts_str = str(e["timestamp"])
+                if "T" in ts_str:
+                    ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
                     e_year = ts.year
                     e_month = ts.month
-                except Exception:
-                    pass
-            if e_year == year and e_month == month:
-                result.append(e)
-        filtered_raw = result
+            except Exception:
+                pass
 
-    filtered = []
-    for e in filtered_raw:
-        filtered.append({
-            "id": e.get("id", ""),
-            "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
-            "text": (e.get("text", "") or "")[:60],
-            "intent": e.get("intent", ""),
-            "timestamp": (e.get("timestamp", "") or "")[:10],
-            "source": e.get("source", ""),
-        })
+        if e_year == year and e_month == month:
+            filtered.append({
+                "id": e.get("id", ""),
+                "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
+                "text": (e.get("text", "") or "")[:60],
+                "intent": e.get("intent", ""),
+                "timestamp": (str(e.get("timestamp", "")) or "")[:10],
+                "source": e.get("source", ""),
+            })
 
     return jsonify({"entries": filtered})
 
