@@ -731,6 +731,7 @@ def migrate_json_to_pg(users_dir: str = USERS_DIR) -> dict:
     if not os.path.exists(users_dir):
         return summary
 
+    # Pattern 1: usuarios/{username}_historial.json (legacy format)
     json_files = [
         f for f in os.listdir(users_dir)
         if f.endswith("_historial.json")
@@ -749,9 +750,61 @@ def migrate_json_to_pg(users_dir: str = USERS_DIR) -> dict:
 
         user_count = 0
         for year_data in history.values():
+            if not isinstance(year_data, dict):
+                continue
             for month_data in year_data.values():
+                if not isinstance(month_data, dict):
+                    continue
                 for week_data in month_data.values():
+                    if not isinstance(week_data, dict):
+                        continue
                     for day_data in week_data.values():
+                        if not isinstance(day_data, dict):
+                            continue
+                        for entry in day_data.get("entries", []):
+                            try:
+                                _pg_add_entry(entry, username)
+                                user_count += 1
+                                summary["migrated"] += 1
+                            except Exception as exc:
+                                logger.warning(f"Error migrando entrada {entry.get('id')}: {exc}")
+                                summary["errors"] += 1
+
+        if user_count > 0:
+            summary["users"].append({"username": username, "entries": user_count})
+            logger.info(f"Migrado {username}: {user_count} entradas")
+
+    # Pattern 2: usuarios/{username}/history.json (subdirectory format)
+    for item in os.listdir(users_dir):
+        subdir = os.path.join(users_dir, item)
+        if not os.path.isdir(subdir):
+            continue
+        history_path = os.path.join(subdir, "history.json")
+        if not os.path.exists(history_path):
+            continue
+
+        username = item
+        try:
+            with open(history_path, "r", encoding="utf-8") as f:
+                history = json.load(f)
+        except Exception as exc:
+            logger.warning(f"No se pudo leer {history_path}: {exc}")
+            summary["errors"] += 1
+            continue
+
+        user_count = 0
+        for year_data in history.values():
+            if not isinstance(year_data, dict):
+                continue
+            for month_data in year_data.values():
+                if not isinstance(month_data, dict):
+                    continue
+                for week_data in month_data.values():
+                    if not isinstance(week_data, dict):
+                        continue
+                    for day_data in week_data.values():
+                        if not isinstance(day_data, dict):
+                            continue
                         for entry in day_data.get("entries", []):
                             try:
                                 _pg_add_entry(entry, username)
