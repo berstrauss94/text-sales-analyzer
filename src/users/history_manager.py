@@ -260,6 +260,25 @@ def get_flat_entries(
     return _json_get_flat(username, limit, users_dir)
 
 
+def get_entry_by_id(username: str, entry_id: str, users_dir: str = USERS_DIR) -> dict | None:
+    """Return a single entry by ID without loading all entries. Returns None if not found."""
+    if _is_pg_available():
+        return _pg_get_entry_by_id(username, entry_id)
+    return _json_get_entry_by_id(username, entry_id, users_dir)
+
+
+def get_entries_by_month(
+    username: str,
+    year: int | None,
+    month: int | None,
+    users_dir: str = USERS_DIR,
+) -> list[dict]:
+    """Return entries filtered by year/month directly at the data layer."""
+    if _is_pg_available():
+        return _pg_get_entries_by_month(username, year, month)
+    return _json_get_entries_by_month(username, year, month, users_dir)
+
+
 def delete_entry(username: str, entry_id: str, users_dir: str = USERS_DIR) -> bool:
     """Delete an entry by ID from the user's history. Returns True if deleted."""
     if _is_pg_available():
@@ -500,6 +519,75 @@ def _pg_get_flat(username: str, limit: int = 50) -> list[dict]:
         return []
 
 
+def _pg_get_entry_by_id(username: str, entry_id: str) -> dict | None:
+    """Fetch a single entry by ID from PostgreSQL — O(1) with primary key."""
+    conn = _get_pg_conn()
+    if conn is None:
+        return None
+    try:
+        try:
+            conn.commit()
+        except Exception:
+            pass
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, username, timestamp, source, audio_filename,
+                       text_short, text_full, intent, intent_conf,
+                       sentiment, sentiment_conf, sales_concepts, re_concepts,
+                       entities, commercial, day_label
+                FROM analysis_history
+                WHERE username = %s AND id = %s
+                LIMIT 1
+            """, (username, entry_id))
+            row = cur.fetchone()
+        if row:
+            return _pg_row_to_entry(row)
+        return None
+    except Exception as exc:
+        logger.error(f"Error buscando entry por ID en PG: {exc}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return None
+
+
+def _pg_get_entries_by_month(username: str, year: int | None, month: int | None) -> list[dict]:
+    """Fetch entries for a specific year/month from PostgreSQL using date filtering."""
+    conn = _get_pg_conn()
+    if conn is None:
+        return []
+    if not year or not month:
+        return []
+    try:
+        try:
+            conn.commit()
+        except Exception:
+            pass
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, username, timestamp, source, audio_filename,
+                       text_short, text_full, intent, intent_conf,
+                       sentiment, sentiment_conf, sales_concepts, re_concepts,
+                       entities, commercial, day_label
+                FROM analysis_history
+                WHERE username = %s
+                  AND EXTRACT(YEAR FROM timestamp) = %s
+                  AND EXTRACT(MONTH FROM timestamp) = %s
+                ORDER BY timestamp DESC
+                LIMIT 100
+            """, (username, year, month))
+            rows = cur.fetchall()
+        return [_pg_row_to_entry(r) for r in rows]
+    except Exception as exc:
+        logger.error(f"Error leyendo entries por mes en PG: {exc}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return []
+
+
 # ---------------------------------------------------------------------------
 # JSON implementation
 # ---------------------------------------------------------------------------
@@ -537,6 +625,92 @@ def _json_get_flat(
                     flat.extend(day_data.get("entries", []))
     flat.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
     return flat[:limit]
+
+
+def _json_get_entry_by_id(
+    username: str,
+    entry_id: str,
+    users_dir: str = USERS_DIR,
+) -> dict | None:
+    """Find a single entry by ID in the JSON tree without flattening all entries."""
+    history = _load_json(username, users_dir)
+    for year_data in history.values():
+        if not isinstance(year_data, dict):
+            continue
+        for month_data in year_data.values():
+            if not isinstance(month_data, dict):
+                continue
+            for week_data in month_data.values():
+                if not isinstance(week_data, dict):
+                    continue
+                for day_data in week_data.values():
+                    if not isinstance(day_data, dict):
+                        continue
+                    for entry in day_data.get("entries", []):
+                        if entry.get("id") == entry_id:
+                            return entry
+    return None
+
+
+def _json_get_entries_by_month(
+    username: str,
+    year: int | None,
+    month: int | None,
+    users_dir: str = USERS_DIR,
+) -> list[dict]:
+    """Get entries for a specific year/month from JSON — navigates directly to the right branch."""
+    if not year or not month:
+        return []
+    history = _load_json(username, users_dir)
+
+    # Try direct key access first (format: "MM-NombreMes")
+    year_key = str(year)
+    month_key = f"{month:02d}-{MONTH_NAMES.get(month, str(month))}"
+
+    year_data = history.get(year_key, {})
+    month_data = year_data.get(month_key, {})
+
+    entries: list[dict] = []
+    if month_data:
+        # Direct access worked — only iterate this month's weeks/days
+        for week_data in month_data.values():
+            if not isinstance(week_data, dict):
+                continue
+            for day_data in week_data.values():
+                if not isinstance(day_data, dict):
+                    continue
+                entries.extend(day_data.get("entries", []))
+    else:
+        # Fallback: scan all entries and filter by timestamp
+        for yd in history.values():
+            if not isinstance(yd, dict):
+                continue
+            for md in yd.values():
+                if not isinstance(md, dict):
+                    continue
+                for wd in md.values():
+                    if not isinstance(wd, dict):
+                        continue
+                    for dd in wd.values():
+                        if not isinstance(dd, dict):
+                            continue
+                        for entry in dd.get("entries", []):
+                            e_year = entry.get("year")
+                            e_month = entry.get("month")
+                            if e_year is None and entry.get("timestamp"):
+                                try:
+                                    ts = datetime.fromisoformat(
+                                        entry["timestamp"].replace("Z", "+00:00")
+                                    )
+                                    e_year = ts.year
+                                    e_month = ts.month
+                                except Exception:
+                                    pass
+                            if e_year == year and e_month == month:
+                                entries.append(entry)
+
+    entries.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
+    return entries[:100]
 
 
 # ---------------------------------------------------------------------------

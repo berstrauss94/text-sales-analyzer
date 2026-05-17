@@ -3348,7 +3348,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Auto-analyze disabled — only analyze when user clicks the button
     });
 
-    loadHistory();
+    // Lazy load: no cargar historial al inicio, solo cuando el usuario lo abra
+    // loadHistory() se llama desde toggleHistory() cuando el usuario hace click
 });
 
 // ── History ───────────────────────────────────────────────────────────────
@@ -4084,33 +4085,19 @@ def saved_texts():
     year = request.args.get("year", type=int)
     month = request.args.get("month", type=int)
 
-    entries = get_flat_entries(session["username"], limit=200)
+    from src.users.history_manager import get_entries_by_month
+    filtered_raw = get_entries_by_month(session["username"], year, month)
 
-    # Filter by year/month — compare using timestamp if year/month fields missing
     filtered = []
-    for e in entries:
-        e_year = e.get("year")
-        e_month = e.get("month")
-
-        # Fallback: extract from timestamp string if year/month not set
-        if e_year is None and e.get("timestamp"):
-            try:
-                from datetime import datetime as _dt
-                ts = _dt.fromisoformat(e["timestamp"].replace("Z", "+00:00"))
-                e_year = ts.year
-                e_month = ts.month
-            except Exception:
-                pass
-
-        if e_year == year and e_month == month:
-            filtered.append({
-                "id": e.get("id", ""),
-                "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
-                "text": (e.get("text", "") or "")[:60],
-                "intent": e.get("intent", ""),
-                "timestamp": e.get("timestamp", "")[:10],
-                "source": e.get("source", ""),
-            })
+    for e in filtered_raw:
+        filtered.append({
+            "id": e.get("id", ""),
+            "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
+            "text": (e.get("text", "") or "")[:60],
+            "intent": e.get("intent", ""),
+            "timestamp": (e.get("timestamp", "") or "")[:10],
+            "source": e.get("source", ""),
+        })
 
     return jsonify({"entries": filtered})
 
@@ -4140,10 +4127,11 @@ def saved_text(entry_id):
     if not session.get("username"):
         return jsonify({"error": "unauthorized"}), 401
 
-    entries = get_flat_entries(session["username"], limit=200)
-    for e in entries:
-        if e.get("id") == entry_id:
-            return jsonify({"text": e.get("text_full", e.get("text", ""))})
+    # Búsqueda directa por ID — evita cargar todas las entries
+    from src.users.history_manager import get_entry_by_id
+    entry = get_entry_by_id(session["username"], entry_id)
+    if entry:
+        return jsonify({"text": entry.get("text_full", entry.get("text", ""))})
 
     return jsonify({"text": ""}), 404
 
