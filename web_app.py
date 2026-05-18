@@ -2628,15 +2628,14 @@ function renderCommercial(c) {
         let detailHtml = '';
         if (Object.keys(catDetail).length > 0) {
             const catRows = Object.entries(catDetail).map(([cat, phrases]) =>
-                '<div style="margin-bottom:5px;"><div style="font-size:0.65rem;color:#aaa;font-weight:600;margin-bottom:2px;">' + cat.replace(/_/g, ' ') + ' (' + phrases.length + ')</div><div style="display:flex;flex-wrap:wrap;gap:3px;">' + phrases.map(p => '<span class="phrase-chip" data-word="' + p.replace(/"/g, '&quot;') + '" data-group="' + ind.key + '" style="background:#0d1a2a;border:1px solid #1a3a5c;color:' + ind.color + ';padding:1px 6px;border-radius:8px;font-size:0.6rem;cursor:pointer;transition:background 0.15s;" onmouseenter="this.style.background=\'#1a2a4a\'" onmouseleave="this.style.background=\'#0d1a2a\'">' + p + '</span>').join('') + '</div></div>'
+                '<div style="margin-bottom:5px;"><div style="font-size:0.65rem;color:#aaa;font-weight:600;margin-bottom:2px;">' + cat.replace(/_/g, ' ') + ' (' + phrases.length + ')</div><div style="display:flex;flex-wrap:wrap;gap:3px;">' + phrases.map(p => '<span class="phrase-chip" data-word="' + p.replace(/"/g, '&quot;') + '" data-group="' + ind.key + '" style="background:#0d1a2a;border:1px solid #1a3a5c;color:' + ind.color + ';padding:1px 6px;border-radius:8px;font-size:0.6rem;cursor:pointer;">' + p + '</span>').join('') + '</div></div>'
             ).join('');
             detailHtml = '<div class="indicator-detail" id="' + detailId + '" style="border-left:3px solid ' + ind.color + ';">' + catRows + '</div>';
         } else if (hasDetail) {
             const rows = Object.entries(detail)
                 .sort((a, b) => b[1] - a[1])
                 .map(([word, count]) => {
-                    const safeWord = word.replace(/'/g, "\\\\'");
-                    return '<div class="detail-word-row detail-word-clickable" onclick="event.stopPropagation(); highlightSingleWord(\\'' + safeWord + '\\', \\'' + ind.key + '\\');"><span class="detail-word">' + word + '</span><span class="detail-count">' + count + 'x</span></div>';
+                    return '<div class="detail-word-row phrase-chip" data-word="' + word.replace(/"/g, '&quot;') + '" data-group="' + ind.key + '" style="cursor:pointer;"><span class="detail-word">' + word + '</span><span class="detail-count">' + count + 'x</span></div>';
                 }).join('');
             detailHtml = '<div class="indicator-detail" id="' + detailId + '" style="border-left:3px solid ' + ind.color + ';">' + rows + '</div>';
         } else {
