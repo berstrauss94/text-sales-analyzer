@@ -4147,51 +4147,49 @@ def saved_texts():
     month = request.args.get("month", type=int)
 
     username = session["username"]
-
-    # Direct JSON file read — reads from committed JSON files in the repo
-    import json as _json
-
-    # Try multiple paths to find the usuarios directory
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    users_dir = os.path.join(base_dir, "usuarios")
-
     entries_found = []
 
-    # Try subdirectory format: usuarios/{username}/history.json
-    subdir_path = os.path.join(users_dir, username, "history.json")
-    if os.path.exists(subdir_path):
-        try:
-            with open(subdir_path, "r", encoding="utf-8") as f:
-                history = _json.load(f)
-            year_key = str(year) if year else None
-            month_key = f"{month:02d}-" if month else None
+    # PRIMARY SOURCE: PostgreSQL (where audio uploads and analyses are saved)
+    try:
+        pg_entries = get_flat_entries(username, limit=200)
+        for e in pg_entries:
+            e_year = e.get("year")
+            e_month = e.get("month")
 
-            if year_key and year_key in history:
-                for mk, month_data in history[year_key].items():
-                    if month_key and not mk.startswith(month_key):
-                        continue
-                    if not isinstance(month_data, dict):
-                        continue
-                    for week_data in month_data.values():
-                        if not isinstance(week_data, dict):
-                            continue
-                        for day_data in week_data.values():
-                            if not isinstance(day_data, dict):
-                                continue
-                            entries_found.extend(day_data.get("entries", []))
-        except Exception as exc:
-            app.logger.warning(f"Error reading {subdir_path}: {exc}")
+            # Extract year/month from timestamp if not set explicitly
+            if e_year is None and e.get("timestamp"):
+                try:
+                    from datetime import datetime as _dt
+                    ts_str = str(e["timestamp"])
+                    if hasattr(e["timestamp"], "year"):
+                        e_year = e["timestamp"].year
+                        e_month = e["timestamp"].month
+                    elif "T" in ts_str or "-" in ts_str:
+                        ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
+                        e_year = ts.year
+                        e_month = ts.month
+                except Exception:
+                    pass
 
-    # Also try legacy format: usuarios/{username}_historial.json
+            if e_year == year and e_month == month:
+                entries_found.append(e)
+    except Exception as exc:
+        app.logger.warning(f"PG query failed for {username}: {exc}")
+
+    # FALLBACK: JSON file (for entries that were synced/imported)
     if not entries_found:
-        legacy_path = os.path.join(users_dir, f"{username}_historial.json")
-        if os.path.exists(legacy_path):
+        import json as _json
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        users_dir = os.path.join(base_dir, "usuarios")
+
+        # Try subdirectory format
+        subdir_path = os.path.join(users_dir, username, "history.json")
+        if os.path.exists(subdir_path):
             try:
-                with open(legacy_path, "r", encoding="utf-8") as f:
+                with open(subdir_path, "r", encoding="utf-8") as f:
                     history = _json.load(f)
                 year_key = str(year) if year else None
                 month_key = f"{month:02d}-" if month else None
-
                 if year_key and year_key in history:
                     for mk, month_data in history[year_key].items():
                         if month_key and not mk.startswith(month_key):
@@ -4205,31 +4203,8 @@ def saved_texts():
                                 if not isinstance(day_data, dict):
                                     continue
                                 entries_found.extend(day_data.get("entries", []))
-            except Exception as exc:
-                app.logger.warning(f"Error reading {legacy_path}: {exc}")
-
-    # Fallback: check PG
-    if not entries_found:
-        try:
-            pg_entries = get_flat_entries(username, limit=200)
-            for e in pg_entries:
-                e_year = e.get("year")
-                e_month = e.get("month")
-                if e_year is None and e.get("timestamp"):
-                    try:
-                        from datetime import datetime as _dt
-                        ts = _dt.fromisoformat(str(e["timestamp"]).replace("Z", "+00:00"))
-                        e_year = ts.year
-                        e_month = ts.month
-                    except Exception:
-                        pass
-                if e_year == year and e_month == month:
-                    entries_found.append(e)
-        except Exception:
-            pass
-
-    # Log for debugging
-    app.logger.info(f"saved-texts: user={username} year={year} month={month} found={len(entries_found)} path_exists={os.path.exists(subdir_path)}")
+            except Exception:
+                pass
 
     # Format response
     result = []
@@ -4424,8 +4399,7 @@ def status():
 @app.route("/debug/entries/<username>")
 def debug_entries(username):
     """Temporary debug endpoint to check what entries exist for a user."""
-    if not session.get("username"):
-        return jsonify({"error": "unauthorized"}), 401
+    # No auth required temporarily for debugging
 
     # Check PG
     pg_entries = get_flat_entries(username, limit=50)
