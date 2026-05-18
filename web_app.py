@@ -1845,9 +1845,12 @@ HTML = """
             </div>
             <div class="date-select-group">
                 <label for="selectText">Textos <span id="savedTextsCount" style="color:#555;"></span></label>
-                <select id="selectText" onchange="onTextSelected(this.value)">
-                    <option value="">-- Seleccionar texto --</option>
-                </select>
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <select id="selectText" onchange="onTextSelected(this.value)" style="flex:1;">
+                        <option value="">-- Seleccionar texto --</option>
+                    </select>
+                    <button id="deleteTextBtn" onclick="deleteSelectedText()" style="display:none;background:transparent;border:1px solid #f55b5b;color:#f55b5b;border-radius:6px;padding:5px 8px;font-size:0.75rem;cursor:pointer;white-space:nowrap;" title="Eliminar texto seleccionado">🗑️</button>
+                </div>
             </div>
         </div>
 
@@ -3026,8 +3029,32 @@ async function loadSavedTexts() {
 }
 
 function onTextSelected(entryId) {
-    if (!entryId) return;
+    if (!entryId) {
+        document.getElementById('deleteTextBtn').style.display = 'none';
+        return;
+    }
+    document.getElementById('deleteTextBtn').style.display = 'inline-block';
     loadSavedText(entryId);
+}
+
+async function deleteSelectedText() {
+    const select = document.getElementById('selectText');
+    const entryId = select.value;
+    if (!entryId) return;
+    const name = select.options[select.selectedIndex].textContent;
+    if (!confirm('¿Eliminar "' + name + '"?')) return;
+    try {
+        const response = await fetch('/delete-entry/' + entryId, { method: 'DELETE' });
+        const data = await response.json();
+        if (data.success) {
+            document.getElementById('deleteTextBtn').style.display = 'none';
+            loadSavedTexts();
+        } else {
+            alert('No se pudo eliminar.');
+        }
+    } catch(e) {
+        alert('Error: ' + e.message);
+    }
 }
 
 async function loadSavedText(entryId) {
