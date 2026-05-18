@@ -4421,6 +4421,51 @@ def status():
     })
 
 
+@app.route("/debug/entries/<username>")
+def debug_entries(username):
+    """Temporary debug endpoint to check what entries exist for a user."""
+    if not session.get("username"):
+        return jsonify({"error": "unauthorized"}), 401
+
+    # Check PG
+    pg_entries = get_flat_entries(username, limit=50)
+    pg_summary = [{"id": e.get("id","")[:12], "year": e.get("year"), "month": e.get("month"),
+                   "ts": str(e.get("timestamp",""))[:19], "name": e.get("entry_name","") or e.get("audio_filename","")}
+                  for e in pg_entries]
+
+    # Check JSON file
+    import json as _json
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    users_dir = os.path.join(base_dir, "usuarios")
+    json_path = os.path.join(users_dir, username, "history.json")
+    json_exists = os.path.exists(json_path)
+    json_count = 0
+    if json_exists:
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                h = _json.load(f)
+            for yd in h.values():
+                if isinstance(yd, dict):
+                    for md in yd.values():
+                        if isinstance(md, dict):
+                            for wd in md.values():
+                                if isinstance(wd, dict):
+                                    for dd in wd.values():
+                                        if isinstance(dd, dict):
+                                            json_count += len(dd.get("entries", []))
+        except Exception:
+            pass
+
+    return jsonify({
+        "username": username,
+        "pg_count": len(pg_entries),
+        "pg_entries": pg_summary[:20],
+        "json_path": json_path,
+        "json_exists": json_exists,
+        "json_count": json_count,
+    })
+
+
 @app.route("/admin/sync", methods=["POST"])
 def admin_sync():
     """Dispara una sincronización manual (solo admin)."""
@@ -4447,28 +4492,6 @@ def admin_sync_log():
         return jsonify([])
     with open(log_file, "r", encoding="utf-8") as f:
         return jsonify(_json.load(f))
-
-
-@app.route("/debug-entries")
-def debug_entries():
-    """Temporary debug endpoint to see what's in the database for a user."""
-    if not session.get("username"):
-        return jsonify({"error": "not logged in"}), 401
-    username = session["username"]
-    entries = get_flat_entries(username, limit=10)
-    # Return raw entry data for debugging
-    debug_data = []
-    for e in entries:
-        debug_data.append({
-            "id": e.get("id", "")[:20],
-            "timestamp": e.get("timestamp", ""),
-            "year": e.get("year"),
-            "month": e.get("month"),
-            "source": e.get("source", ""),
-            "text_preview": (e.get("text", "") or "")[:50],
-            "intent": e.get("intent", ""),
-        })
-    return jsonify({"username": username, "total_returned": len(entries), "entries": debug_data})
 
 
 @app.route("/debug-sync-one")
