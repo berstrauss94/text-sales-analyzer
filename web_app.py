@@ -1844,18 +1844,10 @@ HTML = """
                 </select>
             </div>
             <div class="date-select-group">
-                <label>Textos</label>
-                <button class="saved-texts-btn" onclick="toggleSavedTexts()">📄 Ver textos <span id="savedTextsCount">(0)</span></button>
-            </div>
-        </div>
-
-        <div class="saved-texts-panel" id="savedTextsPanel">
-            <div class="saved-texts-header">
-                <span>📄 Textos guardados en este periodo</span>
-                <button class="saved-texts-close" onclick="toggleSavedTexts()">✕</button>
-            </div>
-            <div class="saved-texts-list" id="savedTextsList">
-                <div class="saved-texts-empty">Selecciona un periodo para ver los textos guardados.</div>
+                <label for="selectText">Textos <span id="savedTextsCount" style="color:#555;"></span></label>
+                <select id="selectText" onchange="onTextSelected(this.value)">
+                    <option value="">-- Seleccionar texto --</option>
+                </select>
             </div>
         </div>
 
@@ -2999,51 +2991,43 @@ async function saveWithName() {
 }
 
 function toggleSavedTexts() {
-    const panel = document.getElementById('savedTextsPanel');
-    if (panel) {
-        panel.classList.toggle('open');
-        if (panel.classList.contains('open')) loadSavedTexts();
-    }
+    // Legacy — now using dropdown select
+    loadSavedTexts();
 }
 
 async function loadSavedTexts() {
     const year = document.getElementById('selectYear').value;
     const month = document.getElementById('selectMonth').value;
-    const months = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
     try {
         const response = await fetch(`/saved-texts?year=${year}&month=${month}`);
         const data = await response.json();
-        const list = document.getElementById('savedTextsList');
+        const select = document.getElementById('selectText');
         const count = document.getElementById('savedTextsCount');
+
+        // Clear existing options except the first placeholder
+        select.innerHTML = '<option value="">-- Seleccionar texto --</option>';
 
         if (data.entries && data.entries.length > 0) {
             count.textContent = `(${data.entries.length})`;
-            list.innerHTML = data.entries.map((e, i) => {
-                // Priority: entry_name > first 50 chars of text > audio_filename
-                let displayName = e.entry_name || '';
-                if (!displayName) {
-                    const textPreview = (e.text || '').substring(0, 50).trim();
-                    displayName = textPreview ? textPreview + '...' : (e.source === 'sync' ? 'Audio sincronizado' : 'Texto #' + (i+1));
-                }
-                const sourceBadge = e.source === 'audio' ? '<span class="st-badge" style="background:#1a2a3a;color:#f5a35b;">🎙️</span>' :
-                                    e.source === 'sync' ? '<span class="st-badge" style="background:#1a2a3a;color:#5bd4f5;">🔄</span>' : '';
-                const dateBadge = e.timestamp ? `<span class="saved-text-time">${e.timestamp}</span>` : '';
-                return `<div class="saved-text-item">
-                    <div class="saved-text-row" onclick="loadSavedText('${e.id}')">
-                        <div class="saved-text-name">${displayName}</div>
-                        <div class="saved-text-meta">${sourceBadge} ${dateBadge}</div>
-                    </div>
-                    <button class="saved-text-delete" onclick="deleteSavedText('${e.id}')" title="Eliminar">🗑️</button>
-                </div>`;
-            }).join('');
+            data.entries.forEach((e, i) => {
+                const name = e.entry_name || (e.text || '').substring(0, 40) + '...' || 'Texto #' + (i+1);
+                const opt = document.createElement('option');
+                opt.value = e.id;
+                opt.textContent = name;
+                select.appendChild(opt);
+            });
         } else {
             count.textContent = '(0)';
-            list.innerHTML = `<div class="saved-texts-empty">No hay textos guardados en ${months[month]} ${year}.</div>`;
         }
     } catch(e) {
         console.error('Error loading saved texts:', e);
     }
+}
+
+function onTextSelected(entryId) {
+    if (!entryId) return;
+    loadSavedText(entryId);
 }
 
 async function loadSavedText(entryId) {
@@ -3413,11 +3397,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     textarea.addEventListener('input', () => {
         closeHighlightOverlay();
-        // Auto-analyze disabled — only analyze when user clicks the button
     });
 
-    // Lazy load: no cargar historial al inicio, solo cuando el usuario lo abra
-    // loadHistory() se llama desde toggleHistory() cuando el usuario hace click
+    // Load saved texts dropdown on page load
+    loadSavedTexts();
 });
 
 // ── History ───────────────────────────────────────────────────────────────
