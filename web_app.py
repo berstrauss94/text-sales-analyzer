@@ -742,6 +742,33 @@ HTML = """
         .card-info-tooltip:hover {
             display: block;
         }
+
+        /* Source fragment toggle */
+        .source-toggle {
+            display: flex;
+            justify-content: flex-end;
+            padding: 4px 6px 0;
+            cursor: pointer;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+        }
+        .source-toggle:hover { opacity: 1; }
+        .source-fragment {
+            display: none;
+            margin-top: 6px;
+            padding: 8px 10px;
+            background: #0a0c14;
+            border: 1px solid #1e2130;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            color: #999;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .source-fragment.open { display: block; }
         @media (max-width: 600px) {
             .card-info-tooltip { width: 200px; right: -10px; }
         }
@@ -2529,6 +2556,10 @@ function renderResults(data, inputText) {
                             <div class="intent-section-text">${iDetail.nextStep}</div>
                         </div>
                     </div>
+                    <div class="source-toggle" onclick="this.nextElementSibling.classList.toggle('open'); this.querySelector('.src-arrow').textContent = this.nextElementSibling.classList.contains('open') ? '▲' : '▼';">
+                        <span class="src-arrow" style="font-size:0.55rem;">▼</span>
+                    </div>
+                    <div class="source-fragment">${inputText.substring(0, 200).replace(/</g, '&lt;')}${inputText.length > 200 ? '...' : ''}</div>
                 </div>
             </div>
             <div class="card">
@@ -2541,6 +2572,10 @@ function renderResults(data, inputText) {
                     <span class="badge badge-${data.sentiment}">${sentimentEs}</span>
                     ${confBar(data.sentiment_confidence)}
                     ${renderSentimentDetail(data.sentiment)}
+                    <div class="source-toggle" onclick="this.nextElementSibling.classList.toggle('open'); this.querySelector('.src-arrow').textContent = this.nextElementSibling.classList.contains('open') ? '▲' : '▼';">
+                        <span class="src-arrow" style="font-size:0.55rem;">▼</span>
+                    </div>
+                    <div class="source-fragment">${inputText.substring(0, 200).replace(/</g, '&lt;')}${inputText.length > 200 ? '...' : ''}</div>
                 </div>
             </div>
             <div class="card">
