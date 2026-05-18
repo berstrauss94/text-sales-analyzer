@@ -2075,6 +2075,7 @@ function translateConcept(key, map) {
 
 function renderResults(data, inputText) {
     const el = document.getElementById('results');
+    window._lastInputText = inputText || '';
 
     if (data.error) {
         const errorMessages = {
@@ -2540,20 +2541,24 @@ function renderResults(data, inputText) {
                         <div class="intent-detail-section">
                             <div class="intent-section-title">Que significa para la venta</div>
                             <div class="intent-section-text">${iDetail.meaning}</div>
+                            ${srcToggle(150)}
                         </div>
                         <div class="intent-detail-section intent-seller-box">
                             <div class="intent-section-title">👤 Para el vendedor</div>
                             <div class="intent-section-text">${iDetail.forSeller}</div>
+                            ${srcToggle(150)}
                         </div>
                         <div class="intent-detail-section">
                             <div class="intent-section-title">💡 Tips practicos</div>
                             <ul class="intent-tips-list">
                                 ${iDetail.tips.map(t => `<li>${t}</li>`).join('')}
                             </ul>
+                            ${srcToggle(150)}
                         </div>
                         <div class="intent-detail-section intent-next-step">
                             <div class="intent-section-title">▶️ Siguiente paso</div>
                             <div class="intent-section-text">${iDetail.nextStep}</div>
+                            ${srcToggle(150)}
                         </div>
                     </div>
                     <div class="source-toggle" onclick="this.nextElementSibling.classList.toggle('open'); this.querySelector('.src-arrow').textContent = this.nextElementSibling.classList.contains('open') ? '▲' : '▼';">
@@ -2572,10 +2577,6 @@ function renderResults(data, inputText) {
                     <span class="badge badge-${data.sentiment}">${sentimentEs}</span>
                     ${confBar(data.sentiment_confidence)}
                     ${renderSentimentDetail(data.sentiment)}
-                    <div class="source-toggle" onclick="this.nextElementSibling.classList.toggle('open'); this.querySelector('.src-arrow').textContent = this.nextElementSibling.classList.contains('open') ? '▲' : '▼';">
-                        <span class="src-arrow" style="font-size:0.55rem;">▼</span>
-                    </div>
-                    <div class="source-fragment">${inputText.substring(0, 200).replace(/</g, '&lt;')}${inputText.length > 200 ? '...' : ''}</div>
                 </div>
             </div>
             <div class="card">
@@ -3147,6 +3148,12 @@ async function deleteLastEntry() {
     }
 }
 
+function srcToggle(maxChars) {
+    const text = (window._lastInputText || '').substring(0, maxChars || 150).replace(/</g, '&lt;');
+    const ellipsis = (window._lastInputText || '').length > (maxChars || 150) ? '...' : '';
+    return '<div class="source-toggle" onclick="this.nextElementSibling.classList.toggle(\'open\'); this.querySelector(\'.src-arrow\').textContent = this.nextElementSibling.classList.contains(\'open\') ? \'▲\' : \'▼\';"><span class="src-arrow" style="font-size:0.55rem;">▼</span></div><div class="source-fragment">' + text + ellipsis + '</div>';
+}
+
 function renderSentimentDetail(sentiment) {
     const details = {
         'POSITIVE': {
@@ -3182,20 +3189,24 @@ function renderSentimentDetail(sentiment) {
             <div class="intent-detail-section">
                 <div class="intent-section-title">Que significa para la venta</div>
                 <div class="intent-section-text">${d.meaning}</div>
+                ${srcToggle(150)}
             </div>
             <div class="intent-detail-section intent-seller-box">
                 <div class="intent-section-title">👤 Para el vendedor</div>
                 <div class="intent-section-text">${d.forSeller}</div>
+                ${srcToggle(150)}
             </div>
             <div class="intent-detail-section">
                 <div class="intent-section-title">💡 Tips practicos</div>
                 <ul class="intent-tips-list">
                     ${d.tips.map(t => `<li>${t}</li>`).join('')}
                 </ul>
+                ${srcToggle(150)}
             </div>
             <div class="intent-detail-section" style="border-left:3px solid ${sentiment === 'NEGATIVE' ? '#f55b5b' : sentiment === 'POSITIVE' ? '#5bf5a3' : '#f5a35b'}">
                 <div class="intent-section-title">⚠️ Nivel de riesgo</div>
                 <div class="intent-section-text">${d.risk}</div>
+                ${srcToggle(150)}
             </div>
         </div>
     `;
