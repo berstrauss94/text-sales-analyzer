@@ -7,7 +7,7 @@ from src.models.data_models import ValidationResult
 
 # Module-level constants (also available as class attributes)
 MIN_LENGTH = 3
-MAX_LENGTH = 50_000
+MAX_LENGTH = 200_000
 
 
 class Validator:

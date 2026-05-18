@@ -199,7 +199,7 @@ def test_whitespace_only_returns_error(analyzer):
 
 def test_too_long_text_returns_error(analyzer):
     """Text over 50,000 chars returns AnalysisError."""
-    result = analyzer.analyze("a" * 50_001)
+    result = analyzer.analyze("a" * 200_001)
     assert isinstance(result, AnalysisError)
     assert result.error_code == "INPUT_TOO_LONG"
 

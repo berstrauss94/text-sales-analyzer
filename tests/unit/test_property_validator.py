@@ -35,9 +35,9 @@ def test_property_too_short_always_rejected(text):
 @given(extra=st.integers(min_value=1, max_value=100))
 @settings(max_examples=50)
 def test_property_too_long_always_rejected(extra):
-    """Req 1.2: any text with len > 50,000 is rejected with INPUT_TOO_LONG.
+    """Req 1.2: any text with len > 200,000 is rejected with INPUT_TOO_LONG.
 
-    Hypothesis cannot generate strings of 50,001+ characters directly, so we
+    Hypothesis cannot generate strings of 200,001+ characters directly, so we
     build the oversized text programmatically using a small random offset.
     """
     text = "a" * (MAX_LENGTH + extra)
