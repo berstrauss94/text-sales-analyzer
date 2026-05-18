@@ -49,20 +49,20 @@ class TestInputTooShort:
 # ---------------------------------------------------------------------------
 
 class TestInputTooLong:
-    def test_text_over_50000_chars_is_too_long(self, validator):
-        long_text = "a" * 50_001
+    def test_text_over_200000_chars_is_too_long(self, validator):
+        long_text = "a" * 200_001
         result = validator.validate(long_text)
         assert result.ok is False
         assert result.error_code == "INPUT_TOO_LONG"
         assert result.error_message == "Input text exceeds maximum allowed length"
 
-    def test_text_at_exactly_50000_chars_is_valid(self, validator):
-        text = "a" * 50_000
+    def test_text_at_exactly_200000_chars_is_valid(self, validator):
+        text = "a" * 200_000
         result = validator.validate(text)
         assert result.error_code != "INPUT_TOO_LONG"
 
-    def test_text_at_50001_chars_is_too_long(self, validator):
-        text = "x" * 50_001
+    def test_text_at_200001_chars_is_too_long(self, validator):
+        text = "x" * 200_001
         result = validator.validate(text)
         assert result.ok is False
         assert result.error_code == "INPUT_TOO_LONG"
@@ -111,7 +111,7 @@ class TestValidText:
         assert result.ok is True
 
     def test_text_at_max_length_is_valid(self, validator):
-        result = validator.validate("a" * 50_000)
+        result = validator.validate("a" * 200_000)
         assert result.ok is True
 
     def test_text_with_leading_trailing_spaces_but_content_is_valid(self, validator):
