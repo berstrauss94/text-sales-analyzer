@@ -4148,10 +4148,12 @@ def saved_texts():
 
     username = session["username"]
 
-    # Direct JSON file read — bypasses PG to ensure data is always available
-    # This reads from the committed JSON files in the repo
+    # Direct JSON file read — reads from committed JSON files in the repo
     import json as _json
-    users_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "usuarios")
+
+    # Try multiple paths to find the usuarios directory
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    users_dir = os.path.join(base_dir, "usuarios")
 
     entries_found = []
 
@@ -4161,7 +4163,6 @@ def saved_texts():
         try:
             with open(subdir_path, "r", encoding="utf-8") as f:
                 history = _json.load(f)
-            # Navigate to the requested year/month
             year_key = str(year) if year else None
             month_key = f"{month:02d}-" if month else None
 
@@ -4179,7 +4180,7 @@ def saved_texts():
                                 continue
                             entries_found.extend(day_data.get("entries", []))
         except Exception as exc:
-            print(f"[WARN] Error reading {subdir_path}: {exc}")
+            app.logger.warning(f"Error reading {subdir_path}: {exc}")
 
     # Also try legacy format: usuarios/{username}_historial.json
     if not entries_found:
@@ -4205,9 +4206,9 @@ def saved_texts():
                                     continue
                                 entries_found.extend(day_data.get("entries", []))
             except Exception as exc:
-                print(f"[WARN] Error reading {legacy_path}: {exc}")
+                app.logger.warning(f"Error reading {legacy_path}: {exc}")
 
-    # Also check PG as additional source
+    # Fallback: check PG
     if not entries_found:
         try:
             pg_entries = get_flat_entries(username, limit=200)
@@ -4226,6 +4227,9 @@ def saved_texts():
                     entries_found.append(e)
         except Exception:
             pass
+
+    # Log for debugging
+    app.logger.info(f"saved-texts: user={username} year={year} month={month} found={len(entries_found)} path_exists={os.path.exists(subdir_path)}")
 
     # Format response
     result = []
@@ -4401,12 +4405,19 @@ def history_flat():
 @app.route("/status")
 def status():
     """Health check — returns component availability."""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    users_dir = os.path.join(base_dir, "usuarios")
+    cath_path = os.path.join(users_dir, "ContrerasCath", "history.json")
     return jsonify({
         "ok": True,
         "whisper_available": audio_transcriber.is_available,
         "whisper_model": audio_transcriber.model_name,
         "analyzer_loaded": analyzer is not None,
         "sync_configured": _mpc_configured,
+        "base_dir": base_dir,
+        "users_dir_exists": os.path.exists(users_dir),
+        "cath_history_exists": os.path.exists(cath_path),
+        "usuarios_contents": os.listdir(users_dir) if os.path.exists(users_dir) else [],
     })
 
 
