@@ -3019,13 +3019,20 @@ async function loadSavedTexts() {
 
         if (data.entries && data.entries.length > 0) {
             count.textContent = `(${data.entries.length})`;
-            list.innerHTML = data.entries.map(e => {
-                const preview = (e.text || '').substring(0, 60) + '...';
-                const intentBadge = e.intent ? `<span class="st-badge">${e.intent}</span>` : '';
+            list.innerHTML = data.entries.map((e, i) => {
+                // Priority: entry_name > first 50 chars of text > audio_filename
+                let displayName = e.entry_name || '';
+                if (!displayName) {
+                    const textPreview = (e.text || '').substring(0, 50).trim();
+                    displayName = textPreview ? textPreview + '...' : (e.source === 'sync' ? 'Audio sincronizado' : 'Texto #' + (i+1));
+                }
+                const sourceBadge = e.source === 'audio' ? '<span class="st-badge" style="background:#1a2a3a;color:#f5a35b;">🎙️</span>' :
+                                    e.source === 'sync' ? '<span class="st-badge" style="background:#1a2a3a;color:#5bd4f5;">🔄</span>' : '';
+                const dateBadge = e.timestamp ? `<span class="saved-text-time">${e.timestamp}</span>` : '';
                 return `<div class="saved-text-item">
                     <div class="saved-text-row" onclick="loadSavedText('${e.id}')">
-                        <div class="saved-text-name">${e.entry_name || preview}</div>
-                        <div class="saved-text-meta">${intentBadge} <span class="saved-text-time">${e.timestamp || ''}</span></div>
+                        <div class="saved-text-name">${displayName}</div>
+                        <div class="saved-text-meta">${sourceBadge} ${dateBadge}</div>
                     </div>
                     <button class="saved-text-delete" onclick="deleteSavedText('${e.id}')" title="Eliminar">🗑️</button>
                 </div>`;
