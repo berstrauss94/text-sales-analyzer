@@ -2561,10 +2561,6 @@ function renderResults(data, inputText) {
                             ${srcToggle(150)}
                         </div>
                     </div>
-                    <div class="source-toggle" onclick="this.nextElementSibling.classList.toggle('open'); this.querySelector('.src-arrow').textContent = this.nextElementSibling.classList.contains('open') ? '▲' : '▼';">
-                        <span class="src-arrow" style="font-size:0.55rem;">▼</span>
-                    </div>
-                    <div class="source-fragment">${inputText.substring(0, 200).replace(/</g, '&lt;')}${inputText.length > 200 ? '...' : ''}</div>
                 </div>
             </div>
             <div class="card">
@@ -3149,9 +3145,10 @@ async function deleteLastEntry() {
 }
 
 function srcToggle(maxChars) {
-    const text = (window._lastInputText || '').substring(0, maxChars || 150).replace(/</g, '&lt;');
+    const text = (window._lastInputText || '').substring(0, maxChars || 150).replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const ellipsis = (window._lastInputText || '').length > (maxChars || 150) ? '...' : '';
-    return '<div class="source-toggle" onclick="this.nextElementSibling.classList.toggle(\'open\'); this.querySelector(\'.src-arrow\').textContent = this.nextElementSibling.classList.contains(\'open\') ? \'▲\' : \'▼\';"><span class="src-arrow" style="font-size:0.55rem;">▼</span></div><div class="source-fragment">' + text + ellipsis + '</div>';
+    const id = 'src-' + Math.random().toString(36).substr(2, 6);
+    return '<div class="source-toggle" data-target="' + id + '"><span class="src-arrow" style="font-size:0.55rem;">▼</span></div><div class="source-fragment" id="' + id + '">' + text + ellipsis + '</div>';
 }
 
 function renderSentimentDetail(sentiment) {
@@ -3453,6 +3450,20 @@ document.addEventListener('click', function(e) {
         const word = chip.getAttribute('data-word');
         const group = chip.getAttribute('data-group');
         if (word && group) highlightSingleWord(word, group);
+        return;
+    }
+    // Delegated click for source toggles — show/hide text fragment
+    const srcTog = e.target.closest('.source-toggle');
+    if (srcTog) {
+        const targetId = srcTog.getAttribute('data-target');
+        if (targetId) {
+            const frag = document.getElementById(targetId);
+            if (frag) {
+                frag.classList.toggle('open');
+                const arrow = srcTog.querySelector('.src-arrow');
+                if (arrow) arrow.textContent = frag.classList.contains('open') ? '▲' : '▼';
+            }
+        }
     }
 });
 
