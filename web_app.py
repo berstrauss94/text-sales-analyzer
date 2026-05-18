@@ -3096,7 +3096,6 @@ async function loadSavedText(entryId) {
         const data = await response.json();
         if (data.text) {
             document.getElementById('textInput').value = data.text;
-            toggleSavedTexts();
         }
     } catch(e) {
         console.error('Error loading text:', e);
