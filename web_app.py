@@ -1898,8 +1898,10 @@ HTML = """
         <div class="btn-row">
             <button class="btn-primary" onclick="analyze()">&#128269; Analizar</button>
             <button class="btn-secondary" onclick="clearAll()">Limpiar</button>
+            {% if username in ['admin', 'Vanesa.Admin', 'BaronVonBerna'] %}
             <input type="text" id="entryNameInput" class="save-name-input" placeholder="Titulo del texto (obligatorio para guardar)..." style="flex:1; margin-left:8px;">
             <button class="btn-save" onclick="saveEntry()">&#128190; Guardar</button>
+            {% endif %}
         </div>
         <div class="loading" id="loading" style="margin-top:10px;">Analizando texto...</div>
     </div>
@@ -4394,8 +4396,8 @@ def analyze():
     if target_user != session["username"] and not _is_admin():
         target_user = session["username"]  # Non-admins can only save to themselves
 
-    # Only save if entry_name is provided (mandatory)
-    if entry_name and _should_save:
+    # Only save if entry_name is provided (mandatory) AND user is admin
+    if entry_name and _should_save and _is_admin():
         add_entry(
             username=target_user,
             text=clean_text,
