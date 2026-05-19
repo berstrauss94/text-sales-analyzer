@@ -1842,7 +1842,7 @@ HTML = """
 
     <div class="input-section">
         <div class="date-selectors">
-            {% if username in ['admin', 'Vanesa.Admin'] %}
+            {% if username in ['admin', 'Vanesa.Admin', 'BaronVonBerna'] %}
             <div class="date-select-group">
                 <label for="selectUser">👤 Usuario</label>
                 <select id="selectUser" onchange="loadSavedTexts(); loadAdminStats();" style="min-width:150px;">
@@ -1906,7 +1906,7 @@ HTML = """
 
     <div class="results" id="results"></div>
 
-    {% if username in ['admin', 'Vanesa.Admin'] %}
+    {% if username in ['admin', 'Vanesa.Admin', 'BaronVonBerna'] %}
     <!-- ── ADMIN STATS PANEL ── -->
     <div class="input-section" id="adminStatsPanel" style="margin-top:20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
@@ -2008,10 +2008,14 @@ async function saveEntry() {
     document.getElementById('results').style.display = 'none';
 
     try {
+        // If admin has a user selected, save to that user
+        const userSelect = document.getElementById('selectUser');
+        const targetUser = userSelect ? userSelect.value : '';
+
         const response = await fetch('/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, year: parseInt(year), month: parseInt(month), entry_name: entryName })
+            body: JSON.stringify({ text, year: parseInt(year), month: parseInt(month), entry_name: entryName, target_user: targetUser })
         });
         const data = await response.json();
         _lastCommercialData = data.commercial || null;
@@ -4385,11 +4389,15 @@ def analyze():
     year = data.get("year")
     month = data.get("month")
     entry_name = data.get("entry_name", "").strip()
+    # Admin can save to another user's account
+    target_user = data.get("target_user", "").strip() or session["username"]
+    if target_user != session["username"] and not _is_admin():
+        target_user = session["username"]  # Non-admins can only save to themselves
 
     # Only save if entry_name is provided (mandatory)
     if entry_name and _should_save:
         add_entry(
-            username=session["username"],
+            username=target_user,
             text=clean_text,
             analysis=analysis_dict,
             source="text",
@@ -4722,7 +4730,7 @@ def debug_entries(username):
 
 
 # Admin usernames
-_ADMIN_USERS = {"admin", "Vanesa.Admin"}
+_ADMIN_USERS = {"admin", "Vanesa.Admin", "BaronVonBerna"}
 
 
 def _is_admin():
