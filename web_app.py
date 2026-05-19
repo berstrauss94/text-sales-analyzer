@@ -3091,6 +3091,16 @@ async function loadSavedTexts() {
     // If admin has a user selected, use admin endpoint
     const userSelect = document.getElementById('selectUser');
     const adminUser = userSelect ? userSelect.value : '';
+
+    // For admin: if no user selected, can't load texts
+    if (userSelect && !adminUser) {
+        const select = document.getElementById('selectText');
+        const count = document.getElementById('savedTextsCount');
+        if (select) select.innerHTML = '<option value="">-- Seleccionar usuario primero --</option>';
+        if (count) count.textContent = '';
+        return;
+    }
+
     const url = adminUser
         ? `/admin/user-texts/${adminUser}?year=${year}&month=${month}`
         : `/saved-texts?year=${year}&month=${month}`;
@@ -4500,6 +4510,10 @@ def saved_texts():
 
             if e_year == year and e_month == month:
                 entries_found.append(e)
+
+        # If no entries matched the filter, show all entries (user might have wrong dates)
+        if not entries_found and pg_entries:
+            entries_found = pg_entries[:50]
     except Exception as exc:
         app.logger.warning(f"PG query failed for {username}: {exc}")
 
