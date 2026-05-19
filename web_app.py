@@ -1909,9 +1909,24 @@ HTML = """
     {% if username in ['admin', 'Vanesa.Admin'] %}
     <!-- ── ADMIN STATS PANEL ── -->
     <div class="input-section" id="adminStatsPanel" style="margin-top:20px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
             <div style="font-size:0.85rem;font-weight:600;color:#b38bff;">📊 Panel de Seguimiento (Admin)</div>
-            <div style="display:flex;gap:8px;align-items:center;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <select id="statsMonth" onchange="onStatsMonthChange()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.8rem;">
+                    <option value="">Mes (todos)</option>
+                    <option value="1">Enero</option>
+                    <option value="2">Febrero</option>
+                    <option value="3">Marzo</option>
+                    <option value="4">Abril</option>
+                    <option value="5">Mayo</option>
+                    <option value="6">Junio</option>
+                    <option value="7">Julio</option>
+                    <option value="8">Agosto</option>
+                    <option value="9">Septiembre</option>
+                    <option value="10">Octubre</option>
+                    <option value="11">Noviembre</option>
+                    <option value="12">Diciembre</option>
+                </select>
                 <select id="statsPeriod" onchange="loadAdminStats()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.8rem;">
                     <option value="mensual">Mensual</option>
                     <option value="bimestral">Bimestral</option>
@@ -3140,6 +3155,21 @@ async function loadSavedText(entryId) {
 }
 
 // ── ADMIN FUNCTIONS ──
+function onStatsMonthChange() {
+    const monthSelect = document.getElementById('statsMonth');
+    const periodSelect = document.getElementById('statsPeriod');
+    if (monthSelect.value) {
+        // Specific month selected — disable period selector
+        periodSelect.disabled = true;
+        periodSelect.style.opacity = '0.4';
+    } else {
+        // No specific month — enable period selector
+        periodSelect.disabled = false;
+        periodSelect.style.opacity = '1';
+    }
+    loadAdminStats();
+}
+
 async function loadAdminUsers() {
     try {
         const resp = await fetch('/admin/users-list');
@@ -3158,10 +3188,12 @@ async function loadAdminUsers() {
 async function loadAdminStats() {
     const userSelect = document.getElementById('selectUser');
     const periodSelect = document.getElementById('statsPeriod');
+    const monthSelect = document.getElementById('statsMonth');
     if (!userSelect || !periodSelect) return;
 
     const username = userSelect.value;
     const period = periodSelect.value;
+    const specificMonth = monthSelect ? monthSelect.value : '';
     const container = document.getElementById('adminStatsContent');
     if (!container) return;
 
@@ -3170,8 +3202,14 @@ async function loadAdminStats() {
         return;
     }
 
+    // If specific month selected, override period
+    let url = `/admin/stats/${username}?period=${period}&year=2026`;
+    if (specificMonth) {
+        url = `/admin/stats/${username}?period=specific&month=${specificMonth}&year=2026`;
+    }
+
     try {
-        const resp = await fetch(`/admin/stats/${username}?period=${period}&year=2026`);
+        const resp = await fetch(url);
         const data = await resp.json();
 
         if (data.entry_count === 0) {
@@ -4738,7 +4776,13 @@ def admin_stats(username):
         "semestral": list(range(max(1, current_month - 5), current_month + 1)),
         "anual": list(range(1, current_month + 1)),
     }
-    months_to_include = period_months.get(period, [current_month])
+
+    # Handle specific month selection
+    specific_month = request.args.get("month", type=int)
+    if period == "specific" and specific_month:
+        months_to_include = [specific_month]
+    else:
+        months_to_include = period_months.get(period, [current_month])
 
     # Aggregate commercial indicators
     totals = {
