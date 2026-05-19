@@ -3341,10 +3341,8 @@ async function deleteLastEntry() {
 }
 
 function srcToggle(maxChars) {
-    const text = (window._lastInputText || '').substring(0, maxChars || 150).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const ellipsis = (window._lastInputText || '').length > (maxChars || 150) ? '...' : '';
-    const id = 'src-' + Math.random().toString(36).substr(2, 6);
-    return '<div class="source-toggle" data-target="' + id + '"><span class="src-arrow" style="font-size:0.55rem;">▼</span></div><div class="source-fragment" id="' + id + '">' + text + ellipsis + '</div>';
+    // Disabled — was showing irrelevant repeated text
+    return '';
 }
 
 function renderSentimentDetail(sentiment) {
