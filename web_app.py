@@ -3372,7 +3372,7 @@ function srcToggle(section) {
                 keywords = ['precio', 'cuota', 'terreno', 'lote', 'barrio'];
         }
 
-        const sentences = text.split(/[.!?\n]+/).filter(s => s.trim().length > 20);
+        const sentences = text.split(/[.!?]+|\\n/).filter(s => s.trim().length > 20);
         const matches = [];
         for (const sent of sentences) {
             const lower = sent.toLowerCase();
