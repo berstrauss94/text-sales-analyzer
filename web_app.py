@@ -2595,24 +2595,24 @@ function renderResults(data, inputText) {
                         <div class="intent-detail-section">
                             <div class="intent-section-title">Que significa para la venta</div>
                             <div class="intent-section-text">${iDetail.meaning}</div>
-                            ${srcToggle(150)}
+                            ${srcToggle('meaning')}
                         </div>
                         <div class="intent-detail-section intent-seller-box">
                             <div class="intent-section-title">👤 Para el vendedor</div>
                             <div class="intent-section-text">${iDetail.forSeller}</div>
-                            ${srcToggle(150)}
+                            ${srcToggle('seller')}
                         </div>
                         <div class="intent-detail-section">
                             <div class="intent-section-title">💡 Tips practicos</div>
                             <ul class="intent-tips-list">
                                 ${iDetail.tips.map(t => `<li>${t}</li>`).join('')}
                             </ul>
-                            ${srcToggle(150)}
+                            ${srcToggle('tips')}
                         </div>
                         <div class="intent-detail-section intent-next-step">
                             <div class="intent-section-title">▶️ Siguiente paso</div>
                             <div class="intent-section-text">${iDetail.nextStep}</div>
-                            ${srcToggle(150)}
+                            ${srcToggle('next')}
                         </div>
                     </div>
                 </div>
@@ -3340,9 +3340,52 @@ async function deleteLastEntry() {
     }
 }
 
-function srcToggle(maxChars) {
-    // Disabled — was showing irrelevant repeated text
-    return '';
+function srcToggle(section) {
+    // Extract relevant fragments from the text based on the section type
+    const text = window._lastInputText || '';
+    if (!text) return '';
+
+    let keywords = [];
+    switch(section) {
+        case 'meaning':
+            keywords = ['precio', 'cuota', 'entrega', 'pesos', 'dolares', 'usd', 'oferta', 'promocion', 'descuento', 'negociar', 'condicion', 'monto', 'valor', 'costo'];
+            break;
+        case 'seller':
+            keywords = ['vendedor', 'le ofrezco', 'tenemos', 'le puedo', 'podemos', 'le sugiero', 'le recomiendo', 'nuestra empresa', 'nuestro compromiso'];
+            break;
+        case 'tips':
+            keywords = ['no se', 'pensar', 'duda', 'caro', 'lejos', 'problema', 'pero', 'no puedo', 'dificil', 'objecion', 'esperar'];
+            break;
+        case 'next':
+            keywords = ['reserva', 'firma', 'cierre', 'agenda', 'coordin', 'miercoles', 'manana', 'visita', 'compromet', 'acepto', 'dale', 'perfecto'];
+            break;
+        default:
+            keywords = ['precio', 'cuota', 'terreno', 'lote', 'barrio'];
+    }
+
+    // Find sentences containing these keywords
+    const sentences = text.split(/[.!?\n]+/).filter(s => s.trim().length > 20);
+    const matches = [];
+    for (const sent of sentences) {
+        const lower = sent.toLowerCase();
+        for (const kw of keywords) {
+            if (lower.includes(kw) && !matches.includes(sent.trim())) {
+                matches.push(sent.trim());
+                break;
+            }
+        }
+        if (matches.length >= 3) break;
+    }
+
+    if (matches.length === 0) return '';
+
+    const fragmentHtml = matches.map(m => {
+        const safe = m.substring(0, 120).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return '"' + safe + (m.length > 120 ? '...' : '') + '"';
+    }).join('<br>');
+
+    const id = 'src-' + Math.random().toString(36).substr(2, 6);
+    return '<div class="source-toggle" data-target="' + id + '"><span class="src-arrow" style="font-size:0.55rem;">▼</span></div><div class="source-fragment" id="' + id + '">' + fragmentHtml + '</div>';
 }
 
 function renderSentimentDetail(sentiment) {
@@ -3380,24 +3423,24 @@ function renderSentimentDetail(sentiment) {
             <div class="intent-detail-section">
                 <div class="intent-section-title">Que significa para la venta</div>
                 <div class="intent-section-text">${d.meaning}</div>
-                ${srcToggle(150)}
+                ${srcToggle('meaning')}
             </div>
             <div class="intent-detail-section intent-seller-box">
                 <div class="intent-section-title">👤 Para el vendedor</div>
                 <div class="intent-section-text">${d.forSeller}</div>
-                ${srcToggle(150)}
+                ${srcToggle('seller')}
             </div>
             <div class="intent-detail-section">
                 <div class="intent-section-title">💡 Tips practicos</div>
                 <ul class="intent-tips-list">
                     ${d.tips.map(t => `<li>${t}</li>`).join('')}
                 </ul>
-                ${srcToggle(150)}
+                ${srcToggle('tips')}
             </div>
             <div class="intent-detail-section" style="border-left:3px solid ${sentiment === 'NEGATIVE' ? '#f55b5b' : sentiment === 'POSITIVE' ? '#5bf5a3' : '#f5a35b'}">
                 <div class="intent-section-title">⚠️ Nivel de riesgo</div>
                 <div class="intent-section-text">${d.risk}</div>
-                ${srcToggle(150)}
+                ${srcToggle('tips')}
             </div>
         </div>
     `;
