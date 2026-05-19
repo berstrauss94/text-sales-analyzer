@@ -2595,24 +2595,20 @@ function renderResults(data, inputText) {
                         <div class="intent-detail-section">
                             <div class="intent-section-title">Que significa para la venta</div>
                             <div class="intent-section-text">${iDetail.meaning}</div>
-                            ${srcToggle('meaning')}
                         </div>
                         <div class="intent-detail-section intent-seller-box">
                             <div class="intent-section-title">👤 Para el vendedor</div>
                             <div class="intent-section-text">${iDetail.forSeller}</div>
-                            ${srcToggle('seller')}
                         </div>
                         <div class="intent-detail-section">
                             <div class="intent-section-title">💡 Tips practicos</div>
                             <ul class="intent-tips-list">
                                 ${iDetail.tips.map(t => `<li>${t}</li>`).join('')}
                             </ul>
-                            ${srcToggle('tips')}
                         </div>
                         <div class="intent-detail-section intent-next-step">
                             <div class="intent-section-title">▶️ Siguiente paso</div>
                             <div class="intent-section-text">${iDetail.nextStep}</div>
-                            ${srcToggle('next')}
                         </div>
                     </div>
                 </div>
@@ -3438,24 +3434,20 @@ function renderSentimentDetail(sentiment) {
             <div class="intent-detail-section">
                 <div class="intent-section-title">Que significa para la venta</div>
                 <div class="intent-section-text">${d.meaning}</div>
-                ${srcToggle('meaning')}
             </div>
             <div class="intent-detail-section intent-seller-box">
                 <div class="intent-section-title">👤 Para el vendedor</div>
                 <div class="intent-section-text">${d.forSeller}</div>
-                ${srcToggle('seller')}
             </div>
             <div class="intent-detail-section">
                 <div class="intent-section-title">💡 Tips practicos</div>
                 <ul class="intent-tips-list">
                     ${d.tips.map(t => `<li>${t}</li>`).join('')}
                 </ul>
-                ${srcToggle('tips')}
             </div>
             <div class="intent-detail-section" style="border-left:3px solid ${sentiment === 'NEGATIVE' ? '#f55b5b' : sentiment === 'POSITIVE' ? '#5bf5a3' : '#f5a35b'}">
                 <div class="intent-section-title">⚠️ Nivel de riesgo</div>
                 <div class="intent-section-text">${d.risk}</div>
-                ${srcToggle('tips')}
             </div>
         </div>
     `;
