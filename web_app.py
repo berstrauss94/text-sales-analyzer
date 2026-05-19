@@ -1912,6 +1912,9 @@ HTML = """
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
             <div style="font-size:0.85rem;font-weight:600;color:#b38bff;">📊 Panel de Seguimiento (Admin)</div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <select id="statsVendor" onchange="loadAdminStats()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.8rem;">
+                    <option value="_all">General (todos)</option>
+                </select>
                 <select id="statsMonth" onchange="onStatsMonthChange()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.8rem;">
                     <option value="">Mes (todos)</option>
                     <option value="1">Enero</option>
@@ -3175,37 +3178,49 @@ async function loadAdminUsers() {
         const resp = await fetch('/admin/users-list');
         const data = await resp.json();
         const select = document.getElementById('selectUser');
-        if (!select || !data.users) return;
-        data.users.forEach(u => {
-            const opt = document.createElement('option');
-            opt.value = u;
-            opt.textContent = u;
-            select.appendChild(opt);
-        });
+        const vendorSelect = document.getElementById('statsVendor');
+        if (!data.users) return;
+        if (select) {
+            data.users.forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u;
+                opt.textContent = u;
+                select.appendChild(opt);
+            });
+        }
+        if (vendorSelect) {
+            data.users.forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u;
+                opt.textContent = u;
+                vendorSelect.appendChild(opt);
+            });
+        }
     } catch(e) { console.error('Error loading users:', e); }
 }
 
 async function loadAdminStats() {
-    const userSelect = document.getElementById('selectUser');
+    const vendorSelect = document.getElementById('statsVendor');
     const periodSelect = document.getElementById('statsPeriod');
     const monthSelect = document.getElementById('statsMonth');
-    if (!userSelect || !periodSelect) return;
+    if (!vendorSelect || !periodSelect) return;
 
-    const username = userSelect.value;
+    const vendor = vendorSelect.value;
     const period = periodSelect.value;
     const specificMonth = monthSelect ? monthSelect.value : '';
     const container = document.getElementById('adminStatsContent');
     if (!container) return;
 
-    if (!username) {
-        container.innerHTML = '<div style="color:#555;font-size:0.8rem;">Selecciona un usuario para ver estadisticas.</div>';
-        return;
+    // Build URL — _all means aggregate all users
+    let url;
+    if (vendor === '_all') {
+        url = `/admin/stats/_all?period=${period}&year=2026`;
+    } else {
+        url = `/admin/stats/${vendor}?period=${period}&year=2026`;
     }
-
-    // If specific month selected, override period
-    let url = `/admin/stats/${username}?period=${period}&year=2026`;
     if (specificMonth) {
-        url = `/admin/stats/${username}?period=specific&month=${specificMonth}&year=2026`;
+        url += `&month=${specificMonth}`;
+        url = url.replace(`period=${period}`, 'period=specific');
     }
 
     try {
@@ -4759,10 +4774,20 @@ def admin_stats(username):
     if not _is_admin():
         return jsonify({"error": "unauthorized"}), 403
 
-    period = request.args.get("period", "mensual")  # mensual, bimestral, trimestral, cuatrimestral, semestral, anual
+    period = request.args.get("period", "mensual")
     year = request.args.get("year", type=int) or 2026
 
-    entries = get_flat_entries(username, limit=500)
+    # If _all, aggregate across all users
+    if username == "_all":
+        all_users = user_manager.list_users()
+        all_entries = []
+        for u in all_users:
+            all_entries.extend(get_flat_entries(u, limit=500))
+        entries = all_entries
+        display_name = "General (todos)"
+    else:
+        entries = get_flat_entries(username, limit=500)
+        display_name = username
 
     # Determine which months to include based on period
     from datetime import datetime as _dt
@@ -4820,7 +4845,7 @@ def admin_stats(username):
                     totals[key] += commercial.get(key, 0)
 
     return jsonify({
-        "username": username,
+        "username": display_name if username == "_all" else username,
         "period": period,
         "year": year,
         "months": months_to_include,
