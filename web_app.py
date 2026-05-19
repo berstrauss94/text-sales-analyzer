@@ -3668,8 +3668,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load admin user list if admin
     if (document.getElementById('selectUser')) {
-        loadAdminUsers();
-        loadAdminStats();
+        loadAdminUsers().then(() => loadAdminStats());
     }
 });
 
