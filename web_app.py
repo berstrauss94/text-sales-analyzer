@@ -3225,7 +3225,16 @@ async function loadAdminStats() {
 
     try {
         const resp = await fetch(url);
+        if (!resp.ok) {
+            container.innerHTML = '<div style="color:#f55b5b;font-size:0.8rem;">Error: ' + resp.status + ' - Verifica que estas logueado como admin.</div>';
+            return;
+        }
         const data = await resp.json();
+
+        if (data.error) {
+            container.innerHTML = '<div style="color:#f55b5b;font-size:0.8rem;">Error: ' + (data.error || 'desconocido') + '</div>';
+            return;
+        }
 
         if (data.entry_count === 0) {
             container.innerHTML = '<div style="color:#555;font-size:0.8rem;">No hay datos para este periodo.</div>';
@@ -3668,6 +3677,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load admin user list if admin
     if (document.getElementById('selectUser')) {
+        // Reset stats vendor to _all on page load (browser may restore previous selection)
+        const sv = document.getElementById('statsVendor');
+        if (sv) sv.value = '_all';
         loadAdminUsers().then(() => loadAdminStats());
     }
 });
@@ -4771,7 +4783,7 @@ def admin_user_texts(username):
 def admin_stats(username):
     """Return commercial indicator stats for a user over a period (admin only)."""
     if not _is_admin():
-        return jsonify({"error": "unauthorized"}), 403
+        return jsonify({"error": "unauthorized", "message": "No eres admin"}), 403
 
     period = request.args.get("period", "mensual")
     year = request.args.get("year", type=int) or 2026
@@ -4779,10 +4791,12 @@ def admin_stats(username):
     # If _all, aggregate across all users
     if username == "_all":
         all_users = user_manager.list_users()
-        all_entries = []
+        entries = []
         for u in all_users:
-            all_entries.extend(get_flat_entries(u, limit=500))
-        entries = all_entries
+            try:
+                entries.extend(get_flat_entries(u, limit=500))
+            except Exception:
+                pass
         display_name = "General (todos)"
     else:
         entries = get_flat_entries(username, limit=500)
