@@ -1,0 +1,19 @@
+=== FICHA DE USUARIO ===
+Fecha de registro : 2026-05-19 01:18:58 UTC
+
+--- DATOS DE ACCESO ---
+Usuario           : Vanesa.Admin
+Contrasena (hash) : 764d182bdb1e48b65d7372fbd4de3dc9241774513bc61b3bdb66863b891879ea
+
+--- DATOS PERSONALES ---
+Nombre            : Vanesa
+Apellido          : Admin
+Celular           : 0000000000
+Email             : admin@empresa.com
+Direccion         : Oficina Central
+
+--- DATOS PROFESIONALES ---
+Empresa           : Empresa
+Cargo             : Administradora
+
+========================
