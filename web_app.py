@@ -3194,10 +3194,11 @@ function onStatsMonthChange() {
 async function loadAdminUsers() {
     try {
         const resp = await fetch('/admin/users-list');
+        if (!resp.ok) { console.error('admin/users-list failed:', resp.status); return; }
         const data = await resp.json();
         const select = document.getElementById('selectUser');
         const vendorSelect = document.getElementById('statsVendor');
-        if (!data.users) return;
+        if (!data.users || !data.users.length) { console.error('No users returned'); return; }
         if (select) {
             data.users.forEach(u => {
                 const opt = document.createElement('option');
@@ -3735,14 +3736,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Load saved texts dropdown on page load
-    loadSavedTexts();
-
-    // Load admin user list if admin
+    // For admin: wait until users are loaded, then load texts
     if (document.getElementById('selectUser')) {
-        // Reset stats vendor to _all on page load (browser may restore previous selection)
         const sv = document.getElementById('statsVendor');
         if (sv) sv.value = '_all';
-        loadAdminUsers().then(() => loadAdminStats());
+        loadAdminUsers().then(() => {
+            loadAdminStats();
+            // Don't auto-load texts for admin — they need to select a user first
+        });
+    } else {
+        // Regular user: load their texts immediately
+        loadSavedTexts();
     }
 });
 
