@@ -4453,9 +4453,18 @@ def saved_text(entry_id):
     if not session.get("username"):
         return jsonify({"error": "unauthorized"}), 401
 
-    # Búsqueda directa por ID — evita cargar todas las entries
     from src.users.history_manager import get_entry_by_id
+
+    # First try the logged-in user
     entry = get_entry_by_id(session["username"], entry_id)
+
+    # If admin and not found, search across all users
+    if not entry and _is_admin():
+        for u in user_manager.list_users():
+            entry = get_entry_by_id(u, entry_id)
+            if entry:
+                break
+
     if entry:
         return jsonify({"text": entry.get("text_full", entry.get("text", ""))})
 
