@@ -3101,7 +3101,8 @@ async function loadSavedTexts() {
         if (data.entries && data.entries.length > 0) {
             count.textContent = `(${data.entries.length})`;
             data.entries.forEach((e, i) => {
-                const name = e.entry_name || (e.text || '').substring(0, 40) + '...' || 'Texto #' + (i+1);
+                const rawName = e.entry_name || (e.text || '').substring(0, 16) || 'Texto #' + (i+1);
+                const name = rawName.length > 16 ? rawName.substring(0, 16) + '...' : rawName;
                 const opt = document.createElement('option');
                 opt.value = e.id;
                 opt.textContent = name;
