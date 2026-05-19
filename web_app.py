@@ -1842,6 +1842,14 @@ HTML = """
 
     <div class="input-section">
         <div class="date-selectors">
+            {% if username in ['admin', 'Vanesa.Admin'] %}
+            <div class="date-select-group">
+                <label for="selectUser">👤 Usuario</label>
+                <select id="selectUser" onchange="loadSavedTexts(); loadAdminStats();" style="min-width:150px;">
+                    <option value="">-- Todos --</option>
+                </select>
+            </div>
+            {% endif %}
             <div class="date-select-group">
                 <label for="selectYear">Año</label>
                 <select id="selectYear" onchange="loadSavedTexts()">
@@ -1897,6 +1905,28 @@ HTML = """
     </div>
 
     <div class="results" id="results"></div>
+
+    {% if username in ['admin', 'Vanesa.Admin'] %}
+    <!-- ── ADMIN STATS PANEL ── -->
+    <div class="input-section" id="adminStatsPanel" style="margin-top:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <div style="font-size:0.85rem;font-weight:600;color:#b38bff;">📊 Panel de Seguimiento (Admin)</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <select id="statsPeriod" onchange="loadAdminStats()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.8rem;">
+                    <option value="mensual">Mensual</option>
+                    <option value="bimestral">Bimestral</option>
+                    <option value="trimestral">Trimestral</option>
+                    <option value="cuatrimestral">Cuatrimestral</option>
+                    <option value="semestral">Semestral</option>
+                    <option value="anual" selected>Anual (Ene a hoy)</option>
+                </select>
+            </div>
+        </div>
+        <div id="adminStatsContent" style="display:flex;flex-wrap:wrap;gap:16px;justify-content:center;">
+            <div style="color:#555;font-size:0.8rem;">Selecciona un usuario y periodo para ver estadisticas.</div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- ── HISTORY ── -->
     <div class="history-section" id="historySection">
@@ -3034,8 +3064,15 @@ async function loadSavedTexts() {
     const year = document.getElementById('selectYear').value;
     const month = document.getElementById('selectMonth').value;
 
+    // If admin has a user selected, use admin endpoint
+    const userSelect = document.getElementById('selectUser');
+    const adminUser = userSelect ? userSelect.value : '';
+    const url = adminUser
+        ? `/admin/user-texts/${adminUser}?year=${year}&month=${month}`
+        : `/saved-texts?year=${year}&month=${month}`;
+
     try {
-        const response = await fetch(`/saved-texts?year=${year}&month=${month}`);
+        const response = await fetch(url);
         const data = await response.json();
         const select = document.getElementById('selectText');
         const count = document.getElementById('savedTextsCount');
@@ -3099,6 +3136,97 @@ async function loadSavedText(entryId) {
         }
     } catch(e) {
         console.error('Error loading text:', e);
+    }
+}
+
+// ── ADMIN FUNCTIONS ──
+async function loadAdminUsers() {
+    try {
+        const resp = await fetch('/admin/users-list');
+        const data = await resp.json();
+        const select = document.getElementById('selectUser');
+        if (!select || !data.users) return;
+        data.users.forEach(u => {
+            const opt = document.createElement('option');
+            opt.value = u;
+            opt.textContent = u;
+            select.appendChild(opt);
+        });
+    } catch(e) { console.error('Error loading users:', e); }
+}
+
+async function loadAdminStats() {
+    const userSelect = document.getElementById('selectUser');
+    const periodSelect = document.getElementById('statsPeriod');
+    if (!userSelect || !periodSelect) return;
+
+    const username = userSelect.value;
+    const period = periodSelect.value;
+    const container = document.getElementById('adminStatsContent');
+    if (!container) return;
+
+    if (!username) {
+        container.innerHTML = '<div style="color:#555;font-size:0.8rem;">Selecciona un usuario para ver estadisticas.</div>';
+        return;
+    }
+
+    try {
+        const resp = await fetch(`/admin/stats/${username}?period=${period}&year=2026`);
+        const data = await resp.json();
+
+        if (data.entry_count === 0) {
+            container.innerHTML = '<div style="color:#555;font-size:0.8rem;">No hay datos para este periodo.</div>';
+            return;
+        }
+
+        const totals = data.totals;
+        const total = Object.values(totals).reduce((s, v) => s + v, 0) || 1;
+        const indicators = [
+            { key: 'palabras_positivas', label: 'Positivas', color: '#5bf5a3' },
+            { key: 'respuestas_afirmativas', label: 'Afirmativas', color: '#7b9cff' },
+            { key: 'indicios_cierre', label: 'Cierre', color: '#f5d75b' },
+            { key: 'escasez_comercial', label: 'Escasez', color: '#f5a35b' },
+            { key: 'pedidos_referidos', label: 'Referidos', color: '#b38bff' },
+            { key: 'objeciones', label: 'Objeciones', color: '#f55b5b' },
+            { key: 'indicios_prospeccion', label: 'Prospeccion', color: '#5bd4f5' },
+        ];
+
+        // Build conic-gradient for 3D-style pie chart
+        let gradientParts = [];
+        let currentDeg = 0;
+        indicators.forEach(ind => {
+            const pct = (totals[ind.key] / total) * 360;
+            gradientParts.push(`${ind.color} ${currentDeg}deg ${currentDeg + pct}deg`);
+            currentDeg += pct;
+        });
+
+        const pieChart = `
+            <div style="position:relative;width:180px;height:180px;border-radius:50%;background:conic-gradient(${gradientParts.join(',')});box-shadow:0 8px 20px rgba(0,0,0,0.4), inset 0 -4px 8px rgba(0,0,0,0.3);transform:rotateX(20deg);margin:0 auto;">
+                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80px;height:80px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;">
+                    <span style="font-size:0.7rem;color:#aaa;">${data.entry_count} textos</span>
+                </div>
+            </div>
+        `;
+
+        const legend = indicators.map(ind => {
+            const pct = Math.round((totals[ind.key] / total) * 100);
+            return `<div style="display:flex;align-items:center;gap:6px;font-size:0.7rem;">
+                <div style="width:10px;height:10px;border-radius:2px;background:${ind.color};"></div>
+                <span style="color:#aaa;">${ind.label}: ${totals[ind.key]} (${pct}%)</span>
+            </div>`;
+        }).join('');
+
+        container.innerHTML = `
+            <div style="text-align:center;">
+                <div style="font-size:0.72rem;color:#888;margin-bottom:8px;">${username} — ${period} (${data.months.length} meses, ${data.entry_count} textos)</div>
+                ${pieChart}
+                <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:12px;">
+                    ${legend}
+                </div>
+            </div>
+        `;
+    } catch(e) {
+        container.innerHTML = '<div style="color:#f55b5b;font-size:0.8rem;">Error cargando estadisticas.</div>';
     }
 }
 
@@ -3484,6 +3612,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load saved texts dropdown on page load
     loadSavedTexts();
+
+    // Load admin user list if admin
+    if (document.getElementById('selectUser')) {
+        loadAdminUsers();
+        loadAdminStats();
+    }
 });
 
 // ── History ───────────────────────────────────────────────────────────────
@@ -4510,6 +4644,135 @@ def debug_entries(username):
         "json_path": json_path,
         "json_exists": json_exists,
         "json_count": json_count,
+    })
+
+
+# Admin usernames
+_ADMIN_USERS = {"admin", "Vanesa.Admin"}
+
+
+def _is_admin():
+    """Check if current session user is an admin."""
+    return session.get("username") in _ADMIN_USERS
+
+
+@app.route("/admin/users-list")
+def admin_users_list():
+    """Return list of all registered users (admin only)."""
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    users = user_manager.list_users()
+    return jsonify({"users": users})
+
+
+@app.route("/admin/user-texts/<username>")
+def admin_user_texts(username):
+    """Return texts for a specific user filtered by year/month (admin only)."""
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+
+    year = request.args.get("year", type=int)
+    month = request.args.get("month", type=int)
+
+    entries = get_flat_entries(username, limit=200)
+
+    filtered = []
+    for e in entries:
+        e_year = e.get("year")
+        e_month = e.get("month")
+        if e_year is None and e.get("timestamp"):
+            try:
+                from datetime import datetime as _dt
+                ts_str = str(e["timestamp"])
+                if hasattr(e["timestamp"], "year"):
+                    e_year = e["timestamp"].year
+                    e_month = e["timestamp"].month
+                elif "T" in ts_str or "-" in ts_str:
+                    ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
+                    e_year = ts.year
+                    e_month = ts.month
+            except Exception:
+                pass
+        if (not year or e_year == year) and (not month or e_month == month):
+            filtered.append({
+                "id": e.get("id", ""),
+                "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
+                "text": (e.get("text", "") or "")[:60],
+                "intent": e.get("intent", ""),
+                "timestamp": (str(e.get("timestamp", "")) or "")[:10],
+                "source": e.get("source", ""),
+            })
+
+    return jsonify({"entries": filtered})
+
+
+@app.route("/admin/stats/<username>")
+def admin_stats(username):
+    """Return commercial indicator stats for a user over a period (admin only)."""
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+
+    period = request.args.get("period", "mensual")  # mensual, bimestral, trimestral, cuatrimestral, semestral, anual
+    year = request.args.get("year", type=int) or 2026
+
+    entries = get_flat_entries(username, limit=500)
+
+    # Determine which months to include based on period
+    from datetime import datetime as _dt
+    current_month = _dt.now().month
+
+    period_months = {
+        "mensual": [current_month],
+        "bimestral": list(range(max(1, current_month - 1), current_month + 1)),
+        "trimestral": list(range(max(1, current_month - 2), current_month + 1)),
+        "cuatrimestral": list(range(max(1, current_month - 3), current_month + 1)),
+        "semestral": list(range(max(1, current_month - 5), current_month + 1)),
+        "anual": list(range(1, current_month + 1)),
+    }
+    months_to_include = period_months.get(period, [current_month])
+
+    # Aggregate commercial indicators
+    totals = {
+        "palabras_positivas": 0,
+        "respuestas_afirmativas": 0,
+        "indicios_cierre": 0,
+        "escasez_comercial": 0,
+        "pedidos_referidos": 0,
+        "objeciones": 0,
+        "indicios_prospeccion": 0,
+    }
+    entry_count = 0
+
+    for e in entries:
+        e_year = e.get("year")
+        e_month = e.get("month")
+        if e_year is None and e.get("timestamp"):
+            try:
+                ts_str = str(e["timestamp"])
+                if hasattr(e["timestamp"], "year"):
+                    e_year = e["timestamp"].year
+                    e_month = e["timestamp"].month
+                elif "T" in ts_str:
+                    ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
+                    e_year = ts.year
+                    e_month = ts.month
+            except Exception:
+                pass
+
+        if e_year == year and e_month in months_to_include:
+            commercial = e.get("commercial") or {}
+            if commercial:
+                entry_count += 1
+                for key in totals:
+                    totals[key] += commercial.get(key, 0)
+
+    return jsonify({
+        "username": username,
+        "period": period,
+        "year": year,
+        "months": months_to_include,
+        "entry_count": entry_count,
+        "totals": totals,
     })
 
 
