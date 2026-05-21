@@ -3752,7 +3752,7 @@ document.addEventListener('click', function(e) {
             if (fragEl.style.display === 'none') {
                 // Populate with relevant fragments
                 const fragments = getRelevantFragments(section);
-                fragEl.innerHTML = fragments.map(f => '<span class="src-phrase phrase-chip" data-word="' + f.replace(/"/g, '&quot;').substring(0,50) + '" data-group="intent">' + f.replace(/</g, '&lt;') + '</span>').join('');
+                fragEl.innerHTML = fragments.map(f => '<span class="src-phrase phrase-chip" data-word="' + f.replace(/"/g, '&quot;') + '" data-group="intent">' + f.replace(/</g, '&lt;') + '</span>').join('');
                 fragEl.style.display = 'block';
                 inlineTog.textContent = '▲';
             } else {
