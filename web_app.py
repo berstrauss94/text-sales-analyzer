@@ -4572,10 +4572,6 @@ def saved_texts():
 
             if e_year == year and e_month == month:
                 entries_found.append(e)
-
-        # If no entries matched the filter, show all entries (user might have wrong dates)
-        if not entries_found and pg_entries:
-            entries_found = pg_entries[:50]
     except Exception as exc:
         app.logger.warning(f"PG query failed for {username}: {exc}")
 
