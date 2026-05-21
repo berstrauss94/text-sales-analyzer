@@ -643,19 +643,43 @@ class CommercialAnalyzer:
                 ca.total_indicadores / ca.total_palabras, 4
             )
 
-        # Probabilidad de cierre (weighted formula)
+        # Probabilidad de cierre (enhanced weighted formula)
+        # Considers: closing signals, affirmatives, objections, buying signals,
+        # commitment level, urgency, and prospection depth
         if ca.total_palabras > 0:
-            raw = (
+            # Base score from indicators
+            base = (
                 (ca.indicios_cierre * 5)
                 + (ca.respuestas_afirmativas * 2)
+                + (ca.palabras_positivas * 1)
+                + (ca.escasez_comercial * 2)
+                + (ca.pedidos_referidos * 3)
                 - (ca.objeciones * 3)
             ) / ca.total_palabras * 100
+
+            # Bonus from buying signals
+            buying_bonus = len(_find_phrases(normalized, _BUYING_SIGNALS)) * 5
+
+            # Bonus from commitment keywords
+            commitment_count = len(_find_phrases(normalized, _COMMITMENT_KEYWORDS))
+            evasion_count = len(_find_phrases(normalized, _EVASION_KEYWORDS))
+            commitment_bonus = (commitment_count - evasion_count) * 3
+
+            # Urgency bonus
+            urgency_count = len(_find_phrases(normalized, _URGENCY_KEYWORDS))
+            urgency_bonus = urgency_count * 2
+
+            # Prospection depth bonus (more categories covered = more engaged)
+            prospeccion_cats = len(ca.prospeccion_detalle) if ca.prospeccion_detalle else 0
+            prospeccion_bonus = prospeccion_cats * 2
+
+            raw = base + buying_bonus + commitment_bonus + urgency_bonus + prospeccion_bonus
             ca.probabilidad_cierre = round(max(0.0, min(100.0, raw)), 2)
 
-        # Lead classification
-        if ca.probabilidad_cierre > 70:
+        # Lead classification (adjusted thresholds for new formula)
+        if ca.probabilidad_cierre > 60:
             ca.tipo_lead = "CALIENTE"
-        elif ca.probabilidad_cierre > 40:
+        elif ca.probabilidad_cierre > 30:
             ca.tipo_lead = "TIBIO"
         else:
             ca.tipo_lead = "FRIO"
