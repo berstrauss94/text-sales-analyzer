@@ -597,6 +597,11 @@ class CommercialAnalyzer:
         ca = CommercialAnalysis()
         ca.detalle = {}
 
+        # Parse roles: separate Vendedor vs Cliente text
+        vendedor_text, cliente_text = self._parse_roles(text)
+        vendedor_norm = _normalize(vendedor_text) if vendedor_text else normalized
+        cliente_norm = _normalize(cliente_text) if cliente_text else normalized
+
         # Count each indicator group and collect word-level detail
         # Keywords that should only be counted as standalone responses (not part of phrases)
         _RESPONSE_ONLY_KEYWORDS = {
@@ -657,16 +662,16 @@ class CommercialAnalyzer:
                 - (ca.objeciones * 3)
             ) / ca.total_palabras * 100
 
-            # Bonus from buying signals
-            buying_bonus = len(_find_phrases(normalized, _BUYING_SIGNALS)) * 5
+            # Bonus from buying signals (from CLIENT — they're the ones buying)
+            buying_bonus = len(_find_phrases(cliente_norm, _BUYING_SIGNALS)) * 5
 
-            # Bonus from commitment keywords
-            commitment_count = len(_find_phrases(normalized, _COMMITMENT_KEYWORDS))
-            evasion_count = len(_find_phrases(normalized, _EVASION_KEYWORDS))
+            # Bonus from commitment keywords (from CLIENT)
+            commitment_count = len(_find_phrases(cliente_norm, _COMMITMENT_KEYWORDS))
+            evasion_count = len(_find_phrases(cliente_norm, _EVASION_KEYWORDS))
             commitment_bonus = (commitment_count - evasion_count) * 3
 
-            # Urgency bonus
-            urgency_count = len(_find_phrases(normalized, _URGENCY_KEYWORDS))
+            # Urgency bonus (from VENDEDOR — they create urgency)
+            urgency_count = len(_find_phrases(vendedor_norm, _URGENCY_KEYWORDS))
             urgency_bonus = urgency_count * 2
 
             # Prospection depth bonus (more categories covered = more engaged)
@@ -878,6 +883,49 @@ class CommercialAnalyzer:
             parts.append(f"Objeciones: {', '.join(ca.objeciones_especificas).lower()}.")
 
         return " ".join(parts)
+
+    def _parse_roles(self, text: str) -> tuple[str, str]:
+        """
+        Parse a conversation text to separate Vendedor and Cliente parts.
+        Returns (vendedor_text, cliente_text).
+        If no roles detected, returns (text, text) — both get the full text.
+        """
+        import re as _re
+        vendedor_parts = []
+        cliente_parts = []
+        current_role = None
+
+        # Split by lines and detect role markers
+        lines = text.split('\n')
+        for line in lines:
+            stripped = line.strip()
+            lower = stripped.lower()
+
+            # Detect role markers
+            if _re.match(r'^vendedor\s*$', lower) or lower.startswith('vendedor\n') or lower == 'vendedor':
+                current_role = 'vendedor'
+                continue
+            elif _re.match(r'^cliente\s*\d*\s*$', lower) or lower.startswith('cliente') and len(lower) < 12:
+                current_role = 'cliente'
+                continue
+            elif _re.match(r'^speaker\s*\d*\s*$', lower):
+                # Generic speaker — treat as unknown
+                continue
+
+            # Assign line to current role
+            if current_role == 'vendedor':
+                vendedor_parts.append(stripped)
+            elif current_role == 'cliente':
+                cliente_parts.append(stripped)
+
+        vendedor_text = ' '.join(vendedor_parts)
+        cliente_text = ' '.join(cliente_parts)
+
+        # If no roles detected (plain text without markers), return full text for both
+        if not vendedor_text and not cliente_text:
+            return text, text
+
+        return vendedor_text or text, cliente_text or text
 
     def _analyze_prospeccion(self, normalized: str) -> dict:
         """
