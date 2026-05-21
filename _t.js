@@ -1314,17 +1314,31 @@ async function loadAdminStats() {
             { key: 'indicios_prospeccion', label: 'Prospeccion', color: '#5bd4f5' },
         ];
 
-        // Build conic-gradient for 3D-style pie chart
+        // Build conic-gradient for 3D-style pie chart with percentage labels
         let gradientParts = [];
         let currentDeg = 0;
-        indicators.forEach(ind => {
-            const pct = (totals[ind.key] / total) * 360;
-            gradientParts.push(`${ind.color} ${currentDeg}deg ${currentDeg + pct}deg`);
-            currentDeg += pct;
+        let pctLabels = '';
+        indicators.forEach((ind, i) => {
+            const pct = Math.round((totals[ind.key] / total) * 100);
+            const degSpan = (totals[ind.key] / total) * 360;
+            gradientParts.push(`${ind.color} ${currentDeg}deg ${currentDeg + degSpan}deg`);
+            // Position label at midpoint of segment
+            if (pct >= 5) {
+                const midDeg = currentDeg + degSpan / 2;
+                const rad = (midDeg - 90) * Math.PI / 180;
+                const x = 50 + 32 * Math.cos(rad);
+                const y = 50 + 32 * Math.sin(rad);
+                pctLabels += `<span style="position:absolute;left:${x}%;top:${y}%;transform:translate(-50%,-50%);font-size:0.55rem;color:#fff;font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,0.8);">${pct}%</span>`;
+            }
+            currentDeg += degSpan;
         });
+
+        // Store word_detail globally for click interaction
+        window._adminWordDetail = data.word_detail || {};
 
         const pieChart = `
             <div style="position:relative;width:180px;height:180px;border-radius:50%;background:conic-gradient(${gradientParts.join(',')});box-shadow:0 8px 20px rgba(0,0,0,0.4), inset 0 -4px 8px rgba(0,0,0,0.3);transform:rotateX(20deg);margin:0 auto;">
+                ${pctLabels}
                 <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80px;height:80px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;">
                     <span style="font-size:0.7rem;color:#aaa;">${data.entry_count} textos</span>
                 </div>
@@ -1333,7 +1347,7 @@ async function loadAdminStats() {
 
         const legend = indicators.map(ind => {
             const pct = Math.round((totals[ind.key] / total) * 100);
-            return `<div style="display:flex;align-items:center;gap:6px;font-size:0.7rem;">
+            return `<div class="stats-legend-item" data-cat="${ind.key}" style="display:flex;align-items:center;gap:6px;font-size:0.7rem;cursor:pointer;padding:3px 6px;border-radius:4px;transition:background 0.15s;" onmouseenter="this.style.background='#1a1d27'" onmouseleave="this.style.background=''">
                 <div style="width:10px;height:10px;border-radius:2px;background:${ind.color};"></div>
                 <span style="color:#aaa;">${ind.label}: ${totals[ind.key]} (${pct}%)</span>
             </div>`;
@@ -1341,15 +1355,38 @@ async function loadAdminStats() {
 
         container.innerHTML = `
             <div style="text-align:center;">
-                <div style="font-size:0.72rem;color:#888;margin-bottom:8px;">${username} — ${period} (${data.months.length} meses, ${data.entry_count} textos)</div>
+                <div style="font-size:0.72rem;color:#888;margin-bottom:8px;">${data.username || vendor} — ${period} (${(data.months||[]).length} meses, ${data.entry_count} textos)</div>
                 ${pieChart}
                 <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:12px;">
                     ${legend}
                 </div>
+                <div id="statsWordDetail" style="margin-top:10px;text-align:left;display:none;padding:8px;background:#0a0c14;border:1px solid #1e2130;border-radius:6px;max-height:150px;overflow-y:auto;"></div>
             </div>
         `;
+
+        // Add click handlers to legend items
+        container.querySelectorAll('.stats-legend-item').forEach(el => {
+            el.addEventListener('click', function() {
+                const cat = this.getAttribute('data-cat');
+                const detail = window._adminWordDetail[cat] || {};
+                const detailEl = document.getElementById('statsWordDetail');
+                if (!detailEl) return;
+                const entries = Object.entries(detail).sort((a,b) => b[1] - a[1]).slice(0, 15);
+                if (entries.length === 0) {
+                    detailEl.innerHTML = '<div style="color:#555;font-size:0.7rem;">Sin detalle de palabras para esta categoria.</div>';
+                } else {
+                    const catTotal = entries.reduce((s, e) => s + e[1], 0);
+                    detailEl.innerHTML = '<div style="font-size:0.68rem;color:#aaa;margin-bottom:4px;font-weight:600;">' + cat.replace(/_/g, ' ') + ' — Top palabras:</div>' + entries.map(([word, count]) => {
+                        const wpct = Math.round((count / catTotal) * 100);
+                        return '<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #1a1d27;font-size:0.65rem;"><span style="color:#ccc;">' + word + '</span><span style="color:#888;">' + count + 'x (' + wpct + '%)</span></div>';
+                    }).join('');
+                }
+                detailEl.style.display = 'block';
+            });
+        });
     } catch(e) {
-        container.innerHTML = '<div style="color:#f55b5b;font-size:0.8rem;">Error cargando estadisticas.</div>';
+        console.error('Stats error:', e);
+        container.innerHTML = '<div style="color:#f55b5b;font-size:0.8rem;">Error cargando estadisticas: ' + e.message + '</div>';
     }
 }
 
@@ -1409,19 +1446,24 @@ function getRelevantFragments(section) {
     else if (section === 'next') keywords = ['reserva', 'firma', 'cierre', 'agenda', 'coordin', 'miercoles', 'manana', 'visita', 'compromet', 'acepto', 'dale', 'perfecto'];
     else keywords = ['precio', 'cuota', 'terreno', 'lote', 'barrio'];
 
+    // Scan the ENTIRE text and collect ALL matching sentences
     var sentences = text.split(/[.!?]+/).filter(function(s) { return s.trim().length > 20; });
-    var matches = [];
-    for (var i = 0; i < sentences.length && matches.length < 3; i++) {
+    var allMatches = [];
+    for (var i = 0; i < sentences.length; i++) {
         var lower = sentences[i].toLowerCase();
         for (var j = 0; j < keywords.length; j++) {
             if (lower.indexOf(keywords[j]) >= 0) {
-                var trimmed = sentences[i].trim().substring(0, 100);
-                if (matches.indexOf(trimmed) < 0) matches.push(trimmed);
+                var trimmed = sentences[i].trim();
+                if (allMatches.indexOf(trimmed) < 0) allMatches.push(trimmed);
                 break;
             }
         }
     }
-    return matches;
+
+    // Select up to 5 distributed across the text (beginning, middle, end)
+    if (allMatches.length <= 5) return allMatches;
+    var step = Math.floor(allMatches.length / 5);
+    return [allMatches[0], allMatches[step], allMatches[step*2], allMatches[step*3], allMatches[allMatches.length-1]];
 }
 
 function renderSentimentDetail(sentiment) {
@@ -1509,7 +1551,7 @@ function renderSalesConceptsDetail(concepts) {
                 <span class="concept-conf">${confPct}%</span>
             </div>
             <div class="concept-detail-desc">${info.desc}</div>
-            <div class="concept-detail-source">${c.source_text ? c.source_text.split(' /// ').map(f => '<div style="margin:3px 0; padding:3px 8px; background:#0a0c14; border-left:2px solid #4a6cf7; border-radius:3px;"><em>"' + f + '"</em></div>').join('') : '<em>Sin fragmento</em>'}</div>
+            <div class="concept-detail-source">${c.source_text ? c.source_text.split(' /// ').map(f => '<div class="phrase-chip" data-word="' + f.replace(/"/g, '&quot;') + '" data-group="intent" style="margin:3px 0; padding:3px 8px; background:#0a0c14; border-left:2px solid #7b5bf5; border-radius:3px; cursor:pointer; transition:background 0.15s;"><em>"' + f + '"</em></div>').join('') : '<em>Sin fragmento</em>'}</div>
             <div class="concept-detail-tip">💡 ${info.tip}</div>
         </div>`;
     });
@@ -1541,7 +1583,7 @@ function renderRealEstateConceptsDetail(concepts) {
                 <span class="concept-conf">${confPct}%</span>
             </div>
             <div class="concept-detail-desc">${info.desc}</div>
-            <div class="concept-detail-source">${c.source_text ? c.source_text.split(' /// ').map(f => '<div style="margin:3px 0; padding:3px 8px; background:#0a0c14; border-left:2px solid #4a6cf7; border-radius:3px;"><em>"' + f + '"</em></div>').join('') : '<em>Sin fragmento</em>'}</div>
+            <div class="concept-detail-source">${c.source_text ? c.source_text.split(' /// ').map(f => '<div class="phrase-chip" data-word="' + f.replace(/"/g, '&quot;') + '" data-group="intent" style="margin:3px 0; padding:3px 8px; background:#0a0c14; border-left:2px solid #7b5bf5; border-radius:3px; cursor:pointer; transition:background 0.15s;"><em>"' + f + '"</em></div>').join('') : '<em>Sin fragmento</em>'}</div>
             <div class="concept-detail-tip">💡 ${info.tip}</div>
         </div>`;
     });
@@ -1564,9 +1606,17 @@ function highlightSingleWord(word, indicatorKey) {
     overlay.classList.add('active');
     closeBtn.classList.add('active');
 
-    // Scroll to the textarea area only when clicking a specific word
+    // Scroll to the textarea area
     const wrapper = document.getElementById('textareaWrapper');
-    wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Auto-scroll inside the overlay to the first highlighted span
+    setTimeout(function() {
+        const firstHl = overlay.querySelector('.hl-' + indicatorKey);
+        if (firstHl) {
+            firstHl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, 300);
 }
 
 function highlightEntityInText(rawValue) {
@@ -1683,6 +1733,10 @@ function buildHighlightedText(text, words, indicatorKey) {
         lastIdx = m.end;
     }
     result += escapeHtml(text.substring(lastIdx));
+
+    // Always highlight "Vendedor" and "Cliente X" labels in green for role identification
+    result = result.replace(/(Vendedor)/g, '<span style="color:#5bf5a3;font-weight:700;">$1</span>');
+    result = result.replace(/(Cliente(?:\s*\d*)?)/g, '<span style="color:#5bf5a3;font-weight:700;">$1</span>');
 
     return result;
 }
