@@ -3,7 +3,7 @@ Fecha de registro : 2026-05-02 19:04:08 UTC
 
 --- DATOS DE ACCESO ---
 Usuario           : MorzanNorma
-Contrasena (hash) : 3074c554eca8fdb5a82e00782db8854cbd1bd3890f0db2ed893f12492fce5f39
+Contrasena (hash) : 1b6fcae5d595874e2b7471ffa924f705fae76289abfa0ec858eb0f3859ad5725
 
 --- DATOS PERSONALES ---
 Nombre            : Norma
