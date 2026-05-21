@@ -409,9 +409,21 @@ class ConceptExtractor:
 
                 seen_positions.add(idx)
 
-                # Extract context around the keyword — full sentence
-                frag_start = max(0, idx - 60)
-                frag_end = min(len(text), idx + len(kw) + 100)
+                # Extract context around the keyword — full sentence boundaries
+                # Find sentence start (look back for . ! ? or newline)
+                frag_start = idx
+                while frag_start > 0 and text[frag_start-1] not in '.!?\n':
+                    frag_start -= 1
+                    if idx - frag_start > 200:
+                        break
+
+                # Find sentence end (look forward for . ! ? or newline)
+                frag_end = idx + len(kw)
+                while frag_end < len(text) and text[frag_end] not in '.!?\n':
+                    frag_end += 1
+                    if frag_end - idx > 250:
+                        break
+
                 fragment = text[frag_start:frag_end].strip()
 
                 # Clean up: don't start mid-word
