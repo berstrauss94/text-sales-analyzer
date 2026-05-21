@@ -1,0 +1,19 @@
+=== FICHA DE USUARIO ===
+Fecha de registro : 2026-05-21 15:13:32 UTC
+
+--- DATOS DE ACCESO ---
+Usuario           : FedericoCeballos
+Contrasena (hash) : bbf6f597d9705715c29336792014b2d9dfa4924a9f4015d142c877e3273340d5
+
+--- DATOS PERSONALES ---
+Nombre            : Federico
+Apellido          : Ceballos
+Celular           : 0000000000
+Email             : fceballos@empresa.com
+Direccion         : Oficina Central
+
+--- DATOS PROFESIONALES ---
+Empresa           : MPC
+Cargo             : Administrador
+
+========================
