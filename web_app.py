@@ -3417,7 +3417,7 @@ function getRelevantFragments(section) {
         var lower = sentences[i].toLowerCase();
         for (var j = 0; j < keywords.length; j++) {
             if (lower.indexOf(keywords[j]) >= 0) {
-                var trimmed = sentences[i].trim().substring(0, 100);
+                var trimmed = sentences[i].trim();
                 if (allMatches.indexOf(trimmed) < 0) allMatches.push(trimmed);
                 break;
             }
