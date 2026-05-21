@@ -633,20 +633,28 @@ function renderResults(data, inputText) {
                         <div class="intent-detail-section">
                             <div class="intent-section-title">Que significa para la venta</div>
                             <div class="intent-section-text">${iDetail.meaning}</div>
+                            <div class="src-toggle-inline" data-section="meaning">▼</div>
+                            <div class="src-fragment-inline" style="display:none;"></div>
                         </div>
                         <div class="intent-detail-section intent-seller-box">
                             <div class="intent-section-title">👤 Para el vendedor</div>
                             <div class="intent-section-text">${iDetail.forSeller}</div>
+                            <div class="src-toggle-inline" data-section="seller">▼</div>
+                            <div class="src-fragment-inline" style="display:none;"></div>
                         </div>
                         <div class="intent-detail-section">
                             <div class="intent-section-title">💡 Tips practicos</div>
                             <ul class="intent-tips-list">
                                 ${iDetail.tips.map(t => `<li>${t}</li>`).join('')}
                             </ul>
+                            <div class="src-toggle-inline" data-section="tips">▼</div>
+                            <div class="src-fragment-inline" style="display:none;"></div>
                         </div>
                         <div class="intent-detail-section intent-next-step">
                             <div class="intent-section-title">▶️ Siguiente paso</div>
                             <div class="intent-section-text">${iDetail.nextStep}</div>
+                            <div class="src-toggle-inline" data-section="next">▼</div>
+                            <div class="src-fragment-inline" style="display:none;"></div>
                         </div>
                     </div>
                 </div>
@@ -1387,54 +1395,33 @@ async function deleteLastEntry() {
 }
 
 function srcToggle(section) {
-    // Extract relevant fragments from the text based on the section type
-    try {
-        const text = window._lastInputText || '';
-        if (!text || text.length < 50) return '';
+    // Not used inline anymore — kept for compatibility
+    return '';
+}
 
-        let keywords = [];
-        switch(section) {
-            case 'meaning':
-                keywords = ['precio', 'cuota', 'entrega', 'pesos', 'dolares', 'usd', 'oferta', 'promocion', 'descuento', 'negociar', 'condicion', 'monto', 'valor', 'costo'];
-                break;
-            case 'seller':
-                keywords = ['vendedor', 'le ofrezco', 'tenemos', 'le puedo', 'podemos', 'le sugiero', 'le recomiendo', 'nuestra empresa', 'nuestro compromiso'];
-                break;
-            case 'tips':
-                keywords = ['no se', 'pensar', 'duda', 'caro', 'lejos', 'problema', 'pero', 'no puedo', 'dificil', 'objecion', 'esperar'];
-                break;
-            case 'next':
-                keywords = ['reserva', 'firma', 'cierre', 'agenda', 'coordin', 'miercoles', 'manana', 'visita', 'compromet', 'acepto', 'dale', 'perfecto'];
-                break;
-            default:
-                keywords = ['precio', 'cuota', 'terreno', 'lote', 'barrio'];
-        }
+function getRelevantFragments(section) {
+    var text = window._lastInputText || '';
+    if (!text || text.length < 50) return [];
+    var keywords = [];
+    if (section === 'meaning') keywords = ['precio', 'cuota', 'entrega', 'pesos', 'dolares', 'usd', 'oferta', 'promocion', 'descuento', 'negociar', 'condicion', 'monto', 'valor', 'costo'];
+    else if (section === 'seller') keywords = ['vendedor', 'le ofrezco', 'tenemos', 'le puedo', 'podemos', 'le sugiero', 'le recomiendo', 'nuestra empresa', 'nuestro compromiso'];
+    else if (section === 'tips') keywords = ['no se', 'pensar', 'duda', 'caro', 'lejos', 'problema', 'pero', 'no puedo', 'dificil', 'objecion', 'esperar'];
+    else if (section === 'next') keywords = ['reserva', 'firma', 'cierre', 'agenda', 'coordin', 'miercoles', 'manana', 'visita', 'compromet', 'acepto', 'dale', 'perfecto'];
+    else keywords = ['precio', 'cuota', 'terreno', 'lote', 'barrio'];
 
-        const sentences = text.split(/[.!?]+|\n/).filter(s => s.trim().length > 20);
-        const matches = [];
-        for (const sent of sentences) {
-            const lower = sent.toLowerCase();
-            for (const kw of keywords) {
-                if (lower.includes(kw) && !matches.includes(sent.trim())) {
-                    matches.push(sent.trim());
-                    break;
-                }
+    var sentences = text.split(/[.!?]+/).filter(function(s) { return s.trim().length > 20; });
+    var matches = [];
+    for (var i = 0; i < sentences.length && matches.length < 3; i++) {
+        var lower = sentences[i].toLowerCase();
+        for (var j = 0; j < keywords.length; j++) {
+            if (lower.indexOf(keywords[j]) >= 0) {
+                var trimmed = sentences[i].trim().substring(0, 100);
+                if (matches.indexOf(trimmed) < 0) matches.push(trimmed);
+                break;
             }
-            if (matches.length >= 3) break;
         }
-
-        if (matches.length === 0) return '';
-
-        const fragmentHtml = matches.map(m => {
-            const safe = m.substring(0, 120).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            return '"' + safe + (m.length > 120 ? '...' : '') + '"';
-        }).join('<br>');
-
-        const id = 'src-' + Math.random().toString(36).substr(2, 6);
-        return '<div class="source-toggle" data-target="' + id + '"><span class="src-arrow" style="font-size:0.55rem;">▼</span></div><div class="source-fragment" id="' + id + '">' + fragmentHtml + '</div>';
-    } catch(e) {
-        return '';
     }
+    return matches;
 }
 
 function renderSentimentDetail(sentiment) {
@@ -1472,20 +1459,28 @@ function renderSentimentDetail(sentiment) {
             <div class="intent-detail-section">
                 <div class="intent-section-title">Que significa para la venta</div>
                 <div class="intent-section-text">${d.meaning}</div>
+                <div class="src-toggle-inline" data-section="meaning">▼</div>
+                <div class="src-fragment-inline" style="display:none;"></div>
             </div>
             <div class="intent-detail-section intent-seller-box">
                 <div class="intent-section-title">👤 Para el vendedor</div>
                 <div class="intent-section-text">${d.forSeller}</div>
+                <div class="src-toggle-inline" data-section="seller">▼</div>
+                <div class="src-fragment-inline" style="display:none;"></div>
             </div>
             <div class="intent-detail-section">
                 <div class="intent-section-title">💡 Tips practicos</div>
                 <ul class="intent-tips-list">
                     ${d.tips.map(t => `<li>${t}</li>`).join('')}
                 </ul>
+                <div class="src-toggle-inline" data-section="tips">▼</div>
+                <div class="src-fragment-inline" style="display:none;"></div>
             </div>
             <div class="intent-detail-section" style="border-left:3px solid ${sentiment === 'NEGATIVE' ? '#f55b5b' : sentiment === 'POSITIVE' ? '#5bf5a3' : '#f5a35b'}">
                 <div class="intent-section-title">⚠️ Nivel de riesgo</div>
                 <div class="intent-section-text">${d.risk}</div>
+                <div class="src-toggle-inline" data-section="tips">▼</div>
+                <div class="src-fragment-inline" style="display:none;"></div>
             </div>
         </div>
     `;
@@ -1747,6 +1742,24 @@ document.addEventListener('click', function(e) {
             }
         }
     }
+    // Delegated click for inline source toggles (violet arrows)
+    const inlineTog = e.target.closest('.src-toggle-inline');
+    if (inlineTog) {
+        const section = inlineTog.getAttribute('data-section');
+        const fragEl = inlineTog.nextElementSibling;
+        if (fragEl && fragEl.classList.contains('src-fragment-inline')) {
+            if (fragEl.style.display === 'none') {
+                // Populate with relevant fragments
+                const fragments = getRelevantFragments(section);
+                fragEl.innerHTML = fragments.map(f => '<span class="src-phrase phrase-chip" data-word="' + f.replace(/"/g, '&quot;').substring(0,50) + '" data-group="intent">' + f.replace(/</g, '&lt;') + '</span>').join('');
+                fragEl.style.display = 'block';
+                inlineTog.textContent = '▲';
+            } else {
+                fragEl.style.display = 'none';
+                inlineTog.textContent = '▼';
+            }
+        }
+    }
 });
 
 // Allow Ctrl+Enter to submit, and auto-analyze after 2s of inactivity
@@ -1765,19 +1778,12 @@ document.addEventListener('DOMContentLoaded', () => {
         closeHighlightOverlay();
     });
 
-    // Load saved texts dropdown on page load
-    // For admin: wait until users are loaded, then load texts
+    // Load on page load
     if (document.getElementById('selectUser')) {
-        const sv = document.getElementById('statsVendor');
-        if (sv) sv.value = '_all';
-        console.log('Admin mode: loading users...');
-        loadAdminUsers().then(() => {
-            console.log('Users loaded, loading stats...');
-            loadAdminStats();
-        });
+        // Admin: users already in HTML via Jinja2, just load stats
+        loadAdminStats();
     } else {
-        // Regular user: load their texts immediately
-        console.log('Regular user: loading texts...');
+        // Regular user: load their texts
         loadSavedTexts();
     }
 });
