@@ -4674,7 +4674,19 @@ def delete_entry_route(entry_id):
         return jsonify({"error": "unauthorized"}), 401
 
     from src.users.history_manager import delete_entry
+
+    # Try deleting from logged-in user first
     success = delete_entry(session["username"], entry_id)
+
+    # If admin and not found, search across all users
+    if not success and _is_admin():
+        for u in user_manager.list_users():
+            if u == session["username"]:
+                continue
+            success = delete_entry(u, entry_id)
+            if success:
+                break
+
     if success:
         return jsonify({"success": True})
     return jsonify({"success": False, "error": "Entry not found"}), 404
