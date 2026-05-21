@@ -1847,6 +1847,9 @@ HTML = """
                 <label for="selectUser">👤 Usuario</label>
                 <select id="selectUser" onchange="loadSavedTexts(); loadAdminStats();" style="min-width:150px;">
                     <option value="">-- Todos --</option>
+                    {% for u in all_users %}
+                    <option value="{{ u }}">{{ u }}</option>
+                    {% endfor %}
                 </select>
             </div>
             {% endif %}
@@ -1916,6 +1919,9 @@ HTML = """
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                 <select id="statsVendor" onchange="loadAdminStats()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.8rem;">
                     <option value="_all">General (todos)</option>
+                    {% for u in all_users %}
+                    <option value="{{ u }}">{{ u }}</option>
+                    {% endfor %}
                 </select>
                 <select id="statsMonth" onchange="onStatsMonthChange()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.8rem;">
                     <option value="">Mes (todos)</option>
@@ -3727,19 +3733,12 @@ document.addEventListener('DOMContentLoaded', () => {
         closeHighlightOverlay();
     });
 
-    // Load saved texts dropdown on page load
-    // For admin: wait until users are loaded, then load texts
+    // Load on page load
     if (document.getElementById('selectUser')) {
-        const sv = document.getElementById('statsVendor');
-        if (sv) sv.value = '_all';
-        console.log('Admin mode: loading users...');
-        loadAdminUsers().then(() => {
-            console.log('Users loaded, loading stats...');
-            loadAdminStats();
-        });
+        // Admin: users already in HTML via Jinja2, just load stats
+        loadAdminStats();
     } else {
-        // Regular user: load their texts immediately
-        console.log('Regular user: loading texts...');
+        // Regular user: load their texts
         loadSavedTexts();
     }
 });
@@ -4376,7 +4375,7 @@ def logout():
 def index():
     if not session.get("username"):
         return redirect(url_for("login_page"))
-    return render_template_string(HTML, username=session["username"], indicador_categorias_json=_INDICADOR_CATEGORIAS_JSON)
+    return render_template_string(HTML, username=session["username"], indicador_categorias_json=_INDICADOR_CATEGORIAS_JSON, all_users=user_manager.list_users())
 
 
 @app.route("/analyze", methods=["POST"])
