@@ -3698,6 +3698,10 @@ function buildHighlightedText(text, words, indicatorKey) {
     }
     result += escapeHtml(text.substring(lastIdx));
 
+    // Always highlight "Vendedor" and "Cliente X" labels in green for role identification
+    result = result.replace(/(Vendedor)/g, '<span style="color:#5bf5a3;font-weight:700;">$1</span>');
+    result = result.replace(/(Cliente(?:\s*\d*)?)/g, '<span style="color:#5bf5a3;font-weight:700;">$1</span>');
+
     return result;
 }
 
