@@ -3327,9 +3327,9 @@ async function loadAdminStats() {
             if (pct >= 5) {
                 const midDeg = currentDeg + degSpan / 2;
                 const rad = (midDeg - 90) * Math.PI / 180;
-                const x = 50 + 32 * Math.cos(rad);
-                const y = 50 + 32 * Math.sin(rad);
-                pctLabels += `<span style="position:absolute;left:${x}%;top:${y}%;transform:translate(-50%,-50%);font-size:0.65rem;color:#fff;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,0.9);pointer-events:none;">${pct}%</span>`;
+                const x = 50 + 38 * Math.cos(rad);
+                const y = 50 + 38 * Math.sin(rad);
+                pctLabels += `<span style="position:absolute;left:${x}%;top:${y}%;transform:translate(-50%,-50%);font-size:0.7rem;color:#fff;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,0.9),0 0 6px rgba(0,0,0,0.7);pointer-events:none;z-index:2;">${pct}%</span>`;
             }
             currentDeg += degSpan;
         });
