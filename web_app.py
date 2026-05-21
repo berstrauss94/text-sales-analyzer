@@ -3342,7 +3342,7 @@ async function loadAdminStats() {
 
         container.innerHTML = `
             <div style="text-align:center;">
-                <div style="font-size:0.72rem;color:#888;margin-bottom:8px;">${username} — ${period} (${data.months.length} meses, ${data.entry_count} textos)</div>
+                <div style="font-size:0.72rem;color:#888;margin-bottom:8px;">${data.username || vendor} — ${period} (${(data.months||[]).length} meses, ${data.entry_count} textos)</div>
                 ${pieChart}
                 <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:12px;">
                     ${legend}
@@ -3350,7 +3350,8 @@ async function loadAdminStats() {
             </div>
         `;
     } catch(e) {
-        container.innerHTML = '<div style="color:#f55b5b;font-size:0.8rem;">Error cargando estadisticas.</div>';
+        console.error('Stats error:', e);
+        container.innerHTML = '<div style="color:#f55b5b;font-size:0.8rem;">Error cargando estadisticas: ' + e.message + '</div>';
     }
 }
 
