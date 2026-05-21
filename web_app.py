@@ -3410,19 +3410,24 @@ function getRelevantFragments(section) {
     else if (section === 'next') keywords = ['reserva', 'firma', 'cierre', 'agenda', 'coordin', 'miercoles', 'manana', 'visita', 'compromet', 'acepto', 'dale', 'perfecto'];
     else keywords = ['precio', 'cuota', 'terreno', 'lote', 'barrio'];
 
+    // Scan the ENTIRE text and collect ALL matching sentences
     var sentences = text.split(/[.!?]+/).filter(function(s) { return s.trim().length > 20; });
-    var matches = [];
-    for (var i = 0; i < sentences.length && matches.length < 3; i++) {
+    var allMatches = [];
+    for (var i = 0; i < sentences.length; i++) {
         var lower = sentences[i].toLowerCase();
         for (var j = 0; j < keywords.length; j++) {
             if (lower.indexOf(keywords[j]) >= 0) {
                 var trimmed = sentences[i].trim().substring(0, 100);
-                if (matches.indexOf(trimmed) < 0) matches.push(trimmed);
+                if (allMatches.indexOf(trimmed) < 0) allMatches.push(trimmed);
                 break;
             }
         }
     }
-    return matches;
+
+    // Select up to 5 distributed across the text (beginning, middle, end)
+    if (allMatches.length <= 5) return allMatches;
+    var step = Math.floor(allMatches.length / 5);
+    return [allMatches[0], allMatches[step], allMatches[step*2], allMatches[step*3], allMatches[allMatches.length-1]];
 }
 
 function renderSentimentDetail(sentiment) {
