@@ -402,6 +402,7 @@ HTML = """
         .hl-pedidos_referidos { background: rgba(163, 91, 245, 0.25); color: #b38bff; border-radius: 3px; padding: 0 2px; }
         .hl-objeciones { background: rgba(245, 91, 91, 0.25); color: #f55b5b; border-radius: 3px; padding: 0 2px; }
         .hl-indicios_prospeccion { background: rgba(91, 212, 245, 0.25); color: #5bd4f5; border-radius: 3px; padding: 0 2px; }
+        .hl-intent { background: rgba(123, 91, 245, 0.3); color: #b38bff; border-radius: 3px; padding: 0 2px; }
 
         /* Date selectors */
         .date-selectors {
