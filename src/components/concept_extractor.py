@@ -409,9 +409,9 @@ class ConceptExtractor:
 
                 seen_positions.add(idx)
 
-                # Extract context around the keyword
-                frag_start = max(0, idx - 30)
-                frag_end = min(len(text), idx + len(kw) + 50)
+                # Extract context around the keyword — full sentence
+                frag_start = max(0, idx - 60)
+                frag_end = min(len(text), idx + len(kw) + 100)
                 fragment = text[frag_start:frag_end].strip()
 
                 # Clean up: don't start mid-word
