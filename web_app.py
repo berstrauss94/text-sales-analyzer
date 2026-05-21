@@ -1875,7 +1875,7 @@ HTML = """
 
     <div class="input-section">
         <div class="date-selectors">
-            {% if username in ['admin', 'Vanesa.Admin', 'BaronVonBerna'] %}
+            {% if username in ['admin', 'Vanesa.Admin', 'BaronVonBerna', 'FedericoCeballos', 'MartinianoSosa'] %}
             <div class="date-select-group">
                 <label for="selectUser">👤 Usuario</label>
                 <select id="selectUser" onchange="loadSavedTexts(); loadAdminStats();" style="min-width:150px;">
@@ -1934,7 +1934,7 @@ HTML = """
         <div class="btn-row">
             <button class="btn-primary" onclick="analyze()">&#128269; Analizar</button>
             <button class="btn-secondary" onclick="clearAll()">Limpiar</button>
-            {% if username in ['admin', 'Vanesa.Admin', 'BaronVonBerna'] %}
+            {% if username in ['admin', 'Vanesa.Admin', 'BaronVonBerna', 'FedericoCeballos', 'MartinianoSosa'] %}
             <input type="text" id="entryNameInput" class="save-name-input" placeholder="Titulo del texto (obligatorio para guardar)..." style="flex:1; margin-left:8px;">
             <button class="btn-save" onclick="saveEntry()">&#128190; Guardar</button>
             {% endif %}
@@ -1944,7 +1944,7 @@ HTML = """
 
     <div class="results" id="results"></div>
 
-    {% if username in ['admin', 'Vanesa.Admin', 'BaronVonBerna'] %}
+    {% if username in ['admin', 'Vanesa.Admin', 'BaronVonBerna', 'FedericoCeballos', 'MartinianoSosa'] %}
     <!-- ── ADMIN STATS PANEL ── -->
     <div class="input-section" id="adminStatsPanel" style="margin-top:20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
@@ -4861,7 +4861,7 @@ def debug_entries(username):
 
 
 # Admin usernames
-_ADMIN_USERS = {"admin", "Vanesa.Admin", "BaronVonBerna"}
+_ADMIN_USERS = {"admin", "Vanesa.Admin", "BaronVonBerna", "FedericoCeballos", "MartinianoSosa"}
 
 
 def _is_admin():
