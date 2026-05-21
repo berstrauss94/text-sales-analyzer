@@ -1646,9 +1646,15 @@ function buildHighlightedText(text, words, indicatorKey) {
         }
 
         const normalizedWord = normalize(word);
-        // Use word boundary matching
+        // Use word boundary matching for short words, substring for long phrases
         const escapedWord = normalizedWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp('(?<![a-z])' + escapedWord + '(?![a-z])', 'gi');
+        let regex;
+        if (normalizedWord.split(' ').length > 3) {
+            // Long phrase: search as substring (no word boundaries)
+            regex = new RegExp(escapedWord, 'gi');
+        } else {
+            regex = new RegExp('(?<![a-z])' + escapedWord + '(?![a-z])', 'gi');
+        }
         let match;
         while ((match = regex.exec(normalizedText)) !== null) {
             matches.push({ start: match.index, end: match.index + match[0].length });
@@ -1751,7 +1757,7 @@ document.addEventListener('click', function(e) {
             if (fragEl.style.display === 'none') {
                 // Populate with relevant fragments
                 const fragments = getRelevantFragments(section);
-                fragEl.innerHTML = fragments.map(f => '<span class="src-phrase phrase-chip" data-word="' + f.replace(/"/g, '&quot;').substring(0,50) + '" data-group="intent">' + f.replace(/</g, '&lt;') + '</span>').join('');
+                fragEl.innerHTML = fragments.map(f => '<span class="src-phrase phrase-chip" data-word="' + f.replace(/"/g, '&quot;') + '" data-group="intent">' + f.replace(/</g, '&lt;') + '</span>').join('');
                 fragEl.style.display = 'block';
                 inlineTog.textContent = '▲';
             } else {

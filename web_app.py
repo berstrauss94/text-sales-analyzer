@@ -3647,9 +3647,15 @@ function buildHighlightedText(text, words, indicatorKey) {
         }
 
         const normalizedWord = normalize(word);
-        // Use word boundary matching
+        // Use word boundary matching for short words, substring for long phrases
         const escapedWord = normalizedWord.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
-        const regex = new RegExp('(?<![a-z])' + escapedWord + '(?![a-z])', 'gi');
+        let regex;
+        if (normalizedWord.split(' ').length > 3) {
+            // Long phrase: search as substring (no word boundaries)
+            regex = new RegExp(escapedWord, 'gi');
+        } else {
+            regex = new RegExp('(?<![a-z])' + escapedWord + '(?![a-z])', 'gi');
+        }
         let match;
         while ((match = regex.exec(normalizedText)) !== null) {
             matches.push({ start: match.index, end: match.index + match[0].length });
