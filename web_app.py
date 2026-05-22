@@ -5186,8 +5186,20 @@ def saved_texts():
     entries_found = []
 
     # PRIMARY SOURCE: PostgreSQL (where audio uploads and analyses are saved)
+    # Retry once if first attempt fails (handles connection reset after redeploy)
+    pg_entries = []
+    for _attempt in range(2):
+        try:
+            pg_entries = get_flat_entries(username, limit=200)
+            break
+        except Exception as exc:
+            app.logger.warning(f"PG attempt {_attempt+1} failed for {username}: {exc}")
+            # Reset PG connection state to force reconnect
+            from src.users import history_manager as _hm
+            _hm._use_pg = None
+            _hm._pg_conn = None
+
     try:
-        pg_entries = get_flat_entries(username, limit=200)
         for e in pg_entries:
             e_year = e.get("year")
             e_month = e.get("month")
@@ -5525,7 +5537,17 @@ def admin_user_texts(username):
     year = request.args.get("year", type=int)
     month = request.args.get("month", type=int)
 
-    entries = get_flat_entries(username, limit=200)
+    # Retry once if PG connection fails
+    entries = []
+    for _attempt in range(2):
+        try:
+            entries = get_flat_entries(username, limit=200)
+            break
+        except Exception as exc:
+            app.logger.warning(f"Admin PG attempt {_attempt+1} failed for {username}: {exc}")
+            from src.users import history_manager as _hm
+            _hm._use_pg = None
+            _hm._pg_conn = None
 
     filtered = []
     for e in entries:
