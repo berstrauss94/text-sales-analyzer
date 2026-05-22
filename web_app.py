@@ -1900,6 +1900,7 @@ HTML = """
             <div class="date-select-group">
                 <label for="selectMonth">Mes</label>
                 <select id="selectMonth" onchange="loadSavedTexts()">
+                    <option value="">Todos</option>
                     <option value="1">Enero</option>
                     <option value="2">Febrero</option>
                     <option value="3">Marzo</option>
@@ -5151,7 +5152,7 @@ def saved_texts():
                 except Exception:
                     pass
 
-            if e_year == year and e_month == month:
+            if (not year or e_year == year) and (not month or e_month == month):
                 entries_found.append(e)
     except Exception as exc:
         app.logger.warning(f"PG query failed for {username}: {exc}")
