@@ -78,39 +78,39 @@ _KEYWORDS: dict[str, list[str]] = {
         "perfecto", "perfecta", "perfectos", "perfectas",
         "excelente", "excelentes",
         "genial", "fantastico", "fantastica",
-        "great", "perfect", "excellent", "wonderful", "amazing",
+        "increible", "espectacular", "barbaro", "impecable",
     ],
     "respuestas_afirmativas": [
         "si", "claro", "ok", "dale", "listo", "correcto",
         "exacto", "afirmativo", "por supuesto", "con gusto",
-        "yes", "sure", "absolutely", "of course", "agreed",
+        "desde luego", "sin duda", "totalmente", "obvio", "seguro",
     ],
     "indicios_cierre": [
         "reservar", "reserva", "bloquear", "bloqueo", "avanzar",
         "firmar", "firma", "cerrar", "cierre", "proceder",
         "confirmar", "confirmamos", "acordamos", "trato",
-        "reserve", "book", "close", "sign", "proceed", "confirm", "deal",
+        "cerramos", "lo tomo", "acepto", "quiero ese",
     ],
     "escasez_comercial": [
         "ultimos", "ultima", "ultimo", "disponible", "disponibles",
         "limitado", "limitada", "pocas", "pocos", "urgente",
-        "last", "available", "limited", "urgent", "only",
+        "exclusivo", "unico", "escaso", "se termina", "se acaba",
     ],
     "pedidos_referidos": [
         "conoces", "conoce", "alguien", "referido", "referidos",
         "recomendar", "recomiendas", "contacto",
-        "know", "someone", "referral", "recommend",
+        "familiar", "amigo", "vecino", "conocido",
     ],
     "objeciones": [
         "precio", "caro", "cara", "costoso", "costosa",
         "cuota", "duda", "dudas", "pensar", "pensarlo",
         "no se", "no estoy", "esperar", "despues",
-        "expensive", "price", "doubt", "think", "wait", "later",
+        "no me alcanza", "es mucho", "todavia no",
     ],
     "indicios_prospeccion": [
         "invertir", "inversion", "consultar", "averiguar",
         "informacion", "interesado", "interesada", "evaluar",
-        "invest", "consult", "information", "interested", "evaluate",
+        "conocer", "saber", "preguntar", "buscar", "necesitar",
     ],
 }
 
@@ -227,21 +227,22 @@ _INDICADOR_CATEGORIAS: dict[str, dict[str, list[str]]] = {
             "me gusta", "me encanta", "ideal", "justo lo que buscaba",
         ],
         "satisfaccion": [
-            "great", "perfect", "excellent", "wonderful", "amazing",
             "contento", "contenta", "satisfecho", "satisfecha", "conforme",
             "encantado", "encantada", "feliz", "comodo", "comoda",
+            "a gusto", "tranquilo", "tranquila", "re bien", "todo bien",
         ],
     },
     "respuestas_afirmativas": {
         "confirmacion_directa": [
             "si", "claro", "ok", "dale", "listo", "correcto",
-            "exacto", "afirmativo", "yes", "sure", "absolutely",
-            "agreed", "asi es", "tal cual", "efectivamente",
+            "exacto", "afirmativo", "asi es", "tal cual",
+            "efectivamente", "por supuesto", "seguro", "obvio", "eso",
         ],
         "acuerdo": [
-            "por supuesto", "con gusto", "of course", "sin problema",
+            "por supuesto", "con gusto", "sin problema",
             "como no", "desde luego", "naturalmente", "obvio",
             "sin duda", "totalmente", "completamente de acuerdo",
+            "estoy de acuerdo", "coincido", "tal cual",
         ],
         "disposicion": [
             "me parece bien", "estoy de acuerdo", "vamos", "hagamoslo",
@@ -252,16 +253,17 @@ _INDICADOR_CATEGORIAS: dict[str, dict[str, list[str]]] = {
     "indicios_cierre": {
         "accion_inmediata": [
             "reservar", "reserva", "bloquear", "bloqueo", "firmar",
-            "firma", "cerrar", "cierre", "reserve", "book",
-            "close", "sign", "quiero reservar", "vamos a firmar",
+            "firma", "cerrar", "cierre", "quiero reservar", "vamos a firmar",
+            "donde firmo", "cuando firmamos", "hagamos la reserva",
         ],
         "compromiso": [
-            "confirmar", "confirmamos", "acordamos", "trato", "deal",
-            "confirm", "cerramos", "lo tomo", "me quedo con",
+            "confirmar", "confirmamos", "acordamos", "trato",
+            "cerramos", "lo tomo", "me quedo con",
             "acepto", "lo compro", "es mio", "quiero ese",
+            "me lo llevo", "hecho",
         ],
         "avance": [
-            "avanzar", "proceder", "proceed", "seguir adelante",
+            "avanzar", "proceder", "seguir adelante",
             "dar el siguiente paso", "como seguimos", "que sigue",
             "cuando empezamos", "como arrancamos", "vamos adelante",
             "quiero avanzar", "sigamos", "continuemos",
@@ -269,31 +271,36 @@ _INDICADOR_CATEGORIAS: dict[str, dict[str, list[str]]] = {
     },
     "escasez_comercial": {
         "disponibilidad": [
-            "disponible", "disponibles", "available", "quedan pocos",
+            "disponible", "disponibles", "quedan pocos",
             "quedan pocas", "hay pocos", "hay pocas", "solo quedan",
             "unidades disponibles", "lotes disponibles", "todavia hay",
+            "ya casi no hay", "se estan terminando",
         ],
         "urgencia_temporal": [
-            "ultimos", "ultima", "ultimo", "last", "urgent", "urgente",
+            "ultimos", "ultima", "ultimo", "urgente",
             "se termina", "se acaba", "no va a durar", "por tiempo limitado",
             "hasta agotar stock", "oferta por hoy", "solo hoy",
+            "aprovecha ahora", "no esperes mas",
         ],
         "limitacion": [
-            "limitado", "limitada", "pocas", "pocos", "only", "limited",
+            "limitado", "limitada", "pocas", "pocos",
             "exclusivo", "exclusiva", "unico", "unica", "escaso",
             "pocas unidades", "edicion limitada", "cupos limitados",
+            "plazas limitadas", "ultimas unidades",
         ],
     },
     "pedidos_referidos": {
         "solicitud_directa": [
-            "conoces", "conoce", "alguien", "know", "someone",
+            "conoces", "conoce", "alguien",
             "tenes alguien", "sabes de alguien", "conoces a alguien",
             "hay alguien que", "alguien mas", "alguien interesado",
+            "tenes algun conocido", "sabes de alguno",
         ],
         "recomendacion": [
-            "recomendar", "recomiendas", "recommend", "referral",
+            "recomendar", "recomiendas",
             "nos recomiendes", "pasanos el contacto", "compartir",
             "decile que", "contale a", "avisale a", "mencionanos",
+            "pasale mi numero", "comentale", "avisale",
         ],
         "red_contactos": [
             "referido", "referidos", "contacto", "familiar",
@@ -304,19 +311,21 @@ _INDICADOR_CATEGORIAS: dict[str, dict[str, list[str]]] = {
     "objeciones": {
         "precio": [
             "precio", "caro", "cara", "costoso", "costosa", "cuota",
-            "expensive", "price", "muy caro", "fuera de presupuesto",
+            "muy caro", "fuera de presupuesto",
             "no me alcanza", "es mucho", "no puedo pagar", "sale mucho",
+            "es demasiado", "no llego",
         ],
         "indecision": [
-            "duda", "dudas", "pensar", "pensarlo", "doubt", "think",
-            "no se", "no estoy", "tengo que consultarlo", "no estoy seguro",
-            "no estoy segura", "dejame pensarlo", "lo tengo que evaluar",
+            "duda", "dudas", "pensar", "pensarlo",
+            "no se", "no estoy seguro", "no estoy segura",
+            "tengo que consultarlo", "dejame pensarlo",
+            "lo tengo que evaluar", "no me decido", "estoy en duda",
         ],
         "postergacion": [
-            "esperar", "despues", "wait", "later", "mas adelante",
+            "esperar", "despues", "mas adelante",
             "otro momento", "la semana que viene", "el mes que viene",
             "ahora no puedo", "no es el momento", "todavia no",
-            "cuando pueda", "en otro momento",
+            "cuando pueda", "en otro momento", "mas adelante vemos",
         ],
     },
 }
@@ -327,92 +336,87 @@ _BUYING_SIGNALS: list[str] = [
     "me convence", "lo quiero", "cerremos", "hagamoslo",
     "cuando empezamos", "donde firmo", "cuanto antes",
     "lo tomo", "me quedo con", "acepto", "de acuerdo",
-    "when can we", "i want it", "let's do it", "i'm ready",
-    "let's move forward", "i'll take it", "deal",
     "felicidades", "bienvenidos", "primer caso",
     "buena inversion", "excelente inversion",
+    "me decidi", "vamos con eso", "estoy convencido",
 ]
 
 _URGENCY_KEYWORDS: list[str] = [
     "urgente", "urgencia", "rapido", "inmediato", "inmediatamente",
     "hoy", "ahora", "ya", "cuanto antes", "lo antes posible",
     "esta semana", "manana", "pronto", "no puede esperar",
-    "urgent", "immediately", "asap", "right now", "today",
-    "this week", "tomorrow", "soon", "can't wait",
+    "enseguida", "de una", "al toque", "sin demora",
 ]
 
 _COMMITMENT_KEYWORDS: list[str] = [
     "confirmo", "acepto", "de acuerdo", "listo", "vamos",
     "procedo", "adelante", "hecho", "perfecto", "ok",
-    "confirm", "agree", "ready", "let's go", "done",
     "seguro", "sin duda", "definitivamente", "por supuesto",
+    "dale", "va", "estoy decidido", "cuenten conmigo",
 ]
 
 _EVASION_KEYWORDS: list[str] = [
     "despues", "luego", "mas adelante", "no se", "tengo que pensar",
     "lo voy a pensar", "no estoy seguro", "tal vez", "quizas",
     "veremos", "puede ser", "dejame ver", "no puedo ahora",
-    "later", "maybe", "not sure", "let me think", "we'll see",
-    "perhaps", "i don't know", "need to think",
+    "capaz", "habria que ver", "no estoy convencido",
 ]
 
 _OPERATION_VENTA: list[str] = [
     "venta", "vender", "vendo", "comprar", "compra", "adquirir",
-    "sale", "sell", "buy", "purchase", "acquire",
+    "escriturar", "transferir", "operacion de compraventa",
 ]
 
 _OPERATION_ALQUILER: list[str] = [
     "alquiler", "alquilar", "renta", "rentar", "arrendamiento",
-    "arriendo", "inquilino", "rent", "lease", "tenant",
+    "arriendo", "inquilino", "locacion", "contrato de alquiler",
 ]
 
 _OPERATION_INVERSION: list[str] = [
     "inversion", "invertir", "rentabilidad", "retorno", "roi",
-    "rendimiento", "capitalizar", "invest", "investment", "return",
-    "yield", "profit", "portfolio",
+    "rendimiento", "capitalizar", "renta mensual",
+    "ganancia", "plusvalia", "revalorizacion",
 ]
 
 _FINANCING_CONTADO: list[str] = [
-    "contado", "cash", "efectivo", "pago completo", "pago total",
-    "sin financiamiento", "pago unico",
+    "contado", "efectivo", "pago completo", "pago total",
+    "sin financiamiento", "pago unico", "de una",
 ]
 
 _FINANCING_CREDITO: list[str] = [
     "credito", "hipoteca", "hipotecario", "banco", "prestamo",
-    "financiamiento bancario", "mortgage", "loan", "bank",
+    "financiamiento bancario",
     "pre-aprobado", "preaprobado", "aprobacion bancaria",
 ]
 
 _FINANCING_DIRECTO: list[str] = [
     "financiamiento directo", "pago en cuotas", "cuotas",
-    "facilidades de pago", "plan de pago", "owner financing",
-    "seller financing", "installments", "payment plan",
+    "facilidades de pago", "plan de pago",
+    "cuotas sin interes", "financiacion propia",
 ]
 
 _PERSUASION_ESCASEZ: list[str] = [
     "ultimo", "ultima", "ultimos", "pocas unidades", "se acaba",
     "no va a durar", "oportunidad unica", "solo queda",
-    "limited", "last one", "won't last", "only one left",
+    "se estan terminando", "ultimas unidades",
 ]
 
 _PERSUASION_AUTORIDAD: list[str] = [
     "experto", "experiencia", "anos en el mercado", "profesional",
     "certificado", "reconocido", "lider", "mejor agente",
-    "expert", "experience", "years in market", "professional",
-    "certified", "top agent", "award",
+    "trayectoria", "especialista", "referente",
 ]
 
 _PERSUASION_SOCIAL: list[str] = [
     "todos quieren", "muy demandado", "se vendieron rapido",
     "otros clientes", "el vecino compro", "muy popular",
-    "everyone wants", "high demand", "sold quickly",
-    "other clients", "very popular",
+    "alta demanda", "se vende solo", "muchos interesados",
 ]
 
 _PERSUASION_RECIPROCIDAD: list[str] = [
-    "te regalo", "sin costo", "gratis", "cortesia", "bonus",
-    "incluyo", "te doy", "de regalo", "free", "complimentary",
-    "no charge", "on the house", "i'll include",
+    "te regalo", "sin costo", "gratis", "cortesia",
+    "incluyo", "te doy", "de regalo", "bonificacion",
+    "sin cargo", "te lo incluimos", "va de regalo",
 ]
 
 # Stopwords for keyword extraction
