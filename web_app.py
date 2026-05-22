@@ -2932,63 +2932,152 @@ function renderTextProgressChart(c) {
 function renderTextReport(data) {
     if (!data || data.error) return '';
     const c = data.commercial || {};
-    const intentEs = INTENT_ES[data.intent] || data.intent;
-    const sentimentEs = SENTIMENT_ES[data.sentiment] || data.sentiment;
+    const intentEs = INTENT_ES[data.intent] || data.intent || '-';
+    const sentimentEs = SENTIMENT_ES[data.sentiment] || data.sentiment || '-';
 
-    // Sales concepts summary
-    let salesSummary = 'Ninguno detectado';
-    if (data.sales_concepts && data.sales_concepts.length > 0) {
-        salesSummary = data.sales_concepts.map(sc => translateConcept(sc.concept, SALES_CONCEPTS_ES) + ' (' + Math.round(sc.confidence * 100) + '%)').join(', ');
-    }
+    // Section style helpers
+    const sectionTitle = function(icon, title) { return '<div style="font-size:0.7rem;color:#aaa;font-weight:600;margin:12px 0 6px;border-bottom:1px solid #1e2130;padding-bottom:4px;">' + icon + ' ' + title + '</div>'; };
+    const pill = function(label, value, color) { return '<div style="padding:5px 8px;background:#0d1017;border-radius:6px;border-left:3px solid ' + color + ';font-size:0.63rem;"><span style="color:#666;">' + label + ':</span> <strong style="color:#e0e0e0;">' + value + '</strong></div>'; };
 
-    // Real estate concepts summary
-    let reSummary = 'Ninguno detectado';
-    if (data.real_estate_concepts && data.real_estate_concepts.length > 0) {
-        reSummary = data.real_estate_concepts.map(rc => translateConcept(rc.concept, RE_CONCEPTS_ES) + ' (' + Math.round(rc.confidence * 100) + '%)').join(', ');
-    }
-
-    // Entities summary
-    let entitiesSummary = '';
-    if (data.entities && data.entities.length > 0) {
-        const grouped = {};
-        data.entities.forEach(e => { if (!grouped[e.concept]) grouped[e.concept] = []; grouped[e.concept].push(e); });
-        entitiesSummary = Object.entries(grouped).map(([concept, items]) => {
-            const label = (ENTITY_ES && ENTITY_ES[concept]) || concept;
-            return label + ': ' + items.slice(0, 3).map(e => e.raw_value).join(', ') + (items.length > 3 ? ' (+' + (items.length - 3) + ')' : '');
-        }).join(' | ');
-    }
-
-    // Commercial indicators summary
-    const indLabels = { palabras_positivas: 'Positivas', respuestas_afirmativas: 'Afirmativas', indicios_cierre: 'Cierre', escasez_comercial: 'Escasez', pedidos_referidos: 'Referidos', objeciones: 'Objeciones', indicios_prospeccion: 'Prospeccion' };
-    const indSummary = Object.entries(indLabels).map(([k, label]) => label + ': ' + (c[k] || 0)).join(' | ');
-
-    // Build report
     let report = '<div style="margin-top:16px;padding:16px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
-    report += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-size:0.75rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">&#128203; Informe del Texto</div><button onclick="copyReport()" style="background:#1a1d27;border:1px solid #2a2d3e;color:#aaa;padding:4px 10px;border-radius:6px;font-size:0.6rem;cursor:pointer;">&#128203; Copiar</button></div>';
+    report += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div style="font-size:0.8rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">&#128203; Informe Completo del Texto</div><button onclick="copyReport()" style="background:#1a1d27;border:1px solid #2a2d3e;color:#aaa;padding:4px 10px;border-radius:6px;font-size:0.6rem;cursor:pointer;">&#128203; Copiar</button></div>';
 
-    report += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.65rem;">';
-    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #4a6cf7;"><span style="color:#666;">Intencion:</span> <strong style="color:#e0e0e0;">' + intentEs + '</strong> (' + Math.round((data.intent_confidence || 0) * 100) + '%)</div>';
-    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid ' + (data.sentiment === 'POSITIVE' ? '#5bf5a3' : data.sentiment === 'NEGATIVE' ? '#f55b5b' : '#f5a35b') + ';"><span style="color:#666;">Sentimiento:</span> <strong style="color:#e0e0e0;">' + sentimentEs + '</strong> (' + Math.round((data.sentiment_confidence || 0) * 100) + '%)</div>';
-    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #f5d75b;"><span style="color:#666;">Lead:</span> <strong style="color:#e0e0e0;">' + (c.tipo_lead || '-') + '</strong></div>';
-    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #5bf5a3;"><span style="color:#666;">Prob. Cierre:</span> <strong style="color:#e0e0e0;">' + (c.probabilidad_cierre || 0).toFixed(1) + '%</strong></div>';
-    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #b38bff;"><span style="color:#666;">Etapa:</span> <strong style="color:#e0e0e0;">' + (c.etapa_funnel || '-') + '</strong></div>';
-    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #f5a35b;"><span style="color:#666;">Urgencia:</span> <strong style="color:#e0e0e0;">' + (c.urgencia || '-') + '</strong></div>';
+    // --- 1. CLASIFICACION GENERAL ---
+    report += sectionTitle('&#128269;', 'Clasificacion General');
+    report += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">';
+    report += pill('Intencion', intentEs + ' (' + Math.round((data.intent_confidence || 0) * 100) + '%)', '#4a6cf7');
+    report += pill('Sentimiento', sentimentEs + ' (' + Math.round((data.sentiment_confidence || 0) * 100) + '%)', data.sentiment === 'POSITIVE' ? '#5bf5a3' : data.sentiment === 'NEGATIVE' ? '#f55b5b' : '#f5a35b');
+    report += pill('Tipo Lead', (c.tipo_lead || '-'), c.tipo_lead === 'CALIENTE' ? '#f55b5b' : c.tipo_lead === 'TIBIO' ? '#f5a35b' : '#5bd4f5');
+    report += pill('Prob. Cierre', (c.probabilidad_cierre || 0).toFixed(1) + '%', '#5bf5a3');
+    report += pill('Etapa Funnel', (c.etapa_funnel || '-'), '#b38bff');
+    report += pill('Urgencia', (c.urgencia || '-'), c.urgencia === 'CRITICA' ? '#f55b5b' : c.urgencia === 'ALTA' ? '#f5a35b' : '#5bd4f5');
+    report += pill('Compromiso', (c.nivel_compromiso || '-'), '#7b9cff');
+    report += pill('Interes', (c.nivel_interes || '-'), '#f5d75b');
     report += '</div>';
 
-    report += '<div style="margin-top:8px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.63rem;"><span style="color:#666;">Indicadores:</span> <span style="color:#ccc;">' + indSummary + '</span></div>';
-    report += '<div style="margin-top:4px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.63rem;"><span style="color:#666;">Conceptos Venta:</span> <span style="color:#ccc;">' + salesSummary + '</span></div>';
-    report += '<div style="margin-top:4px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.63rem;"><span style="color:#666;">Conceptos Inmobiliarios:</span> <span style="color:#ccc;">' + reSummary + '</span></div>';
+    // --- 2. INDICADORES COMERCIALES ---
+    report += sectionTitle('&#128200;', 'Indicadores Comerciales');
+    const indColors = { palabras_positivas: '#5bf5a3', respuestas_afirmativas: '#7b9cff', indicios_cierre: '#f5d75b', escasez_comercial: '#f5a35b', pedidos_referidos: '#b38bff', objeciones: '#f55b5b', indicios_prospeccion: '#5bd4f5' };
+    const indNames = { palabras_positivas: 'Palabras Positivas', respuestas_afirmativas: 'Respuestas Afirmativas', indicios_cierre: 'Indicios de Cierre', escasez_comercial: 'Escasez Comercial', pedidos_referidos: 'Pedidos de Referidos', objeciones: 'Objeciones', indicios_prospeccion: 'Prospeccion' };
+    report += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">';
+    Object.entries(indNames).forEach(function(entry) {
+        var k = entry[0], label = entry[1];
+        var val = c[k] || 0;
+        var detail = c.detalle ? c.detalle[k] : {};
+        var words = detail ? Object.entries(detail).sort(function(a,b){return b[1]-a[1];}).slice(0,5).map(function(e){return e[0] + ' (' + e[1] + 'x)';}).join(', ') : '';
+        report += '<div style="padding:5px 8px;background:#0d1017;border-radius:6px;border-left:3px solid ' + indColors[k] + ';font-size:0.6rem;"><div><span style="color:#666;">' + label + ':</span> <strong style="color:#e0e0e0;">' + val + '</strong></div>' + (words ? '<div style="color:#555;font-size:0.55rem;margin-top:2px;">' + words + '</div>' : '') + '</div>';
+    });
+    report += '</div>';
 
-    if (entitiesSummary) {
-        report += '<div style="margin-top:4px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.63rem;"><span style="color:#666;">Datos Extraidos:</span> <span style="color:#ccc;">' + entitiesSummary + '</span></div>';
+    // --- 3. CONCEPTOS DE VENTA ---
+    report += sectionTitle('&#127991;', 'Conceptos de Venta');
+    if (data.sales_concepts && data.sales_concepts.length > 0) {
+        report += '<div style="display:flex;flex-direction:column;gap:4px;">';
+        data.sales_concepts.forEach(function(sc) {
+            var label = translateConcept(sc.concept, SALES_CONCEPTS_ES);
+            var conf = Math.round(sc.confidence * 100);
+            var source = sc.source_text ? sc.source_text.split(' /// ').slice(0, 2).map(function(f) { return '"' + f.substring(0, 80) + (f.length > 80 ? '...' : '') + '"'; }).join(' | ') : '';
+            report += '<div style="padding:5px 8px;background:#0d1017;border-radius:6px;font-size:0.6rem;"><div style="display:flex;justify-content:space-between;"><span style="color:#e0e0e0;font-weight:600;">' + label + '</span><span style="color:#7b9cff;">' + conf + '%</span></div>' + (source ? '<div style="color:#555;font-size:0.55rem;margin-top:2px;font-style:italic;">' + source + '</div>' : '') + '</div>';
+        });
+        report += '</div>';
+    } else {
+        report += '<div style="font-size:0.6rem;color:#555;">Ninguno detectado</div>';
     }
 
+    // --- 4. CONCEPTOS INMOBILIARIOS ---
+    report += sectionTitle('&#127968;', 'Conceptos Inmobiliarios');
+    if (data.real_estate_concepts && data.real_estate_concepts.length > 0) {
+        report += '<div style="display:flex;flex-direction:column;gap:4px;">';
+        data.real_estate_concepts.forEach(function(rc) {
+            var label = translateConcept(rc.concept, RE_CONCEPTS_ES);
+            var conf = Math.round(rc.confidence * 100);
+            var source = rc.source_text ? rc.source_text.split(' /// ').slice(0, 2).map(function(f) { return '"' + f.substring(0, 80) + (f.length > 80 ? '...' : '') + '"'; }).join(' | ') : '';
+            report += '<div style="padding:5px 8px;background:#0d1017;border-radius:6px;font-size:0.6rem;"><div style="display:flex;justify-content:space-between;"><span style="color:#e0e0e0;font-weight:600;">' + label + '</span><span style="color:#b38bff;">' + conf + '%</span></div>' + (source ? '<div style="color:#555;font-size:0.55rem;margin-top:2px;font-style:italic;">' + source + '</div>' : '') + '</div>';
+        });
+        report += '</div>';
+    } else {
+        report += '<div style="font-size:0.6rem;color:#555;">Ninguno detectado</div>';
+    }
+
+    // --- 5. DATOS EXTRAIDOS ---
+    report += sectionTitle('&#128202;', 'Datos Extraidos');
+    if (data.entities && data.entities.length > 0) {
+        var grouped = {};
+        data.entities.forEach(function(e) { if (!grouped[e.concept]) grouped[e.concept] = []; grouped[e.concept].push(e); });
+        report += '<div style="display:flex;flex-direction:column;gap:4px;">';
+        Object.entries(grouped).forEach(function(entry) {
+            var concept = entry[0], items = entry[1];
+            var label = (ENTITY_ES && ENTITY_ES[concept]) || concept;
+            var icon = (ENTITY_ICONS && ENTITY_ICONS[concept]) || '';
+            var values = items.map(function(e) {
+                var numStr = e.numeric_value !== null ? ' = ' + e.numeric_value + (e.unit ? ' ' + e.unit : '') : '';
+                return e.raw_value + numStr;
+            }).slice(0, 6).join(', ');
+            var extra = items.length > 6 ? ' (+' + (items.length - 6) + ' mas)' : '';
+            report += '<div style="padding:4px 8px;background:#0d1017;border-radius:6px;font-size:0.6rem;"><span style="color:#888;">' + icon + ' ' + label + ':</span> <span style="color:#ccc;">' + values + extra + '</span></div>';
+        });
+        report += '</div>';
+    } else {
+        report += '<div style="font-size:0.6rem;color:#555;">Ninguno detectado</div>';
+    }
+
+    // --- 6. OPERACION Y FINANCIAMIENTO ---
+    report += sectionTitle('&#128176;', 'Operacion y Financiamiento');
+    report += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">';
+    report += pill('Tipo Operacion', (c.tipo_operacion || '-'), '#f5d75b');
+    report += pill('Financiamiento', (c.financiamiento || '-').replace(/_/g, ' '), '#7b9cff');
+    report += '</div>';
+
+    // --- 7. SENALES Y OBJECIONES ---
+    if ((c.senales_compra && c.senales_compra.length > 0) || (c.objeciones_especificas && c.objeciones_especificas.length > 0)) {
+        report += sectionTitle('&#9888;', 'Senales y Objeciones');
+        if (c.senales_compra && c.senales_compra.length > 0) {
+            report += '<div style="padding:5px 8px;background:#0d1a0d;border:1px solid #1a3a1a;border-radius:6px;font-size:0.6rem;margin-bottom:4px;"><span style="color:#5bf5a3;font-weight:600;">Senales de compra:</span> <span style="color:#ccc;">' + c.senales_compra.join(', ') + '</span></div>';
+        }
+        if (c.objeciones_especificas && c.objeciones_especificas.length > 0) {
+            report += '<div style="padding:5px 8px;background:#1a0d0d;border:1px solid #3a1a1a;border-radius:6px;font-size:0.6rem;"><span style="color:#f55b5b;font-weight:600;">Objeciones especificas:</span> <span style="color:#ccc;">' + c.objeciones_especificas.join(', ') + '</span></div>';
+        }
+    }
+
+    // --- 8. TECNICAS Y PREGUNTAS ---
+    if ((c.tecnicas_persuasion && c.tecnicas_persuasion.length > 0) || (c.preguntas_abiertas && c.preguntas_abiertas.length > 0)) {
+        report += sectionTitle('&#128161;', 'Tecnicas y Preguntas');
+        if (c.tecnicas_persuasion && c.tecnicas_persuasion.length > 0) {
+            report += '<div style="padding:5px 8px;background:#0d1017;border-radius:6px;font-size:0.6rem;margin-bottom:4px;"><span style="color:#f5a35b;font-weight:600;">Tecnicas de persuasion:</span> <span style="color:#ccc;">' + c.tecnicas_persuasion.join(', ') + '</span></div>';
+        }
+        if (c.preguntas_abiertas && c.preguntas_abiertas.length > 0) {
+            report += '<div style="padding:5px 8px;background:#0d1017;border-radius:6px;font-size:0.6rem;"><span style="color:#5bd4f5;font-weight:600;">Preguntas abiertas (' + c.preguntas_abiertas.length + '):</span> <span style="color:#ccc;">' + c.preguntas_abiertas.slice(0, 5).join(' | ') + (c.preguntas_abiertas.length > 5 ? ' (+' + (c.preguntas_abiertas.length - 5) + ')' : '') + '</span></div>';
+        }
+    }
+
+    // --- 9. KEYWORDS ---
+    if (c.keywords && c.keywords.length > 0) {
+        report += sectionTitle('&#128273;', 'Palabras Clave');
+        report += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+        c.keywords.forEach(function(kw) {
+            report += '<span style="background:#1a1d27;border:1px solid #2a2d3e;color:#aaa;padding:2px 8px;border-radius:10px;font-size:0.58rem;">' + kw + '</span>';
+        });
+        report += '</div>';
+    }
+
+    // --- 10. RESUMEN Y ACCION ---
+    report += sectionTitle('&#9989;', 'Conclusion y Siguiente Paso');
+    if (c.resumen) {
+        report += '<div style="padding:8px;background:#0d1017;border-radius:6px;font-size:0.63rem;color:#ccc;margin-bottom:4px;">' + c.resumen + '</div>';
+    }
     if (c.recomendacion) {
-        report += '<div style="margin-top:8px;padding:8px;background:#0d1a0d;border:1px solid #1a3a1a;border-radius:6px;font-size:0.65rem;color:#5bf5a3;">💡 ' + c.recomendacion + '</div>';
+        report += '<div style="padding:8px;background:#0d1a0d;border:1px solid #1a3a1a;border-radius:6px;font-size:0.63rem;color:#5bf5a3;margin-bottom:4px;">&#128161; <strong>Recomendacion:</strong> ' + c.recomendacion + '</div>';
     }
     if (c.accion_siguiente) {
-        report += '<div style="margin-top:4px;padding:8px;background:#0d0d1a;border:1px solid #1a1a3a;border-radius:6px;font-size:0.65rem;color:#7b9cff;">▶️ ' + c.accion_siguiente + '</div>';
+        report += '<div style="padding:8px;background:#0d0d1a;border:1px solid #1a1a3a;border-radius:6px;font-size:0.63rem;color:#7b9cff;">&#9654; <strong>Siguiente paso:</strong> ' + c.accion_siguiente + '</div>';
     }
+
+    // --- METRICAS ---
+    report += '<div style="margin-top:10px;display:flex;gap:12px;font-size:0.58rem;color:#555;justify-content:flex-end;">';
+    report += '<span>Densidad: ' + (c.densidad_comercial || 0).toFixed(4) + '</span>';
+    report += '<span>Palabras: ' + (c.total_palabras || 0) + '</span>';
+    report += '<span>Tendencia: ' + (c.tendencia_cierre || '-') + '</span>';
+    report += '</div>';
 
     report += '</div>';
     return report;
