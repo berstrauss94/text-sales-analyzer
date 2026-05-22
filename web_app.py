@@ -2964,7 +2964,7 @@ function renderTextReport(data) {
 
     // Build report
     let report = '<div style="margin-top:16px;padding:16px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
-    report += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-size:0.75rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">📋 Informe del Texto</div><button onclick="copyReport()" style="background:#1a1d27;border:1px solid #2a2d3e;color:#aaa;padding:4px 10px;border-radius:6px;font-size:0.6rem;cursor:pointer;">📋 Copiar</button></div>';
+    report += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-size:0.75rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">&#128203; Informe del Texto</div><button onclick="copyReport()" style="background:#1a1d27;border:1px solid #2a2d3e;color:#aaa;padding:4px 10px;border-radius:6px;font-size:0.6rem;cursor:pointer;">&#128203; Copiar</button></div>';
 
     report += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.65rem;">';
     report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #4a6cf7;"><span style="color:#666;">Intencion:</span> <strong style="color:#e0e0e0;">' + intentEs + '</strong> (' + Math.round((data.intent_confidence || 0) * 100) + '%)</div>';
@@ -3001,21 +3001,22 @@ function copyReport() {
     const sentimentEs = SENTIMENT_ES[data.sentiment] || data.sentiment || '';
     const title = window._currentEntryName || '';
 
-    let text = '=== INFORME DE ANALISIS ===\\n';
-    if (title) text += 'Texto: ' + title + '\\n';
-    text += 'Intencion: ' + intentEs + ' (' + Math.round((data.intent_confidence || 0) * 100) + '%)\\n';
-    text += 'Sentimiento: ' + sentimentEs + ' (' + Math.round((data.sentiment_confidence || 0) * 100) + '%)\\n';
-    text += 'Lead: ' + (c.tipo_lead || '-') + ' | Prob. Cierre: ' + (c.probabilidad_cierre || 0).toFixed(1) + '%\\n';
-    text += 'Etapa: ' + (c.etapa_funnel || '-') + ' | Urgencia: ' + (c.urgencia || '-') + '\\n';
-    text += '---\\n';
-    text += 'Positivas: ' + (c.palabras_positivas || 0) + ' | Afirmativas: ' + (c.respuestas_afirmativas || 0) + ' | Cierre: ' + (c.indicios_cierre || 0) + '\\n';
-    text += 'Objeciones: ' + (c.objeciones || 0) + ' | Referidos: ' + (c.pedidos_referidos || 0) + ' | Prospeccion: ' + (c.indicios_prospeccion || 0) + '\\n';
-    if (c.recomendacion) text += '---\\nRecomendacion: ' + c.recomendacion + '\\n';
-    if (c.accion_siguiente) text += 'Siguiente paso: ' + c.accion_siguiente + '\\n';
+    const lines = [];
+    lines.push('=== INFORME DE ANALISIS ===');
+    if (title) lines.push('Texto: ' + title);
+    lines.push('Intencion: ' + intentEs + ' (' + Math.round((data.intent_confidence || 0) * 100) + '%)');
+    lines.push('Sentimiento: ' + sentimentEs + ' (' + Math.round((data.sentiment_confidence || 0) * 100) + '%)');
+    lines.push('Lead: ' + (c.tipo_lead || '-') + ' | Prob. Cierre: ' + (c.probabilidad_cierre || 0).toFixed(1) + '%');
+    lines.push('Etapa: ' + (c.etapa_funnel || '-') + ' | Urgencia: ' + (c.urgencia || '-'));
+    lines.push('---');
+    lines.push('Positivas: ' + (c.palabras_positivas || 0) + ' | Afirmativas: ' + (c.respuestas_afirmativas || 0) + ' | Cierre: ' + (c.indicios_cierre || 0));
+    lines.push('Objeciones: ' + (c.objeciones || 0) + ' | Referidos: ' + (c.pedidos_referidos || 0) + ' | Prospeccion: ' + (c.indicios_prospeccion || 0));
+    if (c.recomendacion) { lines.push('---'); lines.push('Recomendacion: ' + c.recomendacion); }
+    if (c.accion_siguiente) lines.push('Siguiente paso: ' + c.accion_siguiente);
 
-    navigator.clipboard.writeText(text.replace(/\\\\n/g, '\\n')).then(() => {
-        const btn = document.querySelector('[onclick="copyReport()"]');
-        if (btn) { btn.textContent = '✓ Copiado'; setTimeout(() => { btn.textContent = '📋 Copiar'; }, 2000); }
+    navigator.clipboard.writeText(lines.join(String.fromCharCode(10))).then(function() {
+        var btn = document.querySelector('[onclick="copyReport()"]');
+        if (btn) { btn.textContent = '\\u2713 Copiado'; setTimeout(function() { btn.textContent = '\\ud83d\\udccb Copiar'; }, 2000); }
     });
 }
 
