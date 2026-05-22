@@ -2944,7 +2944,8 @@ function renderTextProgressChart(c) {
 document.addEventListener('click', function(e) {
     // Legend item click — show word detail
     var legendItem = e.target.closest('.text-pie-legend-item');
-    if (legendItem) {
+    if (!legendItem) return;
+    try {
         var cat = legendItem.getAttribute('data-cat');
         var detail = window._textPieWordDetail ? window._textPieWordDetail[cat] : {};
         var detailEl = document.getElementById('textPieWordDetail');
@@ -2962,11 +2963,12 @@ document.addEventListener('click', function(e) {
             }).join('');
         }
         detailEl.style.display = 'block';
-    }
+    } catch(err) { console.error('Text pie legend error:', err); }
 });
 
 // Hover on text pie chart — show tooltip with word breakdown per segment
 (function() {
+    try {
     function initTextPieHover() {
         var pieEl = document.getElementById('textPieChart');
         var tooltipEl = document.getElementById('textPieTooltip');
@@ -3058,6 +3060,7 @@ document.addEventListener('click', function(e) {
         }
     });
     observer.observe(document.body, { childList: true, subtree: true });
+    } catch(err) { console.error('Text pie init error:', err); }
 })();
 
 function renderTextReport(data) {
