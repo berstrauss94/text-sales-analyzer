@@ -2940,128 +2940,55 @@ function renderTextProgressChart(c) {
     '</div>';
 }
 
-// Initialize text pie chart interactivity after render
+// Text pie chart legend click — show word detail below chart
 document.addEventListener('click', function(e) {
-    // Legend item click — show word detail
     var legendItem = e.target.closest('.text-pie-legend-item');
     if (!legendItem) return;
-    try {
-        var cat = legendItem.getAttribute('data-cat');
-        var detail = window._textPieWordDetail ? window._textPieWordDetail[cat] : {};
-        var detailEl = document.getElementById('textPieWordDetail');
-        if (!detailEl) return;
-        var entries = Object.entries(detail || {}).sort(function(a,b){return b[1]-a[1];}).slice(0, 15);
-        if (entries.length === 0) {
-            detailEl.innerHTML = '<div style="color:#555;font-size:0.7rem;">Sin detalle de palabras para esta categoria.</div>';
-        } else {
-            var catTotal = entries.reduce(function(s, e){return s + e[1];}, 0);
-            var seg = (window._textPieSegments || []).find(function(s){return s.key === cat;});
-            var segColor = seg ? seg.color : '#aaa';
-            detailEl.innerHTML = '<div style="font-size:0.68rem;color:' + segColor + ';margin-bottom:4px;font-weight:600;">' + (seg ? seg.label : cat) + ' — Palabras detectadas:</div>' + entries.map(function(e) {
-                var wpct = Math.round((e[1] / catTotal) * 100);
-                return '<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #1a1d27;font-size:0.65rem;"><span style="color:#ccc;">' + e[0] + '</span><span style="color:#888;">' + e[1] + 'x (' + wpct + '%)</span></div>';
-            }).join('');
-        }
-        detailEl.style.display = 'block';
-    } catch(err) { console.error('Text pie legend error:', err); }
+    var cat = legendItem.getAttribute('data-cat');
+    if (!cat || !window._textPieWordDetail) return;
+    var detail = window._textPieWordDetail[cat] || {};
+    var detailEl = document.getElementById('textPieWordDetail');
+    if (!detailEl) return;
+    var entries = Object.entries(detail).sort(function(a,b){return b[1]-a[1];}).slice(0, 15);
+    if (entries.length === 0) {
+        detailEl.innerHTML = '<div style="color:#555;font-size:0.7rem;">Sin detalle.</div>';
+    } else {
+        var catTotal = entries.reduce(function(s, e){return s + e[1];}, 0);
+        detailEl.innerHTML = entries.map(function(e) {
+            return '<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #1a1d27;font-size:0.65rem;"><span style="color:#ccc;">' + e[0] + '</span><span style="color:#888;">' + e[1] + 'x</span></div>';
+        }).join('');
+    }
+    detailEl.style.display = 'block';
 });
 
-// Hover on text pie chart — show tooltip with word breakdown per segment
-(function() {
-    try {
-    function initTextPieHover() {
-        var pieEl = document.getElementById('textPieChart');
-        var tooltipEl = document.getElementById('textPieTooltip');
-        if (!pieEl || !tooltipEl) return;
-
-        function getAngle(e, rect) {
-            var cx = rect.left + rect.width / 2;
-            var cy = rect.top + rect.height / 2;
-            var clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            var clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            var dx = clientX - cx;
-            var dy = clientY - cy;
-            var dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < rect.width * 0.2) return -1;
-            var angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
-            if (angle < 0) angle += 360;
-            return angle;
-        }
-
-        function getSegment(angleDeg) {
-            var segs = window._textPieSegments || [];
-            var total = segs.reduce(function(s, sg){return s + sg.count;}, 0) || 1;
-            var currentDeg = 0;
-            for (var i = 0; i < segs.length; i++) {
-                var degSpan = (segs[i].count / total) * 360;
-                if (angleDeg >= currentDeg && angleDeg < currentDeg + degSpan) return segs[i];
-                currentDeg += degSpan;
-            }
-            return null;
-        }
-
-        function showTooltip(seg) {
-            if (!seg) { tooltipEl.style.display = 'none'; return; }
-            var detail = window._textPieWordDetail ? window._textPieWordDetail[seg.key] : {};
-            var entries = Object.entries(detail || {}).sort(function(a,b){return b[1]-a[1];});
-            var segTotal = entries.reduce(function(s, e){return s + e[1];}, 0) || 1;
-            var html = '<div style="font-size:0.72rem;color:' + seg.color + ';font-weight:700;margin-bottom:5px;border-bottom:1px solid ' + seg.color + '33;padding-bottom:4px;">' + seg.pct + '% ' + seg.label + '</div>';
-            if (entries.length > 0) {
-                html += '<div style="display:flex;flex-direction:column;gap:3px;">';
-                entries.slice(0, 12).forEach(function(e) {
-                    var wordShare = (e[1] / segTotal) * seg.pct;
-                    var displayPct = wordShare < 0.1 ? '<0.1' : wordShare.toFixed(1);
-                    var barWidth = Math.max(Math.round((e[1] / segTotal) * 100), 3);
-                    html += '<div style="display:flex;align-items:center;gap:6px;"><div style="width:36px;text-align:right;font-size:0.6rem;color:' + seg.color + ';font-weight:600;">' + displayPct + '%</div><div style="flex:1;background:#1a1d27;border-radius:4px;height:14px;position:relative;overflow:hidden;"><div style="position:absolute;left:0;top:0;height:100%;width:' + Math.min(barWidth, 100) + '%;background:' + seg.color + '33;border-radius:4px;"></div><span style="position:relative;z-index:1;font-size:0.56rem;color:#ddd;padding-left:4px;line-height:14px;">' + e[0] + '</span></div><div style="font-size:0.53rem;color:#666;min-width:18px;">' + e[1] + 'x</div></div>';
-                });
-                html += '</div>';
-            } else {
-                html += '<div style="font-size:0.6rem;color:#666;">Sin detalle</div>';
-            }
-            tooltipEl.innerHTML = html;
-            tooltipEl.style.display = 'block';
-            tooltipEl.style.borderColor = seg.color + '66';
-        }
-
-        var lastKey = null;
-        pieEl.addEventListener('mousemove', function(e) {
-            var rect = pieEl.getBoundingClientRect();
-            var angle = getAngle(e, rect);
-            if (angle < 0) { tooltipEl.style.display = 'none'; lastKey = null; return; }
-            var seg = getSegment(angle);
-            if (seg && seg.key !== lastKey) { lastKey = seg.key; showTooltip(seg); }
-            else if (!seg) { tooltipEl.style.display = 'none'; lastKey = null; }
-        });
-        pieEl.addEventListener('mouseleave', function() { tooltipEl.style.display = 'none'; lastKey = null; });
-
-        var touchTimer = null;
-        pieEl.addEventListener('touchstart', function(e) {
-            var rect = pieEl.getBoundingClientRect();
-            var angle = getAngle(e, rect);
-            if (angle < 0) return;
-            var seg = getSegment(angle);
-            touchTimer = setTimeout(function() { showTooltip(seg); }, 350);
-        }, {passive: true});
-        pieEl.addEventListener('touchend', function() {
-            if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
-            setTimeout(function() { tooltipEl.style.display = 'none'; }, 2500);
-        }, {passive: true});
-        pieEl.addEventListener('touchmove', function() {
-            if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
-            tooltipEl.style.display = 'none';
-        }, {passive: true});
+// Hover on text pie chart — delegated events (safe, no IIFE)
+document.addEventListener('mousemove', function(e) {
+    var pie = e.target.closest('#textPieChart');
+    if (!pie) return;
+    var tooltip = document.getElementById('textPieTooltip');
+    if (!tooltip || !window._textPieSegments) return;
+    var rect = pie.getBoundingClientRect();
+    var cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    var dx = e.clientX - cx, dy = e.clientY - cy;
+    if (Math.sqrt(dx*dx + dy*dy) < rect.width * 0.2) { tooltip.style.display = 'none'; return; }
+    var angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+    if (angle < 0) angle += 360;
+    var segs = window._textPieSegments, total = segs.reduce(function(s,g){return s+g.count;},0)||1;
+    var cur = 0, seg = null;
+    for (var i=0;i<segs.length;i++) { var span=(segs[i].count/total)*360; if(angle>=cur&&angle<cur+span){seg=segs[i];break;} cur+=span; }
+    if (!seg) { tooltip.style.display = 'none'; return; }
+    var detail = (window._textPieWordDetail||{})[seg.key]||{};
+    var entries = Object.entries(detail).sort(function(a,b){return b[1]-a[1];}).slice(0,10);
+    var segTotal = entries.reduce(function(s,e){return s+e[1];},0)||1;
+    var html = '<div style="font-size:0.7rem;color:'+seg.color+';font-weight:700;margin-bottom:4px;">'+seg.pct+'% '+seg.label+'</div>';
+    entries.forEach(function(en){ var ws=((en[1]/segTotal)*seg.pct).toFixed(1); html+='<div style="font-size:0.6rem;color:#ccc;">'+ws+'% '+en[0]+' ('+en[1]+'x)</div>'; });
+    tooltip.innerHTML = html; tooltip.style.display = 'block';
+}, true);
+document.addEventListener('mouseleave', function(e) {
+    if (e.target.id === 'textPieChart' || (e.target.closest && e.target.closest('#textPieChart'))) {
+        var t = document.getElementById('textPieTooltip'); if(t) t.style.display='none';
     }
-
-    // Re-init after each render
-    var observer = new MutationObserver(function() {
-        if (document.getElementById('textPieChart')) {
-            initTextPieHover();
-            observer.disconnect();
-        }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-    } catch(err) { console.error('Text pie init error:', err); }
-})();
+}, true);
 
 function renderTextReport(data) {
     if (!data || data.error) return '';
@@ -4437,8 +4364,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load on page load
     if (document.getElementById('selectUser')) {
-        // Admin: users already in HTML via Jinja2, just load stats
+        // Admin: load stats and also load texts
         loadAdminStats();
+        loadSavedTexts();
     } else {
         // Regular user: load their texts
         loadSavedTexts();
