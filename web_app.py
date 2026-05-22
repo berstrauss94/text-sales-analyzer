@@ -2691,7 +2691,7 @@ function renderResults(data, inputText) {
                 <div class="card-title card-title-collapsible" onclick="toggleCardContent('ventas-content')">
                     Conceptos de Ventas Detectados &nbsp;<span class="card-arrow" id="ventas-arrow">&#9660;</span>
                     <span class="card-info-icon" onclick="event.stopPropagation()">!</span>
-                    <div class="card-info-tooltip">Detecta conceptos del proceso de venta: ofertas, descuentos, comisiones, cierres, prospectos, objeciones, seguimiento y negociacion. Muestra los fragmentos del texto donde se identificaron.</div>
+                    <div class="card-info-tooltip">Detecta conceptos del proceso de venta usando Machine Learning: ofertas, descuentos, comisiones, cierres, prospectos, objeciones, seguimiento y negociacion. El modelo analiza el 100% del texto buscando patrones y frases clave, extrae los fragmentos relevantes y calcula la confianza de cada deteccion. A mayor confianza, mas clara es la presencia del concepto en la conversacion.</div>
                 </div>
                 <div class="card-collapsible-content" id="ventas-content">
                     ${salesHtml}

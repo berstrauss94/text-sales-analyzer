@@ -411,17 +411,37 @@ class ConceptExtractor:
 
                 # Extract context around the keyword — full sentence boundaries
                 # Find sentence start (look back for . ! ? or newline)
+                # But skip dots that are part of numbers (e.g. 100.000)
                 frag_start = idx
-                while frag_start > 0 and text[frag_start-1] not in '.!?\n':
+                while frag_start > 0:
+                    prev_char = text[frag_start-1]
+                    if prev_char in '!?\n':
+                        break
+                    if prev_char == '.':
+                        # Check if dot is part of a number (e.g. 100.000 or 2.80)
+                        if frag_start >= 2 and text[frag_start-2].isdigit() and frag_start < len(text) and text[frag_start].isdigit():
+                            pass  # numeric dot, continue
+                        else:
+                            break
                     frag_start -= 1
-                    if idx - frag_start > 200:
+                    if idx - frag_start > 300:
                         break
 
                 # Find sentence end (look forward for . ! ? or newline)
+                # But skip dots that are part of numbers
                 frag_end = idx + len(kw)
-                while frag_end < len(text) and text[frag_end] not in '.!?\n':
+                while frag_end < len(text):
+                    curr_char = text[frag_end]
+                    if curr_char in '!?\n':
+                        break
+                    if curr_char == '.':
+                        # Check if dot is part of a number (e.g. 100.000 or 2.80)
+                        if frag_end > 0 and text[frag_end-1].isdigit() and frag_end + 1 < len(text) and text[frag_end+1].isdigit():
+                            pass  # numeric dot, continue
+                        else:
+                            break
                     frag_end += 1
-                    if frag_end - idx > 250:
+                    if frag_end - idx > 350:
                         break
 
                 fragment = text[frag_start:frag_end].strip()
@@ -439,10 +459,10 @@ class ConceptExtractor:
 
                 start_search = idx + len(kw)
 
-                # Limit to 3 fragments per concept
-                if len(fragments) >= 3:
+                # Limit to 5 fragments per concept
+                if len(fragments) >= 5:
                     break
-            if len(fragments) >= 3:
+            if len(fragments) >= 5:
                 break
 
         if fragments:
