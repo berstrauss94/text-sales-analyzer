@@ -3460,13 +3460,18 @@ async function loadAdminStats() {
                 const detail = window._adminWordDetail[seg.key] || {};
                 const entries = Object.entries(detail).sort((a,b) => b[1] - a[1]);
                 const segTotal = entries.reduce((s, e) => s + e[1], 0) || 1;
+                // seg.pct is the segment's % of the total pie (e.g. 5%)
+                // Each word's share = (wordCount / segTotal) * seg.pct
+                // So all words inside sum exactly to seg.pct
                 let html = '<div style="font-size:0.75rem;color:' + seg.color + ';font-weight:700;margin-bottom:6px;border-bottom:1px solid ' + seg.color + '33;padding-bottom:4px;">' + seg.pct + '% ' + seg.label + '</div>';
                 if (entries.length > 0) {
                     html += '<div style="display:flex;flex-direction:column;gap:3px;">';
                     entries.slice(0, 15).forEach(function(e) {
-                        const wordPct = Math.round((e[1] / segTotal) * 100);
-                        const barWidth = Math.max(wordPct, 3);
-                        html += '<div style="display:flex;align-items:center;gap:6px;"><div style="width:30px;text-align:right;font-size:0.62rem;color:' + seg.color + ';font-weight:600;">' + wordPct + '%</div><div style="flex:1;background:#1a1d27;border-radius:4px;height:14px;position:relative;overflow:hidden;"><div style="position:absolute;left:0;top:0;height:100%;width:' + barWidth + '%;background:' + seg.color + '33;border-radius:4px;"></div><span style="position:relative;z-index:1;font-size:0.58rem;color:#ddd;padding-left:4px;line-height:14px;">' + e[0] + '</span></div><div style="font-size:0.55rem;color:#666;min-width:20px;">' + e[1] + 'x</div></div>';
+                        // Proportion of this word within the segment's total percentage
+                        const wordShare = (e[1] / segTotal) * seg.pct;
+                        const displayPct = wordShare < 0.1 ? '<0.1' : wordShare.toFixed(1);
+                        const barWidth = Math.max(Math.round((e[1] / segTotal) * 100), 3);
+                        html += '<div style="display:flex;align-items:center;gap:6px;"><div style="width:36px;text-align:right;font-size:0.62rem;color:' + seg.color + ';font-weight:600;">' + displayPct + '%</div><div style="flex:1;background:#1a1d27;border-radius:4px;height:14px;position:relative;overflow:hidden;"><div style="position:absolute;left:0;top:0;height:100%;width:' + Math.min(barWidth, 100) + '%;background:' + seg.color + '33;border-radius:4px;"></div><span style="position:relative;z-index:1;font-size:0.58rem;color:#ddd;padding-left:4px;line-height:14px;">' + e[0] + '</span></div><div style="font-size:0.55rem;color:#666;min-width:20px;">' + e[1] + 'x</div></div>';
                     });
                     if (entries.length > 15) {
                         html += '<div style="font-size:0.55rem;color:#555;text-align:center;margin-top:2px;">... y ' + (entries.length - 15) + ' mas</div>';
