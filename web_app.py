@@ -2002,6 +2002,7 @@ HTML = """
 <script>
 const INDICADOR_CATEGORIAS = {{ indicador_categorias_json | safe }};
 let _lastCommercialData = null;
+window._currentEntryName = '';
 
 async function analyze() {
     const text = document.getElementById('textInput').value.trim();
@@ -2616,7 +2617,7 @@ function renderResults(data, inputText) {
 
     const iDetail = intentDetail[data.intent] || intentDetail['UNKNOWN'];
 
-    const entryTitle = (document.getElementById('entryNameInput') || {}).value || '';
+    const entryTitle = (document.getElementById('entryNameInput') || {}).value || window._currentEntryName || '';
     const displayTitle = entryTitle.trim() || preview;
 
     el.innerHTML = `
@@ -3182,6 +3183,7 @@ async function loadSavedTexts() {
                 const opt = document.createElement('option');
                 opt.value = e.id;
                 opt.textContent = name;
+                opt.setAttribute('data-fullname', e.entry_name || rawName);
                 select.appendChild(opt);
             });
         } else {
@@ -3198,6 +3200,12 @@ function onTextSelected(entryId) {
         return;
     }
     document.getElementById('deleteTextBtn').style.display = 'inline-block';
+    // Capture the full entry name from the selected option
+    const select = document.getElementById('selectText');
+    const selectedOpt = select.options[select.selectedIndex];
+    if (selectedOpt) {
+        window._currentEntryName = selectedOpt.getAttribute('data-fullname') || selectedOpt.textContent || '';
+    }
     loadSavedText(entryId);
 }
 
@@ -3228,6 +3236,13 @@ async function loadSavedText(entryId) {
         const data = await response.json();
         if (data.text) {
             document.getElementById('textInput').value = data.text;
+        }
+        // Store entry_name globally for display in results preview
+        window._currentEntryName = data.entry_name || '';
+        // Put entry_name in the title input if it exists (admin only)
+        const nameInput = document.getElementById('entryNameInput');
+        if (nameInput && data.entry_name) {
+            nameInput.value = data.entry_name;
         }
     } catch(e) {
         console.error('Error loading text:', e);
@@ -4015,6 +4030,21 @@ document.addEventListener('DOMContentLoaded', () => {
     textarea.addEventListener('input', () => {
         closeHighlightOverlay();
     });
+
+    // Update the preview title when the entry name input changes
+    const entryNameInput = document.getElementById('entryNameInput');
+    if (entryNameInput) {
+        entryNameInput.addEventListener('input', () => {
+            window._currentEntryName = entryNameInput.value.trim();
+            const previewEl = document.querySelector('.input-preview');
+            if (previewEl) {
+                const title = entryNameInput.value.trim();
+                if (title) {
+                    previewEl.textContent = '"' + title + '"';
+                }
+            }
+        });
+    }
 
     // Load on page load
     if (document.getElementById('selectUser')) {
@@ -4876,7 +4906,7 @@ def saved_text(entry_id):
                 break
 
     if entry:
-        return jsonify({"text": entry.get("text_full", entry.get("text", ""))})
+        return jsonify({"text": entry.get("text_full", entry.get("text", "")), "entry_name": entry.get("entry_name", "")})
 
     return jsonify({"text": ""}), 404
 
