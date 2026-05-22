@@ -2814,7 +2814,7 @@ function renderCommercial(c) {
         <div>
             <div class="indicator-item has-detail"
                  style="border-top: 2px solid ${ind.color}; position:relative;"
-                 onclick="toggleDetail('${detailId}', this); highlightInText('${ind.key}');">
+                 onclick="toggleDetail('${detailId}', this);">
                 <span class="card-info-icon" style="position:absolute;top:2px;right:2px;font-size:0.55rem;width:14px;height:14px;line-height:14px;" onclick="event.stopPropagation()">!</span>
                 <div class="card-info-tooltip" style="top:18px;right:0;min-width:180px;max-width:220px;font-size:0.6rem;">${ind.desc}</div>
                 <div class="indicator-label">${ind.label}</div>
