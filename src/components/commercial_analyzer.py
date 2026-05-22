@@ -505,36 +505,63 @@ def _count_as_response(text: str, keyword: str) -> int:
 
 def _count_affirmative_si(text: str) -> int:
     """
-    Count "si" only when it's a genuine affirmative response, NOT conditional.
+    Count "si" only when it's a genuine affirmative response from the client,
+    NOT conditional/conjunction.
 
     Affirmative "si" patterns:
-    - At start of sentence: "Si, claro" / "Si." / "Si!"
-    - After punctuation: "? Si," / ". Si,"
-    - Standalone with comma/period: "si," / "si."
+    - Standalone: "Si." / "Si!" / "Si," / "Si, claro"
+    - At start of sentence followed by comma or period: "Si, ..."
+    - Short response: "Si" alone or "Si si" (repeated)
 
     NOT affirmative (conditional/conjunction):
     - "si tenes" / "si bien" / "si es que" / "si no" / "si hay"
-    - "es posible que si los..." (mid-sentence filler)
+    - "si a Sebastian..." (conditional clause)
+    - "si vos..." / "si usted..." / "si el..." / "si la..."
+    - Any "si" followed by a verb or subject (indicates condition)
     """
-    # Pattern: "si" that is followed by comma, period, exclamation, or end of string
-    # OR "si" at the very start of text followed by comma/space+affirmative
-    affirmative_patterns = [
-        # "Si," or "Si." or "Si!" at sentence start (after . ! ? or start of text)
-        r'(?:^|[.!?\n]\s*)si(?:\s*[,.]|\s*$)',
-        # "Si, " followed by anything (affirmative with comma)
-        r'(?:^|[.!?\n]\s*)si,\s',
-        # Standalone "si" as a complete sentence/response
-        r'(?:^|[.!?\n]\s*)si[.!]',
-    ]
-
-    count = 0
     normalized = text.lower()
     # Remove accents for matching
     nfkd = unicodedata.normalize("NFKD", normalized)
     normalized = "".join(c for c in nfkd if not unicodedata.combining(c))
 
-    for pattern in affirmative_patterns:
-        count += len(re.findall(pattern, normalized, re.MULTILINE))
+    # Conditional words that follow "si" and indicate it's NOT affirmative
+    conditional_followers = (
+        'a ', 'al ', 'el ', 'la ', 'lo ', 'los ', 'las ', 'un ', 'una ',
+        'es ', 'no ', 'hay ', 'se ', 'te ', 'me ', 'le ', 'nos ',
+        'vos ', 'usted ', 'ustedes ', 'yo ', 'tu ', 'el ',
+        'bien ', 'mal ', 'tenes ', 'tiene ', 'tengo ', 'queres ',
+        'puede ', 'puedo ', 'podes ', 'quiere ', 'fuera ', 'fuese ',
+        'hubiera ', 'hubiese ', 'quisiera ',
+    )
+
+    # Find all occurrences of "si" at word boundaries
+    count = 0
+    for match in re.finditer(r'(?:^|[.!?\n]\s*)si\b', normalized, re.MULTILINE):
+        # Get what follows "si"
+        end_pos = match.end()
+        after = normalized[end_pos:end_pos+15].lstrip()
+
+        # If followed by comma, period, exclamation, question, or end → affirmative
+        if not after or after[0] in ',.!?\n':
+            count += 1
+            continue
+
+        # If followed by another "si" (repetition: "si si") → affirmative
+        if after.startswith('si') and (len(after) < 3 or after[2] in ' ,.!?\n'):
+            count += 1
+            continue
+
+        # If followed by a conditional word → NOT affirmative, skip
+        is_conditional = False
+        for cw in conditional_followers:
+            if after.startswith(cw):
+                is_conditional = True
+                break
+
+        if not is_conditional:
+            # Check if it's a short phrase (affirmative context)
+            # e.g. "si claro", "si dale", "si perfecto"
+            count += 1
 
     return count
 
@@ -621,11 +648,11 @@ class CommercialAnalyzer:
             response_only = _RESPONSE_ONLY_KEYWORDS.get(group, set())
             for kw in keywords:
                 # Special handling for "si" in respuestas_afirmativas:
-                # Only count when it's a genuine affirmative response
+                # Only count when it's a genuine affirmative response FROM THE CLIENT
                 if group == "respuestas_afirmativas" and kw == "si":
-                    count = _count_affirmative_si(text)
+                    count = _count_affirmative_si(cliente_text)
                 elif kw in response_only:
-                    count = _count_as_response(text, kw)
+                    count = _count_as_response(cliente_text if group == "respuestas_afirmativas" else text, kw)
                 else:
                     count = _count_keyword(normalized, kw)
                 if count > 0:
