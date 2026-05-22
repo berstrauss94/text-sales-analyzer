@@ -2720,13 +2720,13 @@ function renderCommercial(c) {
     const fillClass = pct > 70 ? 'prob-fill-hot' : pct > 40 ? 'prob-fill-warm' : 'prob-fill-cold';
 
     const indicators = [
-        { key: 'palabras_positivas',    label: 'Palabras Positivas',     value: c.palabras_positivas,    cls: c.palabras_positivas > 0 ? 'positive' : '', color: '#5bf5a3' },
-        { key: 'respuestas_afirmativas',label: 'Respuestas Afirmativas', value: c.respuestas_afirmativas, cls: c.respuestas_afirmativas > 0 ? 'positive' : '', color: '#7b9cff' },
-        { key: 'indicios_cierre',       label: 'Indicios de Cierre',     value: c.indicios_cierre,       cls: c.indicios_cierre > 0 ? 'positive' : '', color: '#f5d75b' },
-        { key: 'escasez_comercial',     label: 'Escasez Comercial',      value: c.escasez_comercial,     cls: '', color: '#f5a35b' },
-        { key: 'pedidos_referidos',     label: 'Pedidos de Referidos',   value: c.pedidos_referidos,     cls: '', color: '#b38bff' },
-        { key: 'objeciones',            label: 'Objeciones',             value: c.objeciones,            cls: c.objeciones > 2 ? 'highlight' : '', color: '#f55b5b' },
-        { key: 'indicios_prospeccion',  label: 'Prospeccion',            value: c.indicios_prospeccion,  cls: '', color: '#5bd4f5' },
+        { key: 'palabras_positivas',    label: 'Palabras Positivas',     value: c.palabras_positivas,    cls: c.palabras_positivas > 0 ? 'positive' : '', color: '#5bf5a3', desc: 'Mide expresiones de entusiasmo, aprobacion y satisfaccion del cliente. Un numero alto indica que el prospecto esta receptivo y con buena predisposicion hacia la propuesta.' },
+        { key: 'respuestas_afirmativas',label: 'Respuestas Afirmativas', value: c.respuestas_afirmativas, cls: c.respuestas_afirmativas > 0 ? 'positive' : '', color: '#7b9cff', desc: 'Cuenta confirmaciones directas, expresiones de acuerdo y disposicion a avanzar. Indica el nivel de aceptacion del cliente ante lo que se le propone.' },
+        { key: 'indicios_cierre',       label: 'Indicios de Cierre',     value: c.indicios_cierre,       cls: c.indicios_cierre > 0 ? 'positive' : '', color: '#f5d75b', desc: 'Detecta senales de que el cliente quiere concretar: reservar, firmar, avanzar. Es el indicador mas fuerte de que la venta esta proxima a cerrarse.' },
+        { key: 'escasez_comercial',     label: 'Escasez Comercial',      value: c.escasez_comercial,     cls: '', color: '#f5a35b', desc: 'Identifica menciones de disponibilidad limitada, urgencia temporal y exclusividad. Refleja el uso de tecnicas de escasez para motivar la decision de compra.' },
+        { key: 'pedidos_referidos',     label: 'Pedidos de Referidos',   value: c.pedidos_referidos,     cls: '', color: '#b38bff', desc: 'Detecta solicitudes de recomendaciones, menciones de contactos y red de referidos. Indica si se esta trabajando la expansion de la cartera de clientes.' },
+        { key: 'objeciones',            label: 'Objeciones',             value: c.objeciones,            cls: c.objeciones > 2 ? 'highlight' : '', color: '#f55b5b', desc: 'Cuenta objeciones de precio, indecision y postergacion del cliente. Un numero alto indica resistencia que debe ser abordada antes de intentar el cierre.' },
+        { key: 'indicios_prospeccion',  label: 'Prospeccion',            value: c.indicios_prospeccion,  cls: '', color: '#5bd4f5', desc: 'Mide frases de apertura, calificacion del prospecto y exploracion de necesidades. Indica si la conversacion esta en etapa inicial de descubrimiento del cliente.' },
     ];
 
     const indicatorsHtml = indicators.map((ind, idx) => {
@@ -2740,12 +2740,23 @@ function renderCommercial(c) {
         const catDetail = (c.indicadores_detalle_categorias || {})[ind.key] || {};
         const detectedCount = Object.values(catDetail).reduce((sum, arr) => sum + arr.length, 0);
 
-        // Pie chart HTML — clickeable para mostrar frases faltantes
+        // Pie chart HTML — clickeable para mostrar frases faltantes, hover/long-press para tooltip de palabras detectadas
         let pieHtml = '';
         if (totalFrases > 0) {
             const piePct = Math.round((detectedCount / totalFrases) * 100);
             const deg = Math.round((piePct / 100) * 360);
-            pieHtml = '<div class="pie-chart-click" data-missing="' + missingPanelId + '" style="position:relative;width:40px;height:40px;border-radius:50%;background:conic-gradient(' + ind.color + ' 0deg ' + deg + 'deg, #2a2a2a ' + deg + 'deg 360deg);display:flex;align-items:center;justify-content:center;margin:4px auto;cursor:pointer;" title="Click para ver frases faltantes"><div style="width:26px;height:26px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;"><span style="font-size:0.55rem;color:#fff;font-weight:600;">' + piePct + '%</span></div></div>';
+            // Build tooltip content: detected phrases grouped by category
+            let tooltipContent = '';
+            if (Object.keys(catDetail).length > 0) {
+                tooltipContent = Object.entries(catDetail).map(([cat, phrases]) =>
+                    '<div style="margin-bottom:4px;"><div style="font-size:0.6rem;color:' + ind.color + ';font-weight:600;margin-bottom:2px;">' + cat.replace(/_/g, ' ') + ' (' + phrases.length + ')</div><div style="display:flex;flex-wrap:wrap;gap:2px;">' + phrases.map(p => '<span style="background:rgba(255,255,255,0.08);border:1px solid ' + ind.color + '44;color:#fff;padding:1px 5px;border-radius:6px;font-size:0.55rem;">' + p + '</span>').join('') + '</div></div>'
+                ).join('');
+            } else {
+                tooltipContent = '<div style="font-size:0.6rem;color:#888;">Sin palabras detectadas</div>';
+            }
+            const tooltipId = 'pie-tooltip-' + idx;
+            pieHtml = '<div class="pie-chart-click" data-missing="' + missingPanelId + '" data-tooltip="' + tooltipId + '" style="position:relative;width:40px;height:40px;border-radius:50%;background:conic-gradient(' + ind.color + ' 0deg ' + deg + 'deg, #2a2a2a ' + deg + 'deg 360deg);display:flex;align-items:center;justify-content:center;margin:4px auto;cursor:pointer;" title=""><div style="width:26px;height:26px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;"><span style="font-size:0.55rem;color:#fff;font-weight:600;">' + piePct + '%</span></div></div>';
+            pieHtml += '<div id="' + tooltipId + '" class="pie-tooltip" style="display:none;position:absolute;z-index:1000;left:50%;transform:translateX(-50%);bottom:calc(100% + 8px);min-width:180px;max-width:260px;max-height:220px;overflow-y:auto;padding:8px 10px;background:#12151f;border:1px solid ' + ind.color + '55;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.6);pointer-events:none;"><div style="font-size:0.62rem;color:#fff;font-weight:700;margin-bottom:4px;">' + ind.label + ' — ' + piePct + '% (' + detectedCount + '/' + totalFrases + ')</div>' + tooltipContent + '</div>';
         }
 
         // Category detail panel — chips clickeables que resaltan en el texto
@@ -2789,6 +2800,8 @@ function renderCommercial(c) {
             <div class="indicator-item has-detail"
                  style="border-top: 2px solid ${ind.color}; position:relative;"
                  onclick="toggleDetail('${detailId}', this); highlightInText('${ind.key}');">
+                <span class="card-info-icon" style="position:absolute;top:2px;right:2px;font-size:0.55rem;width:14px;height:14px;line-height:14px;" onclick="event.stopPropagation()">!</span>
+                <div class="card-info-tooltip" style="top:18px;right:0;min-width:180px;max-width:220px;font-size:0.6rem;">${ind.desc}</div>
                 <div class="indicator-label">${ind.label}</div>
                 <div class="indicator-value ${ind.cls}">${ind.value}</div>
                 ${pieHtml}
@@ -3337,12 +3350,23 @@ async function loadAdminStats() {
         // Store word_detail globally for click interaction
         window._adminWordDetail = data.word_detail || {};
 
+        // Store segment angles for hover detection
+        window._pieSegments = [];
+        let segStart = 0;
+        indicators.forEach((ind) => {
+            const degSpan = (totals[ind.key] / total) * 360;
+            const pct = Math.round((totals[ind.key] / total) * 100);
+            window._pieSegments.push({ key: ind.key, label: ind.label, color: ind.color, startDeg: segStart, endDeg: segStart + degSpan, pct: pct, count: totals[ind.key] });
+            segStart += degSpan;
+        });
+
         const pieChart = `
-            <div style="position:relative;width:200px;height:200px;border-radius:50%;background:conic-gradient(${gradientParts.join(',')});box-shadow:0 6px 16px rgba(0,0,0,0.4);margin:0 auto;">
+            <div id="statsPieChart" style="position:relative;width:200px;height:200px;border-radius:50%;background:conic-gradient(${gradientParts.join(',')});box-shadow:0 6px 16px rgba(0,0,0,0.4);margin:0 auto;cursor:pointer;">
                 ${pctLabels}
-                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80px;height:80px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;">
+                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80px;height:80px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;pointer-events:none;">
                     <span style="font-size:0.7rem;color:#aaa;">${data.entry_count} textos</span>
                 </div>
+                <div id="pieHoverTooltip" style="display:none;position:absolute;z-index:1000;min-width:220px;max-width:320px;max-height:280px;overflow-y:auto;padding:12px 14px;background:#0f1219;border:1px solid #333;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.8);pointer-events:none;left:50%;transform:translateX(-50%);bottom:calc(100% + 12px);"></div>
             </div>
         `;
 
@@ -3385,6 +3409,101 @@ async function loadAdminStats() {
                 detailEl.style.display = 'block';
             });
         });
+
+        // Hover/touch on pie chart segments — show tooltip with word detail
+        const pieEl = document.getElementById('statsPieChart');
+        const tooltipEl = document.getElementById('pieHoverTooltip');
+        if (pieEl && tooltipEl) {
+            function getSegmentAtAngle(angleDeg) {
+                if (!window._pieSegments) return null;
+                for (const seg of window._pieSegments) {
+                    if (angleDeg >= seg.startDeg && angleDeg < seg.endDeg) return seg;
+                }
+                return null;
+            }
+
+            function getAngleFromEvent(e, rect) {
+                const cx = rect.left + rect.width / 2;
+                const cy = rect.top + rect.height / 2;
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                const dx = clientX - cx;
+                const dy = clientY - cy;
+                // Distance from center — ignore if inside donut hole
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < rect.width * 0.2) return -1; // inside hole
+                let angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+                if (angle < 0) angle += 360;
+                return angle;
+            }
+
+            function showPieTooltip(seg) {
+                if (!seg) { tooltipEl.style.display = 'none'; return; }
+                const detail = window._adminWordDetail[seg.key] || {};
+                const entries = Object.entries(detail).sort((a,b) => b[1] - a[1]);
+                const segTotal = entries.reduce((s, e) => s + e[1], 0) || 1;
+                let html = '<div style="font-size:0.75rem;color:' + seg.color + ';font-weight:700;margin-bottom:6px;border-bottom:1px solid ' + seg.color + '33;padding-bottom:4px;">' + seg.pct + '% ' + seg.label + '</div>';
+                if (entries.length > 0) {
+                    html += '<div style="display:flex;flex-direction:column;gap:3px;">';
+                    entries.slice(0, 15).forEach(function(e) {
+                        const wordPct = Math.round((e[1] / segTotal) * 100);
+                        const barWidth = Math.max(wordPct, 3);
+                        html += '<div style="display:flex;align-items:center;gap:6px;"><div style="width:30px;text-align:right;font-size:0.62rem;color:' + seg.color + ';font-weight:600;">' + wordPct + '%</div><div style="flex:1;background:#1a1d27;border-radius:4px;height:14px;position:relative;overflow:hidden;"><div style="position:absolute;left:0;top:0;height:100%;width:' + barWidth + '%;background:' + seg.color + '33;border-radius:4px;"></div><span style="position:relative;z-index:1;font-size:0.58rem;color:#ddd;padding-left:4px;line-height:14px;">' + e[0] + '</span></div><div style="font-size:0.55rem;color:#666;min-width:20px;">' + e[1] + 'x</div></div>';
+                    });
+                    if (entries.length > 15) {
+                        html += '<div style="font-size:0.55rem;color:#555;text-align:center;margin-top:2px;">... y ' + (entries.length - 15) + ' mas</div>';
+                    }
+                    html += '</div>';
+                } else {
+                    html += '<div style="font-size:0.6rem;color:#666;">Sin detalle de palabras disponible</div>';
+                }
+                tooltipEl.innerHTML = html;
+                tooltipEl.style.display = 'block';
+                tooltipEl.style.borderColor = seg.color + '66';
+            }
+
+            let lastSegKey = null;
+            pieEl.addEventListener('mousemove', function(e) {
+                const rect = pieEl.getBoundingClientRect();
+                const angle = getAngleFromEvent(e, rect);
+                if (angle < 0) { tooltipEl.style.display = 'none'; lastSegKey = null; return; }
+                const seg = getSegmentAtAngle(angle);
+                if (seg && seg.key !== lastSegKey) {
+                    lastSegKey = seg.key;
+                    showPieTooltip(seg);
+                } else if (!seg) {
+                    tooltipEl.style.display = 'none';
+                    lastSegKey = null;
+                }
+            });
+
+            pieEl.addEventListener('mouseleave', function() {
+                tooltipEl.style.display = 'none';
+                lastSegKey = null;
+            });
+
+            // Mobile: long-press to show, release to hide
+            let _pieTouchTimer = null;
+            pieEl.addEventListener('touchstart', function(e) {
+                const rect = pieEl.getBoundingClientRect();
+                const angle = getAngleFromEvent(e, rect);
+                if (angle < 0) return;
+                const seg = getSegmentAtAngle(angle);
+                _pieTouchTimer = setTimeout(function() {
+                    showPieTooltip(seg);
+                }, 350);
+            }, {passive: true});
+
+            pieEl.addEventListener('touchend', function() {
+                if (_pieTouchTimer) { clearTimeout(_pieTouchTimer); _pieTouchTimer = null; }
+                setTimeout(function() { tooltipEl.style.display = 'none'; }, 2500);
+            }, {passive: true});
+
+            pieEl.addEventListener('touchmove', function() {
+                if (_pieTouchTimer) { clearTimeout(_pieTouchTimer); _pieTouchTimer = null; }
+                tooltipEl.style.display = 'none';
+            }, {passive: true});
+        }
     } catch(e) {
         console.error('Stats error:', e);
         container.innerHTML = '<div style="color:#f55b5b;font-size:0.8rem;">Error cargando estadisticas: ' + e.message + '</div>';
@@ -3822,6 +3941,61 @@ document.addEventListener('click', function(e) {
         }
     }
 });
+
+// Hover tooltip for pie charts (desktop: mouseenter/mouseleave)
+document.addEventListener('mouseenter', function(e) {
+    const pie = e.target.closest('.pie-chart-click');
+    if (pie) {
+        const tooltipId = pie.getAttribute('data-tooltip');
+        if (tooltipId) {
+            const tooltip = document.getElementById(tooltipId);
+            if (tooltip) tooltip.style.display = 'block';
+        }
+    }
+}, true);
+
+document.addEventListener('mouseleave', function(e) {
+    const pie = e.target.closest('.pie-chart-click');
+    if (pie) {
+        const tooltipId = pie.getAttribute('data-tooltip');
+        if (tooltipId) {
+            const tooltip = document.getElementById(tooltipId);
+            if (tooltip) tooltip.style.display = 'none';
+        }
+    }
+}, true);
+
+// Long-press tooltip for pie charts (mobile: touchstart/touchend)
+let _pieTooltipTimer = null;
+document.addEventListener('touchstart', function(e) {
+    const pie = e.target.closest('.pie-chart-click');
+    if (pie) {
+        const tooltipId = pie.getAttribute('data-tooltip');
+        if (tooltipId) {
+            _pieTooltipTimer = setTimeout(function() {
+                const tooltip = document.getElementById(tooltipId);
+                if (tooltip) {
+                    tooltip.style.display = 'block';
+                    tooltip.style.pointerEvents = 'auto';
+                }
+            }, 400);
+        }
+    }
+}, {passive: true});
+
+document.addEventListener('touchend', function(e) {
+    if (_pieTooltipTimer) {
+        clearTimeout(_pieTooltipTimer);
+        _pieTooltipTimer = null;
+    }
+    // Hide all pie tooltips after a short delay
+    setTimeout(function() {
+        document.querySelectorAll('.pie-tooltip').forEach(function(t) {
+            t.style.display = 'none';
+            t.style.pointerEvents = 'none';
+        });
+    }, 2000);
+}, {passive: true});
 
 // Allow Ctrl+Enter to submit, and auto-analyze after 2s of inactivity
 document.addEventListener('DOMContentLoaded', () => {
