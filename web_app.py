@@ -2617,8 +2617,19 @@ function renderResults(data, inputText) {
 
     const iDetail = intentDetail[data.intent] || intentDetail['UNKNOWN'];
 
-    const entryTitle = (document.getElementById('entryNameInput') || {}).value || window._currentEntryName || '';
-    const displayTitle = entryTitle.trim() || preview;
+    // Get the title: from input field (admin), from selected dropdown option, or from global var
+    const entryNameInputEl = document.getElementById('entryNameInput');
+    const selectTextEl = document.getElementById('selectText');
+    let entryTitle = '';
+    if (entryNameInputEl && entryNameInputEl.value.trim()) {
+        entryTitle = entryNameInputEl.value.trim();
+    } else if (window._currentEntryName) {
+        entryTitle = window._currentEntryName;
+    } else if (selectTextEl && selectTextEl.value) {
+        const selOpt = selectTextEl.options[selectTextEl.selectedIndex];
+        if (selOpt) entryTitle = selOpt.getAttribute('data-fullname') || selOpt.textContent || '';
+    }
+    const displayTitle = entryTitle || preview;
 
     el.innerHTML = `
         <div class="input-preview">"${displayTitle}"</div>
@@ -4911,7 +4922,8 @@ def saved_text(entry_id):
                 break
 
     if entry:
-        return jsonify({"text": entry.get("text_full", entry.get("text", "")), "entry_name": entry.get("entry_name", "")})
+        name = entry.get("entry_name", "") or entry.get("audio_filename", "")
+        return jsonify({"text": entry.get("text_full", entry.get("text", "")), "entry_name": name})
 
     return jsonify({"text": ""}), 404
 
