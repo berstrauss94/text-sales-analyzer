@@ -2616,8 +2616,11 @@ function renderResults(data, inputText) {
 
     const iDetail = intentDetail[data.intent] || intentDetail['UNKNOWN'];
 
+    const entryTitle = (document.getElementById('entryNameInput') || {}).value || '';
+    const displayTitle = entryTitle.trim() || preview;
+
     el.innerHTML = `
-        <div class="input-preview">"${preview}"</div>
+        <div class="input-preview">"${displayTitle}"</div>
         <div class="result-grid">
             <div class="card">
                 <div class="card-title card-title-collapsible" onclick="toggleCardContent('intencion-content')">
