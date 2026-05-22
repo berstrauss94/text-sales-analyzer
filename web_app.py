@@ -2953,42 +2953,12 @@ document.addEventListener('click', function(e) {
     if (entries.length === 0) {
         detailEl.innerHTML = '<div style="color:#555;font-size:0.7rem;">Sin detalle.</div>';
     } else {
-        var catTotal = entries.reduce(function(s, e){return s + e[1];}, 0);
         detailEl.innerHTML = entries.map(function(e) {
             return '<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #1a1d27;font-size:0.65rem;"><span style="color:#ccc;">' + e[0] + '</span><span style="color:#888;">' + e[1] + 'x</span></div>';
         }).join('');
     }
     detailEl.style.display = 'block';
 });
-
-// Hover on text pie chart — delegated events (safe, no IIFE)
-document.addEventListener('mousemove', function(e) {
-    var pie = e.target.closest('#textPieChart');
-    if (!pie) return;
-    var tooltip = document.getElementById('textPieTooltip');
-    if (!tooltip || !window._textPieSegments) return;
-    var rect = pie.getBoundingClientRect();
-    var cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
-    var dx = e.clientX - cx, dy = e.clientY - cy;
-    if (Math.sqrt(dx*dx + dy*dy) < rect.width * 0.2) { tooltip.style.display = 'none'; return; }
-    var angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
-    if (angle < 0) angle += 360;
-    var segs = window._textPieSegments, total = segs.reduce(function(s,g){return s+g.count;},0)||1;
-    var cur = 0, seg = null;
-    for (var i=0;i<segs.length;i++) { var span=(segs[i].count/total)*360; if(angle>=cur&&angle<cur+span){seg=segs[i];break;} cur+=span; }
-    if (!seg) { tooltip.style.display = 'none'; return; }
-    var detail = (window._textPieWordDetail||{})[seg.key]||{};
-    var entries = Object.entries(detail).sort(function(a,b){return b[1]-a[1];}).slice(0,10);
-    var segTotal = entries.reduce(function(s,e){return s+e[1];},0)||1;
-    var html = '<div style="font-size:0.7rem;color:'+seg.color+';font-weight:700;margin-bottom:4px;">'+seg.pct+'% '+seg.label+'</div>';
-    entries.forEach(function(en){ var ws=((en[1]/segTotal)*seg.pct).toFixed(1); html+='<div style="font-size:0.6rem;color:#ccc;">'+ws+'% '+en[0]+' ('+en[1]+'x)</div>'; });
-    tooltip.innerHTML = html; tooltip.style.display = 'block';
-}, true);
-document.addEventListener('mouseleave', function(e) {
-    if (e.target.id === 'textPieChart' || (e.target.closest && e.target.closest('#textPieChart'))) {
-        var t = document.getElementById('textPieTooltip'); if(t) t.style.display='none';
-    }
-}, true);
 
 function renderTextReport(data) {
     if (!data || data.error) return '';
@@ -3166,7 +3136,7 @@ function copyReport() {
 
     navigator.clipboard.writeText(lines.join(String.fromCharCode(10))).then(function() {
         var btn = document.querySelector('[onclick="copyReport()"]');
-        if (btn) { btn.textContent = '\\u2713 Copiado'; setTimeout(function() { btn.textContent = '\\ud83d\\udccb Copiar'; }, 2000); }
+        if (btn) { btn.textContent = 'Copiado!'; setTimeout(function() { btn.textContent = 'Copiar'; }, 2000); }
     });
 }
 
