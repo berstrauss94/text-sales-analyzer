@@ -5173,6 +5173,40 @@ def analyze():
     })
 
 
+@app.route("/debug-db")
+def debug_db():
+    """Diagnostic endpoint to check DB connectivity."""
+    if not session.get("username"):
+        return jsonify({"error": "not logged in"}), 401
+    import os as _os
+    from src.users import history_manager as _hm
+    db_url = _os.environ.get("DATABASE_URL", "")
+    has_url = bool(db_url)
+    pg_status = "unknown"
+    entry_count = 0
+    error_msg = ""
+    try:
+        _hm._use_pg = None  # Force re-check
+        _hm._pg_conn = None
+        from src.users.history_manager import _is_pg_available, get_flat_entries
+        pg_avail = _is_pg_available()
+        pg_status = "available" if pg_avail else "unavailable"
+        if pg_avail:
+            entries = get_flat_entries(session["username"], limit=5)
+            entry_count = len(entries)
+    except Exception as exc:
+        pg_status = "error"
+        error_msg = str(exc)
+    return jsonify({
+        "has_database_url": has_url,
+        "pg_status": pg_status,
+        "entry_count": entry_count,
+        "error": error_msg,
+        "username": session["username"],
+        "_use_pg_cached": _hm._use_pg,
+    })
+
+
 @app.route("/saved-texts")
 def saved_texts():
     """Return entries filtered by year/month for the saved texts panel."""
