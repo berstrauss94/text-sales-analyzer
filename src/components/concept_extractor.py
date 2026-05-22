@@ -410,38 +410,57 @@ class ConceptExtractor:
                 seen_positions.add(idx)
 
                 # Extract context around the keyword — full sentence boundaries
-                # Find sentence start (look back for . ! ? or newline)
-                # But skip dots that are part of numbers (e.g. 100.000)
+                # Find sentence start (look back for newline or period followed by space)
+                # Spanish punctuation (¿ ¡) should NOT break sentences
                 frag_start = idx
                 while frag_start > 0:
                     prev_char = text[frag_start-1]
-                    if prev_char in '!?\n':
+                    if prev_char == '\n':
                         break
                     if prev_char == '.':
                         # Check if dot is part of a number (e.g. 100.000 or 2.80)
                         if frag_start >= 2 and text[frag_start-2].isdigit() and frag_start < len(text) and text[frag_start].isdigit():
                             pass  # numeric dot, continue
+                        # Check if dot is followed by space+uppercase (real sentence end)
+                        elif frag_start < len(text) and text[frag_start] == ' ':
+                            break
                         else:
                             break
                     frag_start -= 1
-                    if idx - frag_start > 300:
+                    if idx - frag_start > 400:
                         break
 
-                # Find sentence end (look forward for . ! ? or newline)
-                # But skip dots that are part of numbers
+                # Find sentence end (look forward for newline or period/? /! followed by space)
+                # Don't break on ? or ! if they're mid-sentence (e.g. ¿...? within a larger sentence)
                 frag_end = idx + len(kw)
                 while frag_end < len(text):
                     curr_char = text[frag_end]
-                    if curr_char in '!?\n':
+                    if curr_char == '\n':
                         break
                     if curr_char == '.':
-                        # Check if dot is part of a number (e.g. 100.000 or 2.80)
+                        # Check if dot is part of a number
                         if frag_end > 0 and text[frag_end-1].isdigit() and frag_end + 1 < len(text) and text[frag_end+1].isdigit():
                             pass  # numeric dot, continue
                         else:
+                            frag_end += 1  # include the period
                             break
+                    if curr_char in '?!':
+                        # Include the closing ? or ! and check if sentence continues
+                        frag_end += 1
+                        # If followed by space and uppercase or end of text, break
+                        if frag_end >= len(text):
+                            break
+                        if text[frag_end] == ' ' and frag_end + 1 < len(text) and text[frag_end+1].isupper():
+                            break
+                        # Otherwise continue (e.g. "¿usted estaría? Yo estaría" — break at uppercase)
+                        if text[frag_end] == ' ':
+                            # Peek ahead: if next sentence starts, break
+                            remaining = text[frag_end+1:frag_end+3]
+                            if remaining and remaining[0].isupper():
+                                break
+                        continue
                     frag_end += 1
-                    if frag_end - idx > 350:
+                    if frag_end - idx > 450:
                         break
 
                 fragment = text[frag_start:frag_end].strip()
