@@ -3,7 +3,7 @@ Fecha de registro : 2026-05-21 15:13:32 UTC
 
 --- DATOS DE ACCESO ---
 Usuario           : FedericoCeballos
-Contrasena (hash) : bbf6f597d9705715c29336792014b2d9dfa4924a9f4015d142c877e3273340d5
+Contrasena (hash) : e483e0af6fc30aace7f19df55c74ad50b087987852a3f1fc0e19013eb8baa243
 
 --- DATOS PERSONALES ---
 Nombre            : Federico
