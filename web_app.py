@@ -3790,7 +3790,15 @@ function highlightEntityInText(rawValue) {
 
     // Scroll to the textarea area
     const wrapper = document.getElementById('textareaWrapper');
-    wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Auto-scroll inside the overlay to the first highlighted span
+    setTimeout(function() {
+        const firstHl = overlay.querySelector('.hl-indicios_cierre');
+        if (firstHl) {
+            firstHl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, 300);
 }
 
 function highlightInText(indicatorKey) {
