@@ -2891,43 +2891,175 @@ function renderTextProgressChart(c) {
         { key: 'objeciones', label: 'Objeciones', color: '#f55b5b' },
         { key: 'indicios_prospeccion', label: 'Prospeccion', color: '#5bd4f5' },
     ];
-    const total = indicators.reduce((s, ind) => s + (c[ind.key] || 0), 0) || 1;
+    const total = indicators.reduce(function(s, ind) { return s + (c[ind.key] || 0); }, 0) || 1;
 
-    let gradientParts = [];
-    let currentDeg = 0;
-    let pctLabels = '';
-    indicators.forEach(ind => {
-        const val = c[ind.key] || 0;
-        const pct = Math.round((val / total) * 100);
-        const degSpan = (val / total) * 360;
+    var gradientParts = [];
+    var currentDeg = 0;
+    var pctLabels = '';
+    indicators.forEach(function(ind) {
+        var val = c[ind.key] || 0;
+        var pct = Math.round((val / total) * 100);
+        var degSpan = (val / total) * 360;
         gradientParts.push(ind.color + ' ' + currentDeg + 'deg ' + (currentDeg + degSpan) + 'deg');
         if (pct >= 5) {
-            const midDeg = currentDeg + degSpan / 2;
-            const rad = (midDeg - 90) * Math.PI / 180;
-            const x = 50 + 35 * Math.cos(rad);
-            const y = 50 + 35 * Math.sin(rad);
-            pctLabels += '<span style="position:absolute;left:' + x + '%;top:' + y + '%;transform:translate(-50%,-50%);font-size:0.6rem;color:#fff;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,0.9);pointer-events:none;">' + pct + '%</span>';
+            var midDeg = currentDeg + degSpan / 2;
+            var rad = (midDeg - 90) * Math.PI / 180;
+            var x = 50 + 35 * Math.cos(rad);
+            var y = 50 + 35 * Math.sin(rad);
+            pctLabels += '<span style="position:absolute;left:' + x + '%;top:' + y + '%;transform:translate(-50%,-50%);font-size:0.6rem;color:#fff;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,0.9);pointer-events:none;z-index:2;">' + pct + '%</span>';
         }
         currentDeg += degSpan;
     });
 
-    const legend = indicators.map(ind => {
-        const val = c[ind.key] || 0;
-        const pct = Math.round((val / total) * 100);
-        return '<div style="display:flex;align-items:center;gap:5px;font-size:0.65rem;"><div style="width:8px;height:8px;border-radius:2px;background:' + ind.color + ';"></div><span style="color:#aaa;">' + ind.label + ': ' + val + ' (' + pct + '%)</span></div>';
+    // Store segments for hover detection
+    var segmentsJson = JSON.stringify(indicators.map(function(ind) {
+        var val = c[ind.key] || 0;
+        return { key: ind.key, label: ind.label, color: ind.color, count: val, pct: Math.round((val / total) * 100) };
+    }));
+
+    // Store word detail for this text
+    var wordDetailJson = JSON.stringify(c.detalle || {});
+
+    var legend = indicators.map(function(ind) {
+        var val = c[ind.key] || 0;
+        var pct = Math.round((val / total) * 100);
+        return '<div class="text-pie-legend-item" data-cat="' + ind.key + '" style="display:flex;align-items:center;gap:5px;font-size:0.65rem;cursor:pointer;padding:3px 6px;border-radius:4px;transition:background 0.15s;" onmouseenter="this.style.background=\'#1a1d27\'" onmouseleave="this.style.background=\'\'">' +
+            '<div style="width:8px;height:8px;border-radius:2px;background:' + ind.color + ';"></div>' +
+            '<span style="color:#aaa;">' + ind.label + ': ' + val + ' (' + pct + '%)</span></div>';
     }).join('');
 
     return '<div style="margin-top:16px;padding:14px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">' +
         '<div style="font-size:0.75rem;color:#888;font-weight:600;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em;">Distribucion de Indicadores — Este Texto</div>' +
         '<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center;">' +
-            '<div style="position:relative;width:140px;height:140px;border-radius:50%;background:conic-gradient(' + gradientParts.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);">' +
+            '<div id="textPieChart" style="position:relative;width:160px;height:160px;border-radius:50%;background:conic-gradient(' + gradientParts.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);cursor:pointer;">' +
                 pctLabels +
-                '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60px;height:60px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;"><span style="font-size:0.6rem;color:#aaa;">' + total + ' ind.</span></div>' +
+                '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:65px;height:65px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;pointer-events:none;"><span style="font-size:0.6rem;color:#aaa;">' + total + ' ind.</span></div>' +
+                '<div id="textPieTooltip" style="display:none;position:absolute;z-index:1000;min-width:200px;max-width:300px;max-height:260px;overflow-y:auto;padding:10px 12px;background:#0f1219;border:1px solid #333;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.8);pointer-events:none;left:50%;transform:translateX(-50%);bottom:calc(100% + 10px);"></div>' +
             '</div>' +
             '<div style="display:flex;flex-direction:column;gap:4px;">' + legend + '</div>' +
         '</div>' +
+        '<div id="textPieWordDetail" style="margin-top:10px;text-align:left;display:none;padding:8px;background:#0d1017;border:1px solid #1e2130;border-radius:6px;max-height:150px;overflow-y:auto;"></div>' +
+        '<script>window._textPieSegments=' + segmentsJson + ';window._textPieWordDetail=' + wordDetailJson + ';</script>' +
     '</div>';
 }
+
+// Initialize text pie chart interactivity after render
+document.addEventListener('click', function(e) {
+    // Legend item click — show word detail
+    var legendItem = e.target.closest('.text-pie-legend-item');
+    if (legendItem) {
+        var cat = legendItem.getAttribute('data-cat');
+        var detail = window._textPieWordDetail ? window._textPieWordDetail[cat] : {};
+        var detailEl = document.getElementById('textPieWordDetail');
+        if (!detailEl) return;
+        var entries = Object.entries(detail || {}).sort(function(a,b){return b[1]-a[1];}).slice(0, 15);
+        if (entries.length === 0) {
+            detailEl.innerHTML = '<div style="color:#555;font-size:0.7rem;">Sin detalle de palabras para esta categoria.</div>';
+        } else {
+            var catTotal = entries.reduce(function(s, e){return s + e[1];}, 0);
+            var seg = (window._textPieSegments || []).find(function(s){return s.key === cat;});
+            var segColor = seg ? seg.color : '#aaa';
+            detailEl.innerHTML = '<div style="font-size:0.68rem;color:' + segColor + ';margin-bottom:4px;font-weight:600;">' + (seg ? seg.label : cat) + ' — Palabras detectadas:</div>' + entries.map(function(e) {
+                var wpct = Math.round((e[1] / catTotal) * 100);
+                return '<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #1a1d27;font-size:0.65rem;"><span style="color:#ccc;">' + e[0] + '</span><span style="color:#888;">' + e[1] + 'x (' + wpct + '%)</span></div>';
+            }).join('');
+        }
+        detailEl.style.display = 'block';
+    }
+});
+
+// Hover on text pie chart — show tooltip with word breakdown per segment
+(function() {
+    function initTextPieHover() {
+        var pieEl = document.getElementById('textPieChart');
+        var tooltipEl = document.getElementById('textPieTooltip');
+        if (!pieEl || !tooltipEl) return;
+
+        function getAngle(e, rect) {
+            var cx = rect.left + rect.width / 2;
+            var cy = rect.top + rect.height / 2;
+            var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            var dx = clientX - cx;
+            var dy = clientY - cy;
+            var dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < rect.width * 0.2) return -1;
+            var angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+            if (angle < 0) angle += 360;
+            return angle;
+        }
+
+        function getSegment(angleDeg) {
+            var segs = window._textPieSegments || [];
+            var total = segs.reduce(function(s, sg){return s + sg.count;}, 0) || 1;
+            var currentDeg = 0;
+            for (var i = 0; i < segs.length; i++) {
+                var degSpan = (segs[i].count / total) * 360;
+                if (angleDeg >= currentDeg && angleDeg < currentDeg + degSpan) return segs[i];
+                currentDeg += degSpan;
+            }
+            return null;
+        }
+
+        function showTooltip(seg) {
+            if (!seg) { tooltipEl.style.display = 'none'; return; }
+            var detail = window._textPieWordDetail ? window._textPieWordDetail[seg.key] : {};
+            var entries = Object.entries(detail || {}).sort(function(a,b){return b[1]-a[1];});
+            var segTotal = entries.reduce(function(s, e){return s + e[1];}, 0) || 1;
+            var html = '<div style="font-size:0.72rem;color:' + seg.color + ';font-weight:700;margin-bottom:5px;border-bottom:1px solid ' + seg.color + '33;padding-bottom:4px;">' + seg.pct + '% ' + seg.label + '</div>';
+            if (entries.length > 0) {
+                html += '<div style="display:flex;flex-direction:column;gap:3px;">';
+                entries.slice(0, 12).forEach(function(e) {
+                    var wordShare = (e[1] / segTotal) * seg.pct;
+                    var displayPct = wordShare < 0.1 ? '<0.1' : wordShare.toFixed(1);
+                    var barWidth = Math.max(Math.round((e[1] / segTotal) * 100), 3);
+                    html += '<div style="display:flex;align-items:center;gap:6px;"><div style="width:36px;text-align:right;font-size:0.6rem;color:' + seg.color + ';font-weight:600;">' + displayPct + '%</div><div style="flex:1;background:#1a1d27;border-radius:4px;height:14px;position:relative;overflow:hidden;"><div style="position:absolute;left:0;top:0;height:100%;width:' + Math.min(barWidth, 100) + '%;background:' + seg.color + '33;border-radius:4px;"></div><span style="position:relative;z-index:1;font-size:0.56rem;color:#ddd;padding-left:4px;line-height:14px;">' + e[0] + '</span></div><div style="font-size:0.53rem;color:#666;min-width:18px;">' + e[1] + 'x</div></div>';
+                });
+                html += '</div>';
+            } else {
+                html += '<div style="font-size:0.6rem;color:#666;">Sin detalle</div>';
+            }
+            tooltipEl.innerHTML = html;
+            tooltipEl.style.display = 'block';
+            tooltipEl.style.borderColor = seg.color + '66';
+        }
+
+        var lastKey = null;
+        pieEl.addEventListener('mousemove', function(e) {
+            var rect = pieEl.getBoundingClientRect();
+            var angle = getAngle(e, rect);
+            if (angle < 0) { tooltipEl.style.display = 'none'; lastKey = null; return; }
+            var seg = getSegment(angle);
+            if (seg && seg.key !== lastKey) { lastKey = seg.key; showTooltip(seg); }
+            else if (!seg) { tooltipEl.style.display = 'none'; lastKey = null; }
+        });
+        pieEl.addEventListener('mouseleave', function() { tooltipEl.style.display = 'none'; lastKey = null; });
+
+        var touchTimer = null;
+        pieEl.addEventListener('touchstart', function(e) {
+            var rect = pieEl.getBoundingClientRect();
+            var angle = getAngle(e, rect);
+            if (angle < 0) return;
+            var seg = getSegment(angle);
+            touchTimer = setTimeout(function() { showTooltip(seg); }, 350);
+        }, {passive: true});
+        pieEl.addEventListener('touchend', function() {
+            if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
+            setTimeout(function() { tooltipEl.style.display = 'none'; }, 2500);
+        }, {passive: true});
+        pieEl.addEventListener('touchmove', function() {
+            if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
+            tooltipEl.style.display = 'none';
+        }, {passive: true});
+    }
+
+    // Re-init after each render
+    var origRender = window.renderTextProgressChart;
+    var observer = new MutationObserver(function() {
+        if (document.getElementById('textPieChart')) { initTextPieHover(); observer.disconnect(); }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+})();
 
 function renderTextReport(data) {
     if (!data || data.error) return '';
