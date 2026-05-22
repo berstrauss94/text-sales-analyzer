@@ -2911,14 +2911,12 @@ function renderTextProgressChart(c) {
         currentDeg += degSpan;
     });
 
-    // Store segments for hover detection
-    var segmentsJson = JSON.stringify(indicators.map(function(ind) {
+    // Store data globally for hover/click interactions
+    window._textPieSegments = indicators.map(function(ind) {
         var val = c[ind.key] || 0;
         return { key: ind.key, label: ind.label, color: ind.color, count: val, pct: Math.round((val / total) * 100) };
-    }));
-
-    // Store word detail for this text
-    var wordDetailJson = JSON.stringify(c.detalle || {});
+    });
+    window._textPieWordDetail = c.detalle || {};
 
     var legend = indicators.map(function(ind) {
         var val = c[ind.key] || 0;
@@ -2939,7 +2937,6 @@ function renderTextProgressChart(c) {
             '<div style="display:flex;flex-direction:column;gap:4px;">' + legend + '</div>' +
         '</div>' +
         '<div id="textPieWordDetail" style="margin-top:10px;text-align:left;display:none;padding:8px;background:#0d1017;border:1px solid #1e2130;border-radius:6px;max-height:150px;overflow-y:auto;"></div>' +
-        '<script>window._textPieSegments=' + segmentsJson + ';window._textPieWordDetail=' + wordDetailJson + ';</script>' +
     '</div>';
 }
 
@@ -3054,9 +3051,11 @@ document.addEventListener('click', function(e) {
     }
 
     // Re-init after each render
-    var origRender = window.renderTextProgressChart;
     var observer = new MutationObserver(function() {
-        if (document.getElementById('textPieChart')) { initTextPieHover(); observer.disconnect(); }
+        if (document.getElementById('textPieChart')) {
+            initTextPieHover();
+            observer.disconnect();
+        }
     });
     observer.observe(document.body, { childList: true, subtree: true });
 })();
