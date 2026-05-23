@@ -4540,6 +4540,23 @@ function renderHistoryTree(history) {
     });
 }
 </script>
+<script>
+// FAILSAFE: Load texts even if main script has errors
+try {
+    if (typeof loadSavedTexts === 'function') {
+        loadSavedTexts();
+    }
+    if (typeof loadAdminStats === 'function' && document.getElementById('selectUser')) {
+        loadAdminStats();
+    }
+} catch(e) {
+    // If loadSavedTexts doesn't exist, the main script failed completely
+    var sel = document.getElementById('selectText');
+    if (sel) sel.innerHTML = '<option value="">ERROR JS - ver consola F12</option>';
+    var cnt = document.getElementById('savedTextsCount');
+    if (cnt) cnt.textContent = '(JS ERROR)';
+}
+</script>
 </body>
 </html>
 """
