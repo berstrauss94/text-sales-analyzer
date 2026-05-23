@@ -2134,6 +2134,44 @@ const SENTIMENT_ES = {
     'NEGATIVE': 'NEGATIVO'
 };
 
+// ML-based descriptions for each field in the report
+const INTENT_DESC = {
+    'OFFER': 'El modelo ML detecta que el texto presenta una propuesta activa: precio, condiciones o producto. Indica que el vendedor esta en modo de presentacion.',
+    'INQUIRY': 'El modelo ML detecta preguntas o solicitudes de informacion. El cliente esta explorando opciones sin compromiso claro aun.',
+    'NEGOTIATION': 'El modelo ML detecta intercambio de condiciones, contrapropuestas o ajustes de precio. Ambas partes estan buscando un acuerdo.',
+    'CLOSING': 'El modelo ML detecta senales de cierre: reserva, firma, confirmacion. La operacion esta en su etapa final.',
+    'DESCRIPTION': 'El modelo ML detecta descripcion de caracteristicas sin negociacion activa. Fase informativa de la conversacion.',
+    'UNKNOWN': 'El modelo ML no pudo clasificar la intencion con suficiente confianza. El texto puede ser ambiguo o mixto.'
+};
+const SENTIMENT_DESC = {
+    'POSITIVE': 'El modelo ML detecta tono emocional positivo: entusiasmo, satisfaccion, acuerdo. El cliente esta receptivo y con buena disposicion.',
+    'NEUTRAL': 'El modelo ML detecta tono neutro o informativo. El cliente evalua fria y racionalmente sin mostrar emocion clara.',
+    'NEGATIVE': 'El modelo ML detecta tono negativo: resistencia, insatisfaccion o rechazo. Requiere atencion inmediata del vendedor.'
+};
+const LEAD_DESC = {
+    'CALIENTE': 'Lead con alta probabilidad de cierre (>70%). El cliente muestra indicios claros de querer avanzar. Prioridad maxima: presentar propuesta final ahora.',
+    'TIBIO': 'Lead con probabilidad media (40-70%). El cliente tiene interes pero aun evalua. Nutrir con informacion y resolver objeciones.',
+    'FRIO': 'Lead con baja probabilidad (<40%). El cliente esta en etapa inicial o tiene resistencias importantes. Seguimiento a largo plazo.'
+};
+const ETAPA_DESC = {
+    'AWARENESS': 'El cliente recien conoce la propuesta. Etapa de descubrimiento: presentar valor, generar interes y calificar necesidades.',
+    'CONSIDERATION': 'El cliente evalua activamente la opcion. Etapa de evaluacion: comparar, resolver dudas y mostrar diferenciadores.',
+    'DECISION': 'El cliente esta listo para decidir. Etapa critica: facilitar el cierre, crear urgencia y eliminar friccion.',
+    'CLOSED': 'La operacion esta cerrada o practicamente cerrada. Etapa de confirmacion: formalizar, solicitar referidos y hacer seguimiento post-venta.'
+};
+const URGENCIA_DESC = {
+    'BAJA': 'Sin senales de urgencia detectadas. El cliente puede esperar. Mantener contacto periodico sin presionar.',
+    'MEDIA': 'Algunas senales de urgencia presentes. El cliente tiene un plazo o motivacion moderada. Aprovechar el momento con propuestas concretas.',
+    'ALTA': 'Urgencia clara detectada. El cliente necesita resolver pronto. Actuar rapidamente con propuesta directa y condiciones claras.',
+    'CRITICA': 'Urgencia maxima detectada. El cliente tiene una necesidad inmediata o un plazo critico. Respuesta inmediata obligatoria.'
+};
+const PROB_CIERRE_DESC = 'Calculada por el modelo ML combinando: indicios de cierre (x5 pts), respuestas afirmativas (x2 pts) y objeciones (-x3 pts). Escala: >70% = CALIENTE, 40-70% = TIBIO, <40% = FRIO.';
+const COMPROMISO_DESC = {
+    'BAJO': 'El cliente no ha mostrado senales de compromiso concreto. Continuar construyendo confianza y presentando valor.',
+    'MEDIO': 'El cliente muestra interes pero sin comprometerse formalmente. Avanzar hacia propuesta concreta.',
+    'ALTO': 'El cliente ha dado senales claras de compromiso: acepto condiciones, pidio avanzar o mostro disposicion a firmar.'
+};
+
 const ENTITY_ES = {
     'price': 'Precio',
     'area_sqm': 'Metraje',
@@ -2935,13 +2973,22 @@ function renderTextReport(data) {
     const intentEs = INTENT_ES[data.intent] || data.intent;
     const sentimentEs = SENTIMENT_ES[data.sentiment] || data.sentiment;
 
-    // Sales concepts summary
+    // Helper: field with (!) tooltip
+    function infoField(label, value, color, desc) {
+        return '<div style="position:relative;padding:6px 8px 6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid ' + color + ';font-size:0.65rem;">' +
+            '<span class="card-info-icon" style="position:absolute;top:4px;right:4px;font-size:0.5rem;width:13px;height:13px;line-height:13px;" onclick="event.stopPropagation()">!</span>' +
+            '<div class="card-info-tooltip" style="top:20px;right:0;min-width:200px;max-width:240px;font-size:0.6rem;z-index:100;">' + desc + '</div>' +
+            '<span style="color:#666;">' + label + ':</span> <strong style="color:#e0e0e0;">' + value + '</strong>' +
+            '</div>';
+    }
+
+    // Sales concepts
     let salesSummary = 'Ninguno detectado';
     if (data.sales_concepts && data.sales_concepts.length > 0) {
         salesSummary = data.sales_concepts.map(sc => translateConcept(sc.concept, SALES_CONCEPTS_ES) + ' (' + Math.round(sc.confidence * 100) + '%)').join(', ');
     }
 
-    // Real estate concepts summary
+    // Real estate concepts
     let reSummary = 'Ninguno detectado';
     if (data.real_estate_concepts && data.real_estate_concepts.length > 0) {
         reSummary = data.real_estate_concepts.map(rc => translateConcept(rc.concept, RE_CONCEPTS_ES) + ' (' + Math.round(rc.confidence * 100) + '%)').join(', ');
@@ -2958,36 +3005,69 @@ function renderTextReport(data) {
         }).join(' | ');
     }
 
-    // Commercial indicators summary
-    const indLabels = { palabras_positivas: 'Positivas', respuestas_afirmativas: 'Afirmativas', indicios_cierre: 'Cierre', escasez_comercial: 'Escasez', pedidos_referidos: 'Referidos', objeciones: 'Objeciones', indicios_prospeccion: 'Prospeccion' };
-    const indSummary = Object.entries(indLabels).map(([k, label]) => label + ': ' + (c[k] || 0)).join(' | ');
+    // Indicators with detail
+    const indColors = { palabras_positivas: '#5bf5a3', respuestas_afirmativas: '#7b9cff', indicios_cierre: '#f5d75b', escasez_comercial: '#f5a35b', pedidos_referidos: '#b38bff', objeciones: '#f55b5b', indicios_prospeccion: '#5bd4f5' };
+    const indNames = { palabras_positivas: 'Positivas', respuestas_afirmativas: 'Afirmativas', indicios_cierre: 'Cierre', escasez_comercial: 'Escasez', pedidos_referidos: 'Referidos', objeciones: 'Objeciones', indicios_prospeccion: 'Prospeccion' };
+    const indDescs = {
+        palabras_positivas: 'Expresiones de entusiasmo, aprobacion y satisfaccion detectadas por ML. Indica receptividad del cliente.',
+        respuestas_afirmativas: 'Confirmaciones directas y acuerdos del cliente detectados por ML. Mide aceptacion de la propuesta.',
+        indicios_cierre: 'Senales de querer concretar (reservar, firmar, avanzar) detectadas por ML. Indicador mas fuerte de cierre proximo.',
+        escasez_comercial: 'Menciones de disponibilidad limitada y urgencia detectadas por ML. Refleja uso de tecnicas de escasez.',
+        pedidos_referidos: 'Solicitudes de recomendaciones y contactos detectadas por ML. Indica trabajo de expansion de cartera.',
+        objeciones: 'Resistencias de precio, indecision y postergacion detectadas por ML. Alto numero requiere atencion antes del cierre.',
+        indicios_prospeccion: 'Frases de apertura y exploracion de necesidades detectadas por ML. Indica etapa inicial de descubrimiento.'
+    };
 
     // Build report
     let report = '<div style="margin-top:16px;padding:16px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
-    report += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-size:0.75rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">📋 Informe del Texto</div><button onclick="copyReport()" style="background:#1a1d27;border:1px solid #2a2d3e;color:#aaa;padding:4px 10px;border-radius:6px;font-size:0.6rem;cursor:pointer;">📋 Copiar</button></div>';
-
-    report += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.65rem;">';
-    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #4a6cf7;"><span style="color:#666;">Intencion:</span> <strong style="color:#e0e0e0;">' + intentEs + '</strong> (' + Math.round((data.intent_confidence || 0) * 100) + '%)</div>';
-    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid ' + (data.sentiment === 'POSITIVE' ? '#5bf5a3' : data.sentiment === 'NEGATIVE' ? '#f55b5b' : '#f5a35b') + ';"><span style="color:#666;">Sentimiento:</span> <strong style="color:#e0e0e0;">' + sentimentEs + '</strong> (' + Math.round((data.sentiment_confidence || 0) * 100) + '%)</div>';
-    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #f5d75b;"><span style="color:#666;">Lead:</span> <strong style="color:#e0e0e0;">' + (c.tipo_lead || '-') + '</strong></div>';
-    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #5bf5a3;"><span style="color:#666;">Prob. Cierre:</span> <strong style="color:#e0e0e0;">' + (c.probabilidad_cierre || 0).toFixed(1) + '%</strong></div>';
-    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #b38bff;"><span style="color:#666;">Etapa:</span> <strong style="color:#e0e0e0;">' + (c.etapa_funnel || '-') + '</strong></div>';
-    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #f5a35b;"><span style="color:#666;">Urgencia:</span> <strong style="color:#e0e0e0;">' + (c.urgencia || '-') + '</strong></div>';
+    report += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+    report += '<div style="font-size:0.75rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">&#128203; Informe del Texto</div>';
+    report += '<button onclick="copyReport()" style="background:#1a1d27;border:1px solid #2a2d3e;color:#aaa;padding:4px 10px;border-radius:6px;font-size:0.6rem;cursor:pointer;">&#128203; Copiar</button>';
     report += '</div>';
 
-    report += '<div style="margin-top:8px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.63rem;"><span style="color:#666;">Indicadores:</span> <span style="color:#ccc;">' + indSummary + '</span></div>';
-    report += '<div style="margin-top:4px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.63rem;"><span style="color:#666;">Conceptos Venta:</span> <span style="color:#ccc;">' + salesSummary + '</span></div>';
-    report += '<div style="margin-top:4px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.63rem;"><span style="color:#666;">Conceptos Inmobiliarios:</span> <span style="color:#ccc;">' + reSummary + '</span></div>';
+    // Grid: 6 main fields with (!) icons
+    report += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">';
+    report += infoField('Intencion', intentEs + ' (' + Math.round((data.intent_confidence || 0) * 100) + '%)', '#4a6cf7', (INTENT_DESC[data.intent] || 'Clasificacion de la intencion principal del texto por ML.'));
+    report += infoField('Sentimiento', sentimentEs + ' (' + Math.round((data.sentiment_confidence || 0) * 100) + '%)', data.sentiment === 'POSITIVE' ? '#5bf5a3' : data.sentiment === 'NEGATIVE' ? '#f55b5b' : '#f5a35b', (SENTIMENT_DESC[data.sentiment] || 'Tono emocional del texto detectado por ML.'));
+    report += infoField('Lead', (c.tipo_lead || '-'), c.tipo_lead === 'CALIENTE' ? '#f55b5b' : c.tipo_lead === 'TIBIO' ? '#f5a35b' : '#5bd4f5', (LEAD_DESC[c.tipo_lead] || 'Clasificacion del prospecto segun probabilidad de cierre.'));
+    report += infoField('Prob. Cierre', (c.probabilidad_cierre || 0).toFixed(1) + '%', '#5bf5a3', PROB_CIERRE_DESC);
+    report += infoField('Etapa Funnel', (c.etapa_funnel || '-'), '#b38bff', (ETAPA_DESC[c.etapa_funnel] || 'Etapa del proceso de venta detectada por ML.'));
+    report += infoField('Urgencia', (c.urgencia || '-'), c.urgencia === 'CRITICA' ? '#f55b5b' : c.urgencia === 'ALTA' ? '#f5a35b' : '#5bd4f5', (URGENCIA_DESC[c.urgencia] || 'Nivel de urgencia detectado en la conversacion.'));
+    report += infoField('Compromiso', (c.nivel_compromiso || '-'), '#7b9cff', (COMPROMISO_DESC[c.nivel_compromiso] || 'Nivel de compromiso del cliente detectado por ML.'));
+    report += infoField('Interes', (c.nivel_interes || '-'), '#f5d75b', 'Nivel de interes general del cliente detectado por ML a partir de la densidad de indicadores positivos en la conversacion.');
+    report += '</div>';
+
+    // Indicators row with (!) per indicator
+    report += '<div style="margin-top:8px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.6rem;">';
+    report += '<div style="color:#666;margin-bottom:4px;font-weight:600;">Indicadores Comerciales (ML):</div>';
+    report += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+    Object.entries(indNames).forEach(function(entry) {
+        var k = entry[0], label = entry[1];
+        var val = c[k] || 0;
+        var color = indColors[k] || '#aaa';
+        var desc = indDescs[k] || '';
+        report += '<div style="position:relative;display:inline-flex;align-items:center;gap:3px;background:#0a0c14;border:1px solid ' + color + '33;border-radius:6px;padding:3px 7px;">' +
+            '<span style="color:' + color + ';font-weight:700;">' + val + '</span>' +
+            '<span style="color:#888;">' + label + '</span>' +
+            '<span class="card-info-icon" style="position:relative;top:0;right:0;font-size:0.45rem;width:11px;height:11px;line-height:11px;margin-left:2px;" onclick="event.stopPropagation()">!</span>' +
+            '<div class="card-info-tooltip" style="top:20px;right:0;min-width:180px;max-width:220px;font-size:0.58rem;z-index:100;">' + desc + '</div>' +
+            '</div>';
+    });
+    report += '</div></div>';
+
+    // Concepts
+    report += '<div style="margin-top:4px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.6rem;"><span style="color:#666;">Conceptos Venta (ML):</span> <span style="color:#ccc;">' + salesSummary + '</span></div>';
+    report += '<div style="margin-top:4px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.6rem;"><span style="color:#666;">Conceptos Inmobiliarios (ML):</span> <span style="color:#ccc;">' + reSummary + '</span></div>';
 
     if (entitiesSummary) {
-        report += '<div style="margin-top:4px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.63rem;"><span style="color:#666;">Datos Extraidos:</span> <span style="color:#ccc;">' + entitiesSummary + '</span></div>';
+        report += '<div style="margin-top:4px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.6rem;"><span style="color:#666;">Datos Extraidos:</span> <span style="color:#ccc;">' + entitiesSummary + '</span></div>';
     }
 
     if (c.recomendacion) {
-        report += '<div style="margin-top:8px;padding:8px;background:#0d1a0d;border:1px solid #1a3a1a;border-radius:6px;font-size:0.65rem;color:#5bf5a3;">💡 ' + c.recomendacion + '</div>';
+        report += '<div style="margin-top:8px;padding:8px;background:#0d1a0d;border:1px solid #1a3a1a;border-radius:6px;font-size:0.65rem;color:#5bf5a3;">&#128161; ' + c.recomendacion + '</div>';
     }
     if (c.accion_siguiente) {
-        report += '<div style="margin-top:4px;padding:8px;background:#0d0d1a;border:1px solid #1a1a3a;border-radius:6px;font-size:0.65rem;color:#7b9cff;">▶️ ' + c.accion_siguiente + '</div>';
+        report += '<div style="margin-top:4px;padding:8px;background:#0d0d1a;border:1px solid #1a1a3a;border-radius:6px;font-size:0.65rem;color:#7b9cff;">&#9654; ' + c.accion_siguiente + '</div>';
     }
 
     report += '</div>';
