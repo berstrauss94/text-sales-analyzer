@@ -2073,6 +2073,15 @@ async function saveEntry() {
         }
         renderResults(data, data.input_text || text);
 
+        // Show save confirmation
+        if (data.saved) {
+            var savedMsg = document.createElement('div');
+            savedMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#0d1a0d;border:1px solid #5bf5a3;color:#5bf5a3;padding:10px 16px;border-radius:8px;font-size:0.75rem;z-index:9999;';
+            savedMsg.textContent = 'Guardado para ' + (data.saved_for || 'usuario');
+            document.body.appendChild(savedMsg);
+            setTimeout(function() { savedMsg.remove(); }, 3000);
+        }
+
         // Scroll to top after saving
         window.scrollTo({ top: 0, behavior: 'smooth' });
         // Clear the title input
@@ -3605,10 +3614,11 @@ async function loadAdminStats() {
 
     // Build URL — _all means aggregate all users
     let url;
+    const currentYear = new Date().getFullYear();
     if (vendor === '_all') {
-        url = `/admin/stats/_all?period=${period}&year=2026`;
+        url = `/admin/stats/_all?period=${period}&year=${currentYear}`;
     } else {
-        url = `/admin/stats/${vendor}?period=${period}&year=2026`;
+        url = `/admin/stats/${vendor}?period=${period}&year=${currentYear}`;
     }
     if (specificMonth) {
         url += `&month=${specificMonth}`;
@@ -5057,12 +5067,12 @@ def analyze():
     _now_ts = __import__('time').time()
     if not hasattr(app, '_last_save_cache'):
         app._last_save_cache = {}
+    # _should_save = True unless this exact text was saved in the last 10 seconds
     if _text_hash in app._last_save_cache and (_now_ts - app._last_save_cache[_text_hash]) < 10:
-        # Skip save, just return the analysis
-        pass
+        _should_save = False  # Duplicate within 10s — skip save
     else:
         app._last_save_cache[_text_hash] = _now_ts
-    _should_save = _text_hash not in app._last_save_cache or app._last_save_cache[_text_hash] == _now_ts
+        _should_save = True  # New text or enough time passed — allow save
 
     result = analyzer.analyze(clean_text)
 
@@ -5108,17 +5118,22 @@ def analyze():
         target_user = session["username"]  # Non-admins can only save to themselves
 
     # Only save if entry_name is provided (mandatory) AND user is admin
+    _was_saved = False
     if entry_name and _should_save and _is_admin():
-        add_entry(
-            username=target_user,
-            text=clean_text,
-            analysis=analysis_dict,
-            source="text",
-            audio_filename=entry_name,
-            year=year,
-            month=month,
-            entry_name=entry_name,
-        )
+        try:
+            add_entry(
+                username=target_user,
+                text=clean_text,
+                analysis=analysis_dict,
+                source="text",
+                audio_filename=entry_name,
+                year=year,
+                month=month,
+                entry_name=entry_name,
+            )
+            _was_saved = True
+        except Exception as _save_exc:
+            app.logger.error(f"Error saving entry for {target_user}: {_save_exc}")
 
     return jsonify({
         "error": False,
@@ -5126,6 +5141,8 @@ def analyze():
         "analyzed_at": result.analyzed_at,
         "year": year,
         "month": month,
+        "saved": _was_saved,
+        "saved_for": target_user if _was_saved else None,
         **analysis_dict,
     })
 
@@ -5653,7 +5670,7 @@ def admin_stats(username):
             except Exception:
                 pass
 
-        if e_year == year and e_month in months_to_include:
+        if (e_year is None or e_year == year) and (e_month is None or e_month in months_to_include):
             commercial = e.get("commercial") or {}
             if commercial:
                 entry_count += 1
