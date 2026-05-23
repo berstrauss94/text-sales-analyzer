@@ -5120,88 +5120,91 @@ def debug_db():
 
 @app.route("/saved-texts")
 def saved_texts():
-    """Return entries filtered by year/month for the saved texts panel."""
+    """Return ALL entries for the current user (no server-side filtering)."""
     if not session.get("username"):
-        return jsonify({"entries": []}), 401
-
-    year = request.args.get("year", type=int)
-    month = request.args.get("month", type=int)
+        return jsonify({"entries": [], "debug": "not logged in"}), 401
 
     username = session["username"]
-    entries_found = []
+    all_entries = []
 
-    # PRIMARY SOURCE: PostgreSQL (where audio uploads and analyses are saved)
-    # Retry once if first attempt fails (handles connection reset after redeploy)
-    pg_entries = []
-    for _attempt in range(2):
+    # SOURCE 1: PostgreSQL
+    try:
+        from src.users import history_manager as _hm
+        # Force fresh connection
+        if _hm._pg_conn and hasattr(_hm._pg_conn, 'closed') and _hm._pg_conn.closed:
+            _hm._pg_conn = None
+            _hm._use_pg = None
+        all_entries = get_flat_entries(username, limit=500)
+    except Exception as exc:
+        app.logger.error(f"PG failed for {username}: {exc}")
+        # Reset and retry once
         try:
-            pg_entries = get_flat_entries(username, limit=200)
-            break
-        except Exception as exc:
-            app.logger.warning(f"PG attempt {_attempt+1} failed for {username}: {exc}")
-            # Reset PG connection state to force reconnect
             from src.users import history_manager as _hm
             _hm._use_pg = None
             _hm._pg_conn = None
+            all_entries = get_flat_entries(username, limit=500)
+        except Exception:
+            pass
 
-    try:
-        for e in pg_entries:
-            e_year = e.get("year")
-            e_month = e.get("month")
+    # SOURCE 2: JSON fallback (always check, merge with PG results)
+    import json as _json
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    users_dir = os.path.join(base_dir, "usuarios")
+    existing_ids = {e.get("id") for e in all_entries}
 
-            # Extract year/month from timestamp if not set explicitly
-            if e_year is None and e.get("timestamp"):
-                try:
-                    from datetime import datetime as _dt
-                    ts_str = str(e["timestamp"])
-                    if hasattr(e["timestamp"], "year"):
-                        e_year = e["timestamp"].year
-                        e_month = e["timestamp"].month
-                    elif "T" in ts_str or "-" in ts_str:
-                        ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
-                        e_year = ts.year
-                        e_month = ts.month
-                except Exception:
-                    pass
-
-            if (not year or e_year == year) and (not month or e_month == month):
-                entries_found.append(e)
-    except Exception as exc:
-        app.logger.warning(f"PG query failed for {username}: {exc}")
-
-    # FALLBACK: JSON file (for entries that were synced/imported)
-    if not entries_found:
-        import json as _json
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        users_dir = os.path.join(base_dir, "usuarios")
-
-        # Try subdirectory format
-        subdir_path = os.path.join(users_dir, username, "history.json")
-        if os.path.exists(subdir_path):
-            try:
-                with open(subdir_path, "r", encoding="utf-8") as f:
-                    history = _json.load(f)
-                year_key = str(year) if year else None
-                month_key = f"{month:02d}-" if month else None
-                if year_key and year_key in history:
-                    for mk, month_data in history[year_key].items():
-                        if month_key and not mk.startswith(month_key):
+    # Try {username}/history.json
+    subdir_path = os.path.join(users_dir, username, "history.json")
+    if os.path.exists(subdir_path):
+        try:
+            with open(subdir_path, "r", encoding="utf-8") as f:
+                history = _json.load(f)
+            for year_data in history.values():
+                if not isinstance(year_data, dict):
+                    continue
+                for month_data in year_data.values():
+                    if not isinstance(month_data, dict):
+                        continue
+                    for week_data in month_data.values():
+                        if not isinstance(week_data, dict):
                             continue
-                        if not isinstance(month_data, dict):
-                            continue
-                        for week_data in month_data.values():
-                            if not isinstance(week_data, dict):
+                        for day_data in week_data.values():
+                            if not isinstance(day_data, dict):
                                 continue
-                            for day_data in week_data.values():
-                                if not isinstance(day_data, dict):
-                                    continue
-                                entries_found.extend(day_data.get("entries", []))
-            except Exception:
-                pass
+                            for entry in day_data.get("entries", []):
+                                if entry.get("id") not in existing_ids:
+                                    all_entries.append(entry)
+                                    existing_ids.add(entry.get("id"))
+        except Exception:
+            pass
 
-    # Format response
+    # Try {username}_historial.json
+    historial_path = os.path.join(users_dir, f"{username}_historial.json")
+    if os.path.exists(historial_path):
+        try:
+            with open(historial_path, "r", encoding="utf-8") as f:
+                history = _json.load(f)
+            for year_data in history.values():
+                if not isinstance(year_data, dict):
+                    continue
+                for month_data in year_data.values():
+                    if not isinstance(month_data, dict):
+                        continue
+                    for week_data in month_data.values():
+                        if not isinstance(week_data, dict):
+                            continue
+                        for day_data in week_data.values():
+                            if not isinstance(day_data, dict):
+                                continue
+                            for entry in day_data.get("entries", []):
+                                if entry.get("id") not in existing_ids:
+                                    all_entries.append(entry)
+                                    existing_ids.add(entry.get("id"))
+        except Exception:
+            pass
+
+    # Format response — NO filtering, return everything
     result = []
-    for e in entries_found:
+    for e in all_entries:
         result.append({
             "id": e.get("id", ""),
             "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
