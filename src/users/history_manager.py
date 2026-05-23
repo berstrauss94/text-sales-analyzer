@@ -445,31 +445,19 @@ def _pg_row_to_entry(row) -> dict:
 
     ts_str = ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
 
-    # Extract year/month — prefer day_label (dd/mm/yyyy) over timestamp
-    # because entries may be categorized in a different month than their timestamp
+    # Extract year/month from timestamp for UI filtering
     entry_year = None
     entry_month = None
-
-    # Try day_label first (format: "13/01/2026" or "dd/mm/yyyy")
-    if day_label:
-        import re as _re
-        dl_match = _re.match(r'(\d{1,2})/(\d{1,2})/(\d{4})', day_label)
-        if dl_match:
-            entry_month = int(dl_match.group(2))
-            entry_year = int(dl_match.group(3))
-
-    # Fallback to timestamp
-    if entry_year is None:
-        if hasattr(ts, "year"):
-            entry_year = ts.year
-            entry_month = ts.month
-        else:
-            try:
-                parsed_ts = datetime.fromisoformat(ts_str)
-                entry_year = parsed_ts.year
-                entry_month = parsed_ts.month
-            except Exception:
-                pass
+    if hasattr(ts, "year"):
+        entry_year = ts.year
+        entry_month = ts.month
+    else:
+        try:
+            parsed_ts = datetime.fromisoformat(ts_str)
+            entry_year = parsed_ts.year
+            entry_month = parsed_ts.month
+        except Exception:
+            pass
 
     return {
         "id": eid,
