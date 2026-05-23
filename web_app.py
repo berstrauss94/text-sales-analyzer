@@ -18,7 +18,7 @@ os.environ["PYTHONIOENCODING"] = "utf-8"
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import secrets
-from flask import Flask, request, jsonify, render_template_string, session, redirect, url_for
+from flask import Flask, request, jsonify, render_template_string, session, redirect, url_for, make_response
 from src.factory import create_analyzer
 from src.components.commercial_analyzer import CommercialAnalyzer
 from src.components.audio_transcriber import AudioTranscriber
@@ -4984,7 +4984,11 @@ def logout():
 def index():
     if not session.get("username"):
         return redirect(url_for("login_page"))
-    return render_template_string(HTML, username=session["username"], indicador_categorias_json=_INDICADOR_CATEGORIAS_JSON, all_users=user_manager.list_users())
+    response = make_response(render_template_string(HTML, username=session["username"], indicador_categorias_json=_INDICADOR_CATEGORIAS_JSON, all_users=user_manager.list_users()))
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 @app.route("/analyze", methods=["POST"])
