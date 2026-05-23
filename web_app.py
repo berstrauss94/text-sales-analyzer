@@ -18,7 +18,7 @@ os.environ["PYTHONIOENCODING"] = "utf-8"
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import secrets
-from flask import Flask, request, jsonify, render_template_string, session, redirect, url_for, make_response
+from flask import Flask, request, jsonify, render_template_string, session, redirect, url_for
 from src.factory import create_analyzer
 from src.components.commercial_analyzer import CommercialAnalyzer
 from src.components.audio_transcriber import AudioTranscriber
@@ -276,7 +276,7 @@ HTML = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analizador de Textos - Ventas y Bienes Raices v4</title>
+    <title>Analizador de Textos - Ventas y Bienes Raices v3</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1881,7 +1881,7 @@ HTML = """
                 <select id="selectUser" onchange="loadSavedTexts(); loadAdminStats();" style="min-width:150px;">
                     <option value="">-- Todos --</option>
                     {% for u in all_users %}
-                    <option value="{{ u }}" {% if loop.first %}selected{% endif %}>{{ u }}</option>
+                    <option value="{{ u }}">{{ u }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -1900,7 +1900,6 @@ HTML = """
             <div class="date-select-group">
                 <label for="selectMonth">Mes</label>
                 <select id="selectMonth" onchange="loadSavedTexts()">
-                    <option value="">Todos</option>
                     <option value="1">Enero</option>
                     <option value="2">Febrero</option>
                     <option value="3">Marzo</option>
@@ -2046,25 +2045,20 @@ async function saveEntry() {
     if (!entryName) { alert('El titulo es obligatorio para guardar.'); return; }
 
     const year = document.getElementById('selectYear').value;
-    // For month: if "Todos" is selected (empty value), use current month
-    var monthEl = document.getElementById('selectMonth');
-    var monthVal = monthEl ? monthEl.value : '';
-    var month = monthVal ? parseInt(monthVal) : (new Date().getMonth() + 1);
+    const month = document.getElementById('selectMonth').value;
 
     document.getElementById('loading').style.display = 'block';
     document.getElementById('results').style.display = 'none';
 
     try {
-        // If admin has a specific user selected, save to that user
+        // If admin has a user selected, save to that user
         const userSelect = document.getElementById('selectUser');
-        var targetUser = userSelect ? userSelect.value : '';
-        // Don't use empty or _all as target user
-        if (!targetUser || targetUser === '_all') targetUser = '';
+        const targetUser = userSelect ? userSelect.value : '';
 
         const response = await fetch('/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, year: parseInt(year), month: month, entry_name: entryName, target_user: targetUser })
+            body: JSON.stringify({ text, year: parseInt(year), month: parseInt(month), entry_name: entryName, target_user: targetUser })
         });
         const data = await response.json();
         _lastCommercialData = data.commercial || null;
@@ -2072,23 +2066,6 @@ async function saveEntry() {
             document.getElementById('textInput').value = data.input_text;
         }
         renderResults(data, data.input_text || text);
-
-        // Show save confirmation
-        if (data.saved) {
-            var savedMsg = document.createElement('div');
-            savedMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#0d1a0d;border:1px solid #5bf5a3;color:#5bf5a3;padding:10px 16px;border-radius:8px;font-size:0.75rem;z-index:9999;';
-            savedMsg.textContent = 'Guardado para ' + (data.saved_for || 'usuario');
-            document.body.appendChild(savedMsg);
-            setTimeout(function() { savedMsg.remove(); }, 3000);
-        } else if (entryName) {
-            // Save was attempted but failed
-            var failMsg = document.createElement('div');
-            failMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#1a0d0d;border:1px solid #f55b5b;color:#f55b5b;padding:10px 16px;border-radius:8px;font-size:0.75rem;z-index:9999;max-width:300px;';
-            var dbg = data.save_debug || {};
-            failMsg.textContent = 'No guardado. Debug: entry_name=' + (dbg.entry_name||'?') + ' should_save=' + dbg.should_save + ' is_admin=' + dbg.is_admin + ' target=' + (dbg.target_user||'?');
-            document.body.appendChild(failMsg);
-            setTimeout(function() { failMsg.remove(); }, 8000);
-        }
 
         // Scroll to top after saving
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2914,224 +2891,104 @@ function renderTextProgressChart(c) {
         { key: 'objeciones', label: 'Objeciones', color: '#f55b5b' },
         { key: 'indicios_prospeccion', label: 'Prospeccion', color: '#5bd4f5' },
     ];
-    const total = indicators.reduce(function(s, ind) { return s + (c[ind.key] || 0); }, 0) || 1;
+    const total = indicators.reduce((s, ind) => s + (c[ind.key] || 0), 0) || 1;
 
-    var gradientParts = [];
-    var currentDeg = 0;
-    var pctLabels = '';
-    indicators.forEach(function(ind) {
-        var val = c[ind.key] || 0;
-        var pct = Math.round((val / total) * 100);
-        var degSpan = (val / total) * 360;
+    let gradientParts = [];
+    let currentDeg = 0;
+    let pctLabels = '';
+    indicators.forEach(ind => {
+        const val = c[ind.key] || 0;
+        const pct = Math.round((val / total) * 100);
+        const degSpan = (val / total) * 360;
         gradientParts.push(ind.color + ' ' + currentDeg + 'deg ' + (currentDeg + degSpan) + 'deg');
         if (pct >= 5) {
-            var midDeg = currentDeg + degSpan / 2;
-            var rad = (midDeg - 90) * Math.PI / 180;
-            var x = 50 + 35 * Math.cos(rad);
-            var y = 50 + 35 * Math.sin(rad);
-            pctLabels += '<span style="position:absolute;left:' + x + '%;top:' + y + '%;transform:translate(-50%,-50%);font-size:0.6rem;color:#fff;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,0.9);pointer-events:none;z-index:2;">' + pct + '%</span>';
+            const midDeg = currentDeg + degSpan / 2;
+            const rad = (midDeg - 90) * Math.PI / 180;
+            const x = 50 + 35 * Math.cos(rad);
+            const y = 50 + 35 * Math.sin(rad);
+            pctLabels += '<span style="position:absolute;left:' + x + '%;top:' + y + '%;transform:translate(-50%,-50%);font-size:0.6rem;color:#fff;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,0.9);pointer-events:none;">' + pct + '%</span>';
         }
         currentDeg += degSpan;
     });
 
-    // Store data globally for hover/click interactions
-    window._textPieSegments = indicators.map(function(ind) {
-        var val = c[ind.key] || 0;
-        return { key: ind.key, label: ind.label, color: ind.color, count: val, pct: Math.round((val / total) * 100) };
-    });
-    window._textPieWordDetail = c.detalle || {};
-
-    var legend = indicators.map(function(ind) {
-        var val = c[ind.key] || 0;
-        var pct = Math.round((val / total) * 100);
-        return '<div class="text-pie-legend-item" data-cat="' + ind.key + '" style="display:flex;align-items:center;gap:5px;font-size:0.65rem;cursor:pointer;padding:3px 6px;border-radius:4px;transition:background 0.15s;" onmouseenter="this.style.background=\'#1a1d27\'" onmouseleave="this.style.background=\'\'">' +
-            '<div style="width:8px;height:8px;border-radius:2px;background:' + ind.color + ';"></div>' +
-            '<span style="color:#aaa;">' + ind.label + ': ' + val + ' (' + pct + '%)</span></div>';
+    const legend = indicators.map(ind => {
+        const val = c[ind.key] || 0;
+        const pct = Math.round((val / total) * 100);
+        return '<div style="display:flex;align-items:center;gap:5px;font-size:0.65rem;"><div style="width:8px;height:8px;border-radius:2px;background:' + ind.color + ';"></div><span style="color:#aaa;">' + ind.label + ': ' + val + ' (' + pct + '%)</span></div>';
     }).join('');
 
     return '<div style="margin-top:16px;padding:14px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">' +
         '<div style="font-size:0.75rem;color:#888;font-weight:600;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em;">Distribucion de Indicadores — Este Texto</div>' +
         '<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center;">' +
-            '<div id="textPieChart" style="position:relative;width:160px;height:160px;border-radius:50%;background:conic-gradient(' + gradientParts.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);cursor:pointer;">' +
+            '<div style="position:relative;width:140px;height:140px;border-radius:50%;background:conic-gradient(' + gradientParts.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);">' +
                 pctLabels +
-                '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:65px;height:65px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;pointer-events:none;"><span style="font-size:0.6rem;color:#aaa;">' + total + ' ind.</span></div>' +
-                '<div id="textPieTooltip" style="display:none;position:absolute;z-index:1000;min-width:200px;max-width:300px;max-height:260px;overflow-y:auto;padding:10px 12px;background:#0f1219;border:1px solid #333;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.8);pointer-events:none;left:50%;transform:translateX(-50%);bottom:calc(100% + 10px);"></div>' +
+                '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60px;height:60px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;"><span style="font-size:0.6rem;color:#aaa;">' + total + ' ind.</span></div>' +
             '</div>' +
             '<div style="display:flex;flex-direction:column;gap:4px;">' + legend + '</div>' +
         '</div>' +
-        '<div id="textPieWordDetail" style="margin-top:10px;text-align:left;display:none;padding:8px;background:#0d1017;border:1px solid #1e2130;border-radius:6px;max-height:150px;overflow-y:auto;"></div>' +
     '</div>';
 }
-
-// Text pie chart legend click — show word detail below chart
-document.addEventListener('click', function(e) {
-    var legendItem = e.target.closest('.text-pie-legend-item');
-    if (!legendItem) return;
-    var cat = legendItem.getAttribute('data-cat');
-    if (!cat || !window._textPieWordDetail) return;
-    var detail = window._textPieWordDetail[cat] || {};
-    var detailEl = document.getElementById('textPieWordDetail');
-    if (!detailEl) return;
-    var entries = Object.entries(detail).sort(function(a,b){return b[1]-a[1];}).slice(0, 15);
-    if (entries.length === 0) {
-        detailEl.innerHTML = '<div style="color:#555;font-size:0.7rem;">Sin detalle.</div>';
-    } else {
-        detailEl.innerHTML = entries.map(function(e) {
-            return '<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #1a1d27;font-size:0.65rem;"><span style="color:#ccc;">' + e[0] + '</span><span style="color:#888;">' + e[1] + 'x</span></div>';
-        }).join('');
-    }
-    detailEl.style.display = 'block';
-});
 
 function renderTextReport(data) {
     if (!data || data.error) return '';
     const c = data.commercial || {};
-    const intentEs = INTENT_ES[data.intent] || data.intent || '-';
-    const sentimentEs = SENTIMENT_ES[data.sentiment] || data.sentiment || '-';
+    const intentEs = INTENT_ES[data.intent] || data.intent;
+    const sentimentEs = SENTIMENT_ES[data.sentiment] || data.sentiment;
 
-    // Section style helpers
-    const sectionTitle = function(icon, title) { return '<div style="font-size:0.7rem;color:#aaa;font-weight:600;margin:12px 0 6px;border-bottom:1px solid #1e2130;padding-bottom:4px;">' + icon + ' ' + title + '</div>'; };
-    const pill = function(label, value, color) { return '<div style="padding:5px 8px;background:#0d1017;border-radius:6px;border-left:3px solid ' + color + ';font-size:0.63rem;"><span style="color:#666;">' + label + ':</span> <strong style="color:#e0e0e0;">' + value + '</strong></div>'; };
-
-    let report = '<div style="margin-top:16px;padding:16px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
-    report += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div style="font-size:0.8rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">&#128203; Informe Completo del Texto</div><button onclick="copyReport()" style="background:#1a1d27;border:1px solid #2a2d3e;color:#aaa;padding:4px 10px;border-radius:6px;font-size:0.6rem;cursor:pointer;">&#128203; Copiar</button></div>';
-
-    // --- 1. CLASIFICACION GENERAL ---
-    report += sectionTitle('&#128269;', 'Clasificacion General');
-    report += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">';
-    report += pill('Intencion', intentEs + ' (' + Math.round((data.intent_confidence || 0) * 100) + '%)', '#4a6cf7');
-    report += pill('Sentimiento', sentimentEs + ' (' + Math.round((data.sentiment_confidence || 0) * 100) + '%)', data.sentiment === 'POSITIVE' ? '#5bf5a3' : data.sentiment === 'NEGATIVE' ? '#f55b5b' : '#f5a35b');
-    report += pill('Tipo Lead', (c.tipo_lead || '-'), c.tipo_lead === 'CALIENTE' ? '#f55b5b' : c.tipo_lead === 'TIBIO' ? '#f5a35b' : '#5bd4f5');
-    report += pill('Prob. Cierre', (c.probabilidad_cierre || 0).toFixed(1) + '%', '#5bf5a3');
-    report += pill('Etapa Funnel', (c.etapa_funnel || '-'), '#b38bff');
-    report += pill('Urgencia', (c.urgencia || '-'), c.urgencia === 'CRITICA' ? '#f55b5b' : c.urgencia === 'ALTA' ? '#f5a35b' : '#5bd4f5');
-    report += pill('Compromiso', (c.nivel_compromiso || '-'), '#7b9cff');
-    report += pill('Interes', (c.nivel_interes || '-'), '#f5d75b');
-    report += '</div>';
-
-    // --- 2. INDICADORES COMERCIALES ---
-    report += sectionTitle('&#128200;', 'Indicadores Comerciales');
-    const indColors = { palabras_positivas: '#5bf5a3', respuestas_afirmativas: '#7b9cff', indicios_cierre: '#f5d75b', escasez_comercial: '#f5a35b', pedidos_referidos: '#b38bff', objeciones: '#f55b5b', indicios_prospeccion: '#5bd4f5' };
-    const indNames = { palabras_positivas: 'Palabras Positivas', respuestas_afirmativas: 'Respuestas Afirmativas', indicios_cierre: 'Indicios de Cierre', escasez_comercial: 'Escasez Comercial', pedidos_referidos: 'Pedidos de Referidos', objeciones: 'Objeciones', indicios_prospeccion: 'Prospeccion' };
-    report += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">';
-    Object.entries(indNames).forEach(function(entry) {
-        var k = entry[0], label = entry[1];
-        var val = c[k] || 0;
-        var detail = c.detalle ? c.detalle[k] : {};
-        var words = detail ? Object.entries(detail).sort(function(a,b){return b[1]-a[1];}).slice(0,5).map(function(e){return e[0] + ' (' + e[1] + 'x)';}).join(', ') : '';
-        report += '<div style="padding:5px 8px;background:#0d1017;border-radius:6px;border-left:3px solid ' + indColors[k] + ';font-size:0.6rem;"><div><span style="color:#666;">' + label + ':</span> <strong style="color:#e0e0e0;">' + val + '</strong></div>' + (words ? '<div style="color:#555;font-size:0.55rem;margin-top:2px;">' + words + '</div>' : '') + '</div>';
-    });
-    report += '</div>';
-
-    // --- 3. CONCEPTOS DE VENTA ---
-    report += sectionTitle('&#127991;', 'Conceptos de Venta');
+    // Sales concepts summary
+    let salesSummary = 'Ninguno detectado';
     if (data.sales_concepts && data.sales_concepts.length > 0) {
-        report += '<div style="display:flex;flex-direction:column;gap:4px;">';
-        data.sales_concepts.forEach(function(sc) {
-            var label = translateConcept(sc.concept, SALES_CONCEPTS_ES);
-            var conf = Math.round(sc.confidence * 100);
-            var source = sc.source_text ? sc.source_text.split(' /// ').slice(0, 2).map(function(f) { return '"' + f.substring(0, 80) + (f.length > 80 ? '...' : '') + '"'; }).join(' | ') : '';
-            report += '<div style="padding:5px 8px;background:#0d1017;border-radius:6px;font-size:0.6rem;"><div style="display:flex;justify-content:space-between;"><span style="color:#e0e0e0;font-weight:600;">' + label + '</span><span style="color:#7b9cff;">' + conf + '%</span></div>' + (source ? '<div style="color:#555;font-size:0.55rem;margin-top:2px;font-style:italic;">' + source + '</div>' : '') + '</div>';
-        });
-        report += '</div>';
-    } else {
-        report += '<div style="font-size:0.6rem;color:#555;">Ninguno detectado</div>';
+        salesSummary = data.sales_concepts.map(sc => translateConcept(sc.concept, SALES_CONCEPTS_ES) + ' (' + Math.round(sc.confidence * 100) + '%)').join(', ');
     }
 
-    // --- 4. CONCEPTOS INMOBILIARIOS ---
-    report += sectionTitle('&#127968;', 'Conceptos Inmobiliarios');
+    // Real estate concepts summary
+    let reSummary = 'Ninguno detectado';
     if (data.real_estate_concepts && data.real_estate_concepts.length > 0) {
-        report += '<div style="display:flex;flex-direction:column;gap:4px;">';
-        data.real_estate_concepts.forEach(function(rc) {
-            var label = translateConcept(rc.concept, RE_CONCEPTS_ES);
-            var conf = Math.round(rc.confidence * 100);
-            var source = rc.source_text ? rc.source_text.split(' /// ').slice(0, 2).map(function(f) { return '"' + f.substring(0, 80) + (f.length > 80 ? '...' : '') + '"'; }).join(' | ') : '';
-            report += '<div style="padding:5px 8px;background:#0d1017;border-radius:6px;font-size:0.6rem;"><div style="display:flex;justify-content:space-between;"><span style="color:#e0e0e0;font-weight:600;">' + label + '</span><span style="color:#b38bff;">' + conf + '%</span></div>' + (source ? '<div style="color:#555;font-size:0.55rem;margin-top:2px;font-style:italic;">' + source + '</div>' : '') + '</div>';
-        });
-        report += '</div>';
-    } else {
-        report += '<div style="font-size:0.6rem;color:#555;">Ninguno detectado</div>';
+        reSummary = data.real_estate_concepts.map(rc => translateConcept(rc.concept, RE_CONCEPTS_ES) + ' (' + Math.round(rc.confidence * 100) + '%)').join(', ');
     }
 
-    // --- 5. DATOS EXTRAIDOS ---
-    report += sectionTitle('&#128202;', 'Datos Extraidos');
+    // Entities summary
+    let entitiesSummary = '';
     if (data.entities && data.entities.length > 0) {
-        var grouped = {};
-        data.entities.forEach(function(e) { if (!grouped[e.concept]) grouped[e.concept] = []; grouped[e.concept].push(e); });
-        report += '<div style="display:flex;flex-direction:column;gap:4px;">';
-        Object.entries(grouped).forEach(function(entry) {
-            var concept = entry[0], items = entry[1];
-            var label = (ENTITY_ES && ENTITY_ES[concept]) || concept;
-            var icon = (ENTITY_ICONS && ENTITY_ICONS[concept]) || '';
-            var values = items.map(function(e) {
-                var numStr = e.numeric_value !== null ? ' = ' + e.numeric_value + (e.unit ? ' ' + e.unit : '') : '';
-                return e.raw_value + numStr;
-            }).slice(0, 6).join(', ');
-            var extra = items.length > 6 ? ' (+' + (items.length - 6) + ' mas)' : '';
-            report += '<div style="padding:4px 8px;background:#0d1017;border-radius:6px;font-size:0.6rem;"><span style="color:#888;">' + icon + ' ' + label + ':</span> <span style="color:#ccc;">' + values + extra + '</span></div>';
-        });
-        report += '</div>';
-    } else {
-        report += '<div style="font-size:0.6rem;color:#555;">Ninguno detectado</div>';
+        const grouped = {};
+        data.entities.forEach(e => { if (!grouped[e.concept]) grouped[e.concept] = []; grouped[e.concept].push(e); });
+        entitiesSummary = Object.entries(grouped).map(([concept, items]) => {
+            const label = (ENTITY_ES && ENTITY_ES[concept]) || concept;
+            return label + ': ' + items.slice(0, 3).map(e => e.raw_value).join(', ') + (items.length > 3 ? ' (+' + (items.length - 3) + ')' : '');
+        }).join(' | ');
     }
 
-    // --- 6. OPERACION Y FINANCIAMIENTO ---
-    report += sectionTitle('&#128176;', 'Operacion y Financiamiento');
-    report += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">';
-    report += pill('Tipo Operacion', (c.tipo_operacion || '-'), '#f5d75b');
-    report += pill('Financiamiento', (c.financiamiento || '-').replace(/_/g, ' '), '#7b9cff');
+    // Commercial indicators summary
+    const indLabels = { palabras_positivas: 'Positivas', respuestas_afirmativas: 'Afirmativas', indicios_cierre: 'Cierre', escasez_comercial: 'Escasez', pedidos_referidos: 'Referidos', objeciones: 'Objeciones', indicios_prospeccion: 'Prospeccion' };
+    const indSummary = Object.entries(indLabels).map(([k, label]) => label + ': ' + (c[k] || 0)).join(' | ');
+
+    // Build report
+    let report = '<div style="margin-top:16px;padding:16px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
+    report += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-size:0.75rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">📋 Informe del Texto</div><button onclick="copyReport()" style="background:#1a1d27;border:1px solid #2a2d3e;color:#aaa;padding:4px 10px;border-radius:6px;font-size:0.6rem;cursor:pointer;">📋 Copiar</button></div>';
+
+    report += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.65rem;">';
+    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #4a6cf7;"><span style="color:#666;">Intencion:</span> <strong style="color:#e0e0e0;">' + intentEs + '</strong> (' + Math.round((data.intent_confidence || 0) * 100) + '%)</div>';
+    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid ' + (data.sentiment === 'POSITIVE' ? '#5bf5a3' : data.sentiment === 'NEGATIVE' ? '#f55b5b' : '#f5a35b') + ';"><span style="color:#666;">Sentimiento:</span> <strong style="color:#e0e0e0;">' + sentimentEs + '</strong> (' + Math.round((data.sentiment_confidence || 0) * 100) + '%)</div>';
+    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #f5d75b;"><span style="color:#666;">Lead:</span> <strong style="color:#e0e0e0;">' + (c.tipo_lead || '-') + '</strong></div>';
+    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #5bf5a3;"><span style="color:#666;">Prob. Cierre:</span> <strong style="color:#e0e0e0;">' + (c.probabilidad_cierre || 0).toFixed(1) + '%</strong></div>';
+    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #b38bff;"><span style="color:#666;">Etapa:</span> <strong style="color:#e0e0e0;">' + (c.etapa_funnel || '-') + '</strong></div>';
+    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #f5a35b;"><span style="color:#666;">Urgencia:</span> <strong style="color:#e0e0e0;">' + (c.urgencia || '-') + '</strong></div>';
     report += '</div>';
 
-    // --- 7. SENALES Y OBJECIONES ---
-    if ((c.senales_compra && c.senales_compra.length > 0) || (c.objeciones_especificas && c.objeciones_especificas.length > 0)) {
-        report += sectionTitle('&#9888;', 'Senales y Objeciones');
-        if (c.senales_compra && c.senales_compra.length > 0) {
-            report += '<div style="padding:5px 8px;background:#0d1a0d;border:1px solid #1a3a1a;border-radius:6px;font-size:0.6rem;margin-bottom:4px;"><span style="color:#5bf5a3;font-weight:600;">Senales de compra:</span> <span style="color:#ccc;">' + c.senales_compra.join(', ') + '</span></div>';
-        }
-        if (c.objeciones_especificas && c.objeciones_especificas.length > 0) {
-            report += '<div style="padding:5px 8px;background:#1a0d0d;border:1px solid #3a1a1a;border-radius:6px;font-size:0.6rem;"><span style="color:#f55b5b;font-weight:600;">Objeciones especificas:</span> <span style="color:#ccc;">' + c.objeciones_especificas.join(', ') + '</span></div>';
-        }
+    report += '<div style="margin-top:8px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.63rem;"><span style="color:#666;">Indicadores:</span> <span style="color:#ccc;">' + indSummary + '</span></div>';
+    report += '<div style="margin-top:4px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.63rem;"><span style="color:#666;">Conceptos Venta:</span> <span style="color:#ccc;">' + salesSummary + '</span></div>';
+    report += '<div style="margin-top:4px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.63rem;"><span style="color:#666;">Conceptos Inmobiliarios:</span> <span style="color:#ccc;">' + reSummary + '</span></div>';
+
+    if (entitiesSummary) {
+        report += '<div style="margin-top:4px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.63rem;"><span style="color:#666;">Datos Extraidos:</span> <span style="color:#ccc;">' + entitiesSummary + '</span></div>';
     }
 
-    // --- 8. TECNICAS Y PREGUNTAS ---
-    if ((c.tecnicas_persuasion && c.tecnicas_persuasion.length > 0) || (c.preguntas_abiertas && c.preguntas_abiertas.length > 0)) {
-        report += sectionTitle('&#128161;', 'Tecnicas y Preguntas');
-        if (c.tecnicas_persuasion && c.tecnicas_persuasion.length > 0) {
-            report += '<div style="padding:5px 8px;background:#0d1017;border-radius:6px;font-size:0.6rem;margin-bottom:4px;"><span style="color:#f5a35b;font-weight:600;">Tecnicas de persuasion:</span> <span style="color:#ccc;">' + c.tecnicas_persuasion.join(', ') + '</span></div>';
-        }
-        if (c.preguntas_abiertas && c.preguntas_abiertas.length > 0) {
-            report += '<div style="padding:5px 8px;background:#0d1017;border-radius:6px;font-size:0.6rem;"><span style="color:#5bd4f5;font-weight:600;">Preguntas abiertas (' + c.preguntas_abiertas.length + '):</span> <span style="color:#ccc;">' + c.preguntas_abiertas.slice(0, 5).join(' | ') + (c.preguntas_abiertas.length > 5 ? ' (+' + (c.preguntas_abiertas.length - 5) + ')' : '') + '</span></div>';
-        }
-    }
-
-    // --- 9. KEYWORDS ---
-    if (c.keywords && c.keywords.length > 0) {
-        report += sectionTitle('&#128273;', 'Palabras Clave');
-        report += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
-        c.keywords.forEach(function(kw) {
-            report += '<span style="background:#1a1d27;border:1px solid #2a2d3e;color:#aaa;padding:2px 8px;border-radius:10px;font-size:0.58rem;">' + kw + '</span>';
-        });
-        report += '</div>';
-    }
-
-    // --- 10. RESUMEN Y ACCION ---
-    report += sectionTitle('&#9989;', 'Conclusion y Siguiente Paso');
-    if (c.resumen) {
-        report += '<div style="padding:8px;background:#0d1017;border-radius:6px;font-size:0.63rem;color:#ccc;margin-bottom:4px;">' + c.resumen + '</div>';
-    }
     if (c.recomendacion) {
-        report += '<div style="padding:8px;background:#0d1a0d;border:1px solid #1a3a1a;border-radius:6px;font-size:0.63rem;color:#5bf5a3;margin-bottom:4px;">&#128161; <strong>Recomendacion:</strong> ' + c.recomendacion + '</div>';
+        report += '<div style="margin-top:8px;padding:8px;background:#0d1a0d;border:1px solid #1a3a1a;border-radius:6px;font-size:0.65rem;color:#5bf5a3;">💡 ' + c.recomendacion + '</div>';
     }
     if (c.accion_siguiente) {
-        report += '<div style="padding:8px;background:#0d0d1a;border:1px solid #1a1a3a;border-radius:6px;font-size:0.63rem;color:#7b9cff;">&#9654; <strong>Siguiente paso:</strong> ' + c.accion_siguiente + '</div>';
+        report += '<div style="margin-top:4px;padding:8px;background:#0d0d1a;border:1px solid #1a1a3a;border-radius:6px;font-size:0.65rem;color:#7b9cff;">▶️ ' + c.accion_siguiente + '</div>';
     }
-
-    // --- METRICAS ---
-    report += '<div style="margin-top:10px;display:flex;gap:12px;font-size:0.58rem;color:#555;justify-content:flex-end;">';
-    report += '<span>Densidad: ' + (c.densidad_comercial || 0).toFixed(4) + '</span>';
-    report += '<span>Palabras: ' + (c.total_palabras || 0) + '</span>';
-    report += '<span>Tendencia: ' + (c.tendencia_cierre || '-') + '</span>';
-    report += '</div>';
 
     report += '</div>';
     return report;
@@ -3144,22 +3001,21 @@ function copyReport() {
     const sentimentEs = SENTIMENT_ES[data.sentiment] || data.sentiment || '';
     const title = window._currentEntryName || '';
 
-    const lines = [];
-    lines.push('=== INFORME DE ANALISIS ===');
-    if (title) lines.push('Texto: ' + title);
-    lines.push('Intencion: ' + intentEs + ' (' + Math.round((data.intent_confidence || 0) * 100) + '%)');
-    lines.push('Sentimiento: ' + sentimentEs + ' (' + Math.round((data.sentiment_confidence || 0) * 100) + '%)');
-    lines.push('Lead: ' + (c.tipo_lead || '-') + ' | Prob. Cierre: ' + (c.probabilidad_cierre || 0).toFixed(1) + '%');
-    lines.push('Etapa: ' + (c.etapa_funnel || '-') + ' | Urgencia: ' + (c.urgencia || '-'));
-    lines.push('---');
-    lines.push('Positivas: ' + (c.palabras_positivas || 0) + ' | Afirmativas: ' + (c.respuestas_afirmativas || 0) + ' | Cierre: ' + (c.indicios_cierre || 0));
-    lines.push('Objeciones: ' + (c.objeciones || 0) + ' | Referidos: ' + (c.pedidos_referidos || 0) + ' | Prospeccion: ' + (c.indicios_prospeccion || 0));
-    if (c.recomendacion) { lines.push('---'); lines.push('Recomendacion: ' + c.recomendacion); }
-    if (c.accion_siguiente) lines.push('Siguiente paso: ' + c.accion_siguiente);
+    let text = '=== INFORME DE ANALISIS ===\\n';
+    if (title) text += 'Texto: ' + title + '\\n';
+    text += 'Intencion: ' + intentEs + ' (' + Math.round((data.intent_confidence || 0) * 100) + '%)\\n';
+    text += 'Sentimiento: ' + sentimentEs + ' (' + Math.round((data.sentiment_confidence || 0) * 100) + '%)\\n';
+    text += 'Lead: ' + (c.tipo_lead || '-') + ' | Prob. Cierre: ' + (c.probabilidad_cierre || 0).toFixed(1) + '%\\n';
+    text += 'Etapa: ' + (c.etapa_funnel || '-') + ' | Urgencia: ' + (c.urgencia || '-') + '\\n';
+    text += '---\\n';
+    text += 'Positivas: ' + (c.palabras_positivas || 0) + ' | Afirmativas: ' + (c.respuestas_afirmativas || 0) + ' | Cierre: ' + (c.indicios_cierre || 0) + '\\n';
+    text += 'Objeciones: ' + (c.objeciones || 0) + ' | Referidos: ' + (c.pedidos_referidos || 0) + ' | Prospeccion: ' + (c.indicios_prospeccion || 0) + '\\n';
+    if (c.recomendacion) text += '---\\nRecomendacion: ' + c.recomendacion + '\\n';
+    if (c.accion_siguiente) text += 'Siguiente paso: ' + c.accion_siguiente + '\\n';
 
-    navigator.clipboard.writeText(lines.join(String.fromCharCode(10))).then(function() {
-        var btn = document.querySelector('[onclick="copyReport()"]');
-        if (btn) { btn.textContent = 'Copiado!'; setTimeout(function() { btn.textContent = 'Copiar'; }, 2000); }
+    navigator.clipboard.writeText(text.replace(/\\\\n/g, '\\n')).then(() => {
+        const btn = document.querySelector('[onclick="copyReport()"]');
+        if (btn) { btn.textContent = '✓ Copiado'; setTimeout(() => { btn.textContent = '📋 Copiar'; }, 2000); }
     });
 }
 
@@ -3459,27 +3315,12 @@ async function loadSavedTexts() {
         return;
     }
 
-    // For admin with _all selected, skip text loading (no single user)
-    if (adminUser === '_all') {
-        const select = document.getElementById('selectText');
-        const count = document.getElementById('savedTextsCount');
-        if (select) select.innerHTML = '<option value="">-- Seleccionar un usuario especifico --</option>';
-        if (count) count.textContent = '';
-        return;
-    }
-
     const url = adminUser
-        ? '/admin/user-texts/' + adminUser + '?year=' + year + (month ? '&month=' + month : '')
-        : '/saved-texts?year=' + year + (month ? '&month=' + month : '');
+        ? `/admin/user-texts/${adminUser}?year=${year}&month=${month}`
+        : `/saved-texts?year=${year}&month=${month}`;
 
     try {
         const response = await fetch(url);
-        if (!response.ok) {
-            console.error('loadSavedTexts HTTP error:', response.status);
-            const count = document.getElementById('savedTextsCount');
-            if (count) count.textContent = '(error ' + response.status + ')';
-            return;
-        }
         const data = await response.json();
         const select = document.getElementById('selectText');
         const count = document.getElementById('savedTextsCount');
@@ -3489,24 +3330,21 @@ async function loadSavedTexts() {
         select.innerHTML = '<option value="">-- Seleccionar texto --</option>';
 
         if (data.entries && data.entries.length > 0) {
-            count.textContent = '(' + data.entries.length + ')';
-            data.entries.forEach(function(e, i) {
-                var rawName = e.entry_name || (e.text || '').substring(0, 16) || 'Texto #' + (i+1);
-                var name = rawName.length > 16 ? rawName.substring(0, 16) + '...' : rawName;
-                var opt = document.createElement('option');
+            count.textContent = `(${data.entries.length})`;
+            data.entries.forEach((e, i) => {
+                const rawName = e.entry_name || (e.text || '').substring(0, 16) || 'Texto #' + (i+1);
+                const name = rawName.length > 16 ? rawName.substring(0, 16) + '...' : rawName;
+                const opt = document.createElement('option');
                 opt.value = e.id;
                 opt.textContent = name;
                 opt.setAttribute('data-fullname', e.entry_name || rawName);
                 select.appendChild(opt);
             });
         } else {
-            count.textContent = '(0 textos)';
-            select.innerHTML = '<option value="">Sin textos para este periodo</option>';
+            count.textContent = '(0)';
         }
     } catch(e) {
         console.error('Error loading saved texts:', e);
-        var count = document.getElementById('savedTextsCount');
-        if (count) count.textContent = '(error de red)';
     }
 }
 
@@ -3622,11 +3460,10 @@ async function loadAdminStats() {
 
     // Build URL — _all means aggregate all users
     let url;
-    const currentYear = new Date().getFullYear();
     if (vendor === '_all') {
-        url = `/admin/stats/_all?period=${period}&year=${currentYear}`;
+        url = `/admin/stats/_all?period=${period}&year=2026`;
     } else {
-        url = `/admin/stats/${vendor}?period=${period}&year=${currentYear}`;
+        url = `/admin/stats/${vendor}?period=${period}&year=2026`;
     }
     if (specificMonth) {
         url += `&month=${specificMonth}`;
@@ -4376,27 +4213,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load on page load
     if (document.getElementById('selectUser')) {
-        // Admin: auto-select first real user if none selected
-        var userSel = document.getElementById('selectUser');
-        if (userSel && !userSel.value) {
-            // Find first option with a real username (not empty, not _all)
-            for (var i = 0; i < userSel.options.length; i++) {
-                var v = userSel.options[i].value;
-                if (v && v !== '_all' && v !== '') {
-                    userSel.value = v;
-                    break;
-                }
-            }
-        }
+        // Admin: users already in HTML via Jinja2, just load stats
         loadAdminStats();
-        loadSavedTexts();
     } else {
         // Regular user: load their texts
         loadSavedTexts();
     }
-    // Debug: show that JS loaded correctly
-    var countEl = document.getElementById('savedTextsCount');
-    if (countEl) countEl.textContent = '(cargando...)';
 });
 
 // ── History ───────────────────────────────────────────────────────────────
@@ -4581,23 +4403,6 @@ function renderHistoryTree(history) {
 
         container.appendChild(yearDiv);
     });
-}
-</script>
-<script>
-// FAILSAFE: Load texts even if main script has errors
-try {
-    if (typeof loadSavedTexts === 'function') {
-        loadSavedTexts();
-    }
-    if (typeof loadAdminStats === 'function' && document.getElementById('selectUser')) {
-        loadAdminStats();
-    }
-} catch(e) {
-    // If loadSavedTexts doesn't exist, the main script failed completely
-    var sel = document.getElementById('selectText');
-    if (sel) sel.innerHTML = '<option value="">ERROR JS - ver consola F12</option>';
-    var cnt = document.getElementById('savedTextsCount');
-    if (cnt) cnt.textContent = '(JS ERROR)';
 }
 </script>
 </body>
@@ -5048,11 +4853,7 @@ def logout():
 def index():
     if not session.get("username"):
         return redirect(url_for("login_page"))
-    response = make_response(render_template_string(HTML, username=session["username"], indicador_categorias_json=_INDICADOR_CATEGORIAS_JSON, all_users=user_manager.list_users()))
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
-    return response
+    return render_template_string(HTML, username=session["username"], indicador_categorias_json=_INDICADOR_CATEGORIAS_JSON, all_users=user_manager.list_users())
 
 
 @app.route("/analyze", methods=["POST"])
@@ -5075,12 +4876,12 @@ def analyze():
     _now_ts = __import__('time').time()
     if not hasattr(app, '_last_save_cache'):
         app._last_save_cache = {}
-    # _should_save = True unless this exact text was saved in the last 3 seconds (prevent double-click)
-    if _text_hash in app._last_save_cache and (_now_ts - app._last_save_cache[_text_hash]) < 3:
-        _should_save = False  # Double-click within 3s — skip save
+    if _text_hash in app._last_save_cache and (_now_ts - app._last_save_cache[_text_hash]) < 10:
+        # Skip save, just return the analysis
+        pass
     else:
         app._last_save_cache[_text_hash] = _now_ts
-        _should_save = True  # Allow save
+    _should_save = _text_hash not in app._last_save_cache or app._last_save_cache[_text_hash] == _now_ts
 
     result = analyzer.analyze(clean_text)
 
@@ -5126,30 +4927,17 @@ def analyze():
         target_user = session["username"]  # Non-admins can only save to themselves
 
     # Only save if entry_name is provided (mandatory) AND user is admin
-    _was_saved = False
-    _save_debug = {
-        "entry_name": entry_name,
-        "should_save": _should_save,
-        "is_admin": _is_admin(),
-        "target_user": target_user,
-        "year": year,
-        "month": month,
-    }
     if entry_name and _should_save and _is_admin():
-        try:
-            add_entry(
-                username=target_user,
-                text=clean_text,
-                analysis=analysis_dict,
-                source="text",
-                audio_filename=entry_name,
-                year=year,
-                month=month,
-                entry_name=entry_name,
-            )
-            _was_saved = True
-        except Exception as _save_exc:
-            app.logger.error(f"Error saving entry for {target_user}: {_save_exc}")
+        add_entry(
+            username=target_user,
+            text=clean_text,
+            analysis=analysis_dict,
+            source="text",
+            audio_filename=entry_name,
+            year=year,
+            month=month,
+            entry_name=entry_name,
+        )
 
     return jsonify({
         "error": False,
@@ -5157,142 +4945,82 @@ def analyze():
         "analyzed_at": result.analyzed_at,
         "year": year,
         "month": month,
-        "saved": _was_saved,
-        "saved_for": target_user if _was_saved else None,
-        "save_debug": _save_debug,
         **analysis_dict,
-    })
-
-
-@app.route("/debug-db")
-def debug_db():
-    """Diagnostic endpoint to check DB connectivity."""
-    if not session.get("username"):
-        return jsonify({"error": "not logged in"}), 401
-    import os as _os
-    from src.users import history_manager as _hm
-    db_url = _os.environ.get("DATABASE_URL", "")
-    has_url = bool(db_url)
-    pg_status = "unknown"
-    entry_count = 0
-    error_msg = ""
-    all_users_counts = {}
-    try:
-        _hm._use_pg = None  # Force re-check
-        _hm._pg_conn = None
-        from src.users.history_manager import _is_pg_available, get_flat_entries, _get_pg_conn
-        pg_avail = _is_pg_available()
-        pg_status = "available" if pg_avail else "unavailable"
-        if pg_avail:
-            entries = get_flat_entries(session["username"], limit=500)
-            entry_count = len(entries)
-            # Count all users in DB
-            conn = _get_pg_conn()
-            if conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT username, COUNT(*) FROM analysis_history GROUP BY username ORDER BY COUNT(*) DESC")
-                    rows = cur.fetchall()
-                    all_users_counts = {r[0]: r[1] for r in rows}
-    except Exception as exc:
-        pg_status = "error"
-        error_msg = str(exc)
-    return jsonify({
-        "has_database_url": has_url,
-        "pg_status": pg_status,
-        "entry_count_for_user": entry_count,
-        "all_users_in_db": all_users_counts,
-        "error": error_msg,
-        "username": session["username"],
     })
 
 
 @app.route("/saved-texts")
 def saved_texts():
-    """Return ALL entries for the current user (no server-side filtering)."""
+    """Return entries filtered by year/month for the saved texts panel."""
     if not session.get("username"):
-        return jsonify({"entries": [], "debug": "not logged in"}), 401
+        return jsonify({"entries": []}), 401
+
+    year = request.args.get("year", type=int)
+    month = request.args.get("month", type=int)
 
     username = session["username"]
-    all_entries = []
+    entries_found = []
 
-    # SOURCE 1: PostgreSQL
+    # PRIMARY SOURCE: PostgreSQL (where audio uploads and analyses are saved)
     try:
-        from src.users import history_manager as _hm
-        # Force fresh connection
-        if _hm._pg_conn and hasattr(_hm._pg_conn, 'closed') and _hm._pg_conn.closed:
-            _hm._pg_conn = None
-            _hm._use_pg = None
-        all_entries = get_flat_entries(username, limit=500)
+        pg_entries = get_flat_entries(username, limit=200)
+        for e in pg_entries:
+            e_year = e.get("year")
+            e_month = e.get("month")
+
+            # Extract year/month from timestamp if not set explicitly
+            if e_year is None and e.get("timestamp"):
+                try:
+                    from datetime import datetime as _dt
+                    ts_str = str(e["timestamp"])
+                    if hasattr(e["timestamp"], "year"):
+                        e_year = e["timestamp"].year
+                        e_month = e["timestamp"].month
+                    elif "T" in ts_str or "-" in ts_str:
+                        ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
+                        e_year = ts.year
+                        e_month = ts.month
+                except Exception:
+                    pass
+
+            if e_year == year and e_month == month:
+                entries_found.append(e)
     except Exception as exc:
-        app.logger.error(f"PG failed for {username}: {exc}")
-        # Reset and retry once
-        try:
-            from src.users import history_manager as _hm
-            _hm._use_pg = None
-            _hm._pg_conn = None
-            all_entries = get_flat_entries(username, limit=500)
-        except Exception:
-            pass
+        app.logger.warning(f"PG query failed for {username}: {exc}")
 
-    # SOURCE 2: JSON fallback (always check, merge with PG results)
-    import json as _json
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    users_dir = os.path.join(base_dir, "usuarios")
-    existing_ids = {e.get("id") for e in all_entries}
+    # FALLBACK: JSON file (for entries that were synced/imported)
+    if not entries_found:
+        import json as _json
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        users_dir = os.path.join(base_dir, "usuarios")
 
-    # Try {username}/history.json
-    subdir_path = os.path.join(users_dir, username, "history.json")
-    if os.path.exists(subdir_path):
-        try:
-            with open(subdir_path, "r", encoding="utf-8") as f:
-                history = _json.load(f)
-            for year_data in history.values():
-                if not isinstance(year_data, dict):
-                    continue
-                for month_data in year_data.values():
-                    if not isinstance(month_data, dict):
-                        continue
-                    for week_data in month_data.values():
-                        if not isinstance(week_data, dict):
+        # Try subdirectory format
+        subdir_path = os.path.join(users_dir, username, "history.json")
+        if os.path.exists(subdir_path):
+            try:
+                with open(subdir_path, "r", encoding="utf-8") as f:
+                    history = _json.load(f)
+                year_key = str(year) if year else None
+                month_key = f"{month:02d}-" if month else None
+                if year_key and year_key in history:
+                    for mk, month_data in history[year_key].items():
+                        if month_key and not mk.startswith(month_key):
                             continue
-                        for day_data in week_data.values():
-                            if not isinstance(day_data, dict):
-                                continue
-                            for entry in day_data.get("entries", []):
-                                if entry.get("id") not in existing_ids:
-                                    all_entries.append(entry)
-                                    existing_ids.add(entry.get("id"))
-        except Exception:
-            pass
-
-    # Try {username}_historial.json
-    historial_path = os.path.join(users_dir, f"{username}_historial.json")
-    if os.path.exists(historial_path):
-        try:
-            with open(historial_path, "r", encoding="utf-8") as f:
-                history = _json.load(f)
-            for year_data in history.values():
-                if not isinstance(year_data, dict):
-                    continue
-                for month_data in year_data.values():
-                    if not isinstance(month_data, dict):
-                        continue
-                    for week_data in month_data.values():
-                        if not isinstance(week_data, dict):
+                        if not isinstance(month_data, dict):
                             continue
-                        for day_data in week_data.values():
-                            if not isinstance(day_data, dict):
+                        for week_data in month_data.values():
+                            if not isinstance(week_data, dict):
                                 continue
-                            for entry in day_data.get("entries", []):
-                                if entry.get("id") not in existing_ids:
-                                    all_entries.append(entry)
-                                    existing_ids.add(entry.get("id"))
-        except Exception:
-            pass
+                            for day_data in week_data.values():
+                                if not isinstance(day_data, dict):
+                                    continue
+                                entries_found.extend(day_data.get("entries", []))
+            except Exception:
+                pass
 
-    # Format response — NO filtering, return everything
+    # Format response
     result = []
-    for e in all_entries:
+    for e in entries_found:
         result.append({
             "id": e.get("id", ""),
             "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
@@ -5573,28 +5301,34 @@ def admin_user_texts(username):
     year = request.args.get("year", type=int)
     month = request.args.get("month", type=int)
 
-    # Retry once if PG connection fails
-    entries = []
-    for _attempt in range(2):
-        try:
-            entries = get_flat_entries(username, limit=200)
-            break
-        except Exception as exc:
-            app.logger.warning(f"Admin PG attempt {_attempt+1} failed for {username}: {exc}")
-            from src.users import history_manager as _hm
-            _hm._use_pg = None
-            _hm._pg_conn = None
+    entries = get_flat_entries(username, limit=200)
 
     filtered = []
     for e in entries:
-        filtered.append({
-            "id": e.get("id", ""),
-            "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
-            "text": (e.get("text", "") or "")[:60],
-            "intent": e.get("intent", ""),
-            "timestamp": (str(e.get("timestamp", "")) or "")[:10],
-            "source": e.get("source", ""),
-        })
+        e_year = e.get("year")
+        e_month = e.get("month")
+        if e_year is None and e.get("timestamp"):
+            try:
+                from datetime import datetime as _dt
+                ts_str = str(e["timestamp"])
+                if hasattr(e["timestamp"], "year"):
+                    e_year = e["timestamp"].year
+                    e_month = e["timestamp"].month
+                elif "T" in ts_str or "-" in ts_str:
+                    ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
+                    e_year = ts.year
+                    e_month = ts.month
+            except Exception:
+                pass
+        if (not year or e_year == year) and (not month or e_month == month):
+            filtered.append({
+                "id": e.get("id", ""),
+                "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
+                "text": (e.get("text", "") or "")[:60],
+                "intent": e.get("intent", ""),
+                "timestamp": (str(e.get("timestamp", "")) or "")[:10],
+                "source": e.get("source", ""),
+            })
 
     return jsonify({"entries": filtered})
 
@@ -5671,10 +5405,10 @@ def admin_stats(username):
             except Exception:
                 pass
 
-        if (e_year is None or e_year == year) and (e_month is None or e_month in months_to_include):
+        if e_year == year and e_month in months_to_include:
             commercial = e.get("commercial") or {}
-            entry_count += 1  # Count all entries, not just those with commercial data
             if commercial:
+                entry_count += 1
                 for key in totals:
                     totals[key] += commercial.get(key, 0)
                 # Aggregate word-level detail
