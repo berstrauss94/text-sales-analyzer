@@ -5672,8 +5672,8 @@ def admin_stats(username):
 
         if (e_year is None or e_year == year) and (e_month is None or e_month in months_to_include):
             commercial = e.get("commercial") or {}
+            entry_count += 1  # Count all entries, not just those with commercial data
             if commercial:
-                entry_count += 1
                 for key in totals:
                     totals[key] += commercial.get(key, 0)
                 # Aggregate word-level detail
