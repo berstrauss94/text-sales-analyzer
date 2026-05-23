@@ -2083,10 +2083,11 @@ async function saveEntry() {
         } else if (entryName) {
             // Save was attempted but failed
             var failMsg = document.createElement('div');
-            failMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#1a0d0d;border:1px solid #f55b5b;color:#f55b5b;padding:10px 16px;border-radius:8px;font-size:0.75rem;z-index:9999;';
-            failMsg.textContent = 'No se pudo guardar. Verifica que eres admin y el titulo no esta vacio.';
+            failMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#1a0d0d;border:1px solid #f55b5b;color:#f55b5b;padding:10px 16px;border-radius:8px;font-size:0.75rem;z-index:9999;max-width:300px;';
+            var dbg = data.save_debug || {};
+            failMsg.textContent = 'No guardado. Debug: entry_name=' + (dbg.entry_name||'?') + ' should_save=' + dbg.should_save + ' is_admin=' + dbg.is_admin + ' target=' + (dbg.target_user||'?');
             document.body.appendChild(failMsg);
-            setTimeout(function() { failMsg.remove(); }, 5000);
+            setTimeout(function() { failMsg.remove(); }, 8000);
         }
 
         // Scroll to top after saving
@@ -5126,6 +5127,14 @@ def analyze():
 
     # Only save if entry_name is provided (mandatory) AND user is admin
     _was_saved = False
+    _save_debug = {
+        "entry_name": entry_name,
+        "should_save": _should_save,
+        "is_admin": _is_admin(),
+        "target_user": target_user,
+        "year": year,
+        "month": month,
+    }
     if entry_name and _should_save and _is_admin():
         try:
             add_entry(
@@ -5150,6 +5159,7 @@ def analyze():
         "month": month,
         "saved": _was_saved,
         "saved_for": target_user if _was_saved else None,
+        "save_debug": _save_debug,
         **analysis_dict,
     })
 
