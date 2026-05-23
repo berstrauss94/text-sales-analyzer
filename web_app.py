@@ -4344,7 +4344,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load on page load
     if (document.getElementById('selectUser')) {
-        // Admin: load stats and also load texts
+        // Admin: auto-select first user if none selected, then load stats and texts
+        var userSel = document.getElementById('selectUser');
+        if (userSel && !userSel.value && userSel.options.length > 1) {
+            userSel.value = userSel.options[1].value; // Select first real user (skip empty option)
+        }
         loadAdminStats();
         loadSavedTexts();
     } else {
@@ -5543,7 +5547,7 @@ def admin_user_texts(username):
                     e_month = ts.month
             except Exception:
                 pass
-        if (not year or e_year == year) and (not month or e_month == month):
+        if (not year or e_year is None or e_year == year) and (not month or e_month is None or e_month == month):
             filtered.append({
                 "id": e.get("id", ""),
                 "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
