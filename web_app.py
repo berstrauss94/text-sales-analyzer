@@ -3437,6 +3437,15 @@ async function loadSavedTexts() {
         return;
     }
 
+    // For admin with _all selected, skip text loading (no single user)
+    if (adminUser === '_all') {
+        const select = document.getElementById('selectText');
+        const count = document.getElementById('savedTextsCount');
+        if (select) select.innerHTML = '<option value="">-- Seleccionar un usuario especifico --</option>';
+        if (count) count.textContent = '';
+        return;
+    }
+
     const url = adminUser
         ? '/admin/user-texts/' + adminUser + '?year=' + year + (month ? '&month=' + month : '')
         : '/saved-texts?year=' + year + (month ? '&month=' + month : '');
@@ -4344,10 +4353,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load on page load
     if (document.getElementById('selectUser')) {
-        // Admin: auto-select first user if none selected, then load stats and texts
+        // Admin: auto-select first real user if none selected
         var userSel = document.getElementById('selectUser');
-        if (userSel && !userSel.value && userSel.options.length > 1) {
-            userSel.value = userSel.options[1].value; // Select first real user (skip empty option)
+        if (userSel && !userSel.value) {
+            // Find first option with a real username (not empty, not _all)
+            for (var i = 0; i < userSel.options.length; i++) {
+                var v = userSel.options[i].value;
+                if (v && v !== '_all' && v !== '') {
+                    userSel.value = v;
+                    break;
+                }
+            }
         }
         loadAdminStats();
         loadSavedTexts();
