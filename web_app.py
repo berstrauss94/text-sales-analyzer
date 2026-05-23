@@ -2046,20 +2046,25 @@ async function saveEntry() {
     if (!entryName) { alert('El titulo es obligatorio para guardar.'); return; }
 
     const year = document.getElementById('selectYear').value;
-    const month = document.getElementById('selectMonth').value;
+    // For month: if "Todos" is selected (empty value), use current month
+    var monthEl = document.getElementById('selectMonth');
+    var monthVal = monthEl ? monthEl.value : '';
+    var month = monthVal ? parseInt(monthVal) : (new Date().getMonth() + 1);
 
     document.getElementById('loading').style.display = 'block';
     document.getElementById('results').style.display = 'none';
 
     try {
-        // If admin has a user selected, save to that user
+        // If admin has a specific user selected, save to that user
         const userSelect = document.getElementById('selectUser');
-        const targetUser = userSelect ? userSelect.value : '';
+        var targetUser = userSelect ? userSelect.value : '';
+        // Don't use empty or _all as target user
+        if (!targetUser || targetUser === '_all') targetUser = '';
 
         const response = await fetch('/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, year: parseInt(year), month: parseInt(month), entry_name: entryName, target_user: targetUser })
+            body: JSON.stringify({ text, year: parseInt(year), month: month, entry_name: entryName, target_user: targetUser })
         });
         const data = await response.json();
         _lastCommercialData = data.commercial || null;
