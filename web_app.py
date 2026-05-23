@@ -1881,7 +1881,7 @@ HTML = """
                 <select id="selectUser" onchange="loadSavedTexts(); loadAdminStats();" style="min-width:150px;">
                     <option value="">-- Todos --</option>
                     {% for u in all_users %}
-                    <option value="{{ u }}">{{ u }}</option>
+                    <option value="{{ u }}" {% if loop.first %}selected{% endif %}>{{ u }}</option>
                     {% endfor %}
                 </select>
             </div>
