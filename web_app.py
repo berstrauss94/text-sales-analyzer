@@ -2080,6 +2080,13 @@ async function saveEntry() {
             savedMsg.textContent = 'Guardado para ' + (data.saved_for || 'usuario');
             document.body.appendChild(savedMsg);
             setTimeout(function() { savedMsg.remove(); }, 3000);
+        } else if (entryName) {
+            // Save was attempted but failed
+            var failMsg = document.createElement('div');
+            failMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#1a0d0d;border:1px solid #f55b5b;color:#f55b5b;padding:10px 16px;border-radius:8px;font-size:0.75rem;z-index:9999;';
+            failMsg.textContent = 'No se pudo guardar. Verifica que eres admin y el titulo no esta vacio.';
+            document.body.appendChild(failMsg);
+            setTimeout(function() { failMsg.remove(); }, 5000);
         }
 
         // Scroll to top after saving
@@ -5067,12 +5074,12 @@ def analyze():
     _now_ts = __import__('time').time()
     if not hasattr(app, '_last_save_cache'):
         app._last_save_cache = {}
-    # _should_save = True unless this exact text was saved in the last 10 seconds
-    if _text_hash in app._last_save_cache and (_now_ts - app._last_save_cache[_text_hash]) < 10:
-        _should_save = False  # Duplicate within 10s — skip save
+    # _should_save = True unless this exact text was saved in the last 3 seconds (prevent double-click)
+    if _text_hash in app._last_save_cache and (_now_ts - app._last_save_cache[_text_hash]) < 3:
+        _should_save = False  # Double-click within 3s — skip save
     else:
         app._last_save_cache[_text_hash] = _now_ts
-        _should_save = True  # New text or enough time passed — allow save
+        _should_save = True  # Allow save
 
     result = analyzer.analyze(clean_text)
 
