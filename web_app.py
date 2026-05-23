@@ -3470,6 +3470,7 @@ async function loadSavedTexts() {
             });
         } else {
             count.textContent = '(0 textos)';
+            select.innerHTML = '<option value="">Sin textos para este periodo</option>';
         }
     } catch(e) {
         console.error('Error loading saved texts:', e);
@@ -4350,6 +4351,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Regular user: load their texts
         loadSavedTexts();
     }
+    // Debug: show that JS loaded correctly
+    var countEl = document.getElementById('savedTextsCount');
+    if (countEl) countEl.textContent = '(cargando...)';
 });
 
 // ── History ───────────────────────────────────────────────────────────────
