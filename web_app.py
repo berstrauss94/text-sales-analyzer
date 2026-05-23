@@ -5587,30 +5587,14 @@ def admin_user_texts(username):
 
     filtered = []
     for e in entries:
-        e_year = e.get("year")
-        e_month = e.get("month")
-        if e_year is None and e.get("timestamp"):
-            try:
-                from datetime import datetime as _dt
-                ts_str = str(e["timestamp"])
-                if hasattr(e["timestamp"], "year"):
-                    e_year = e["timestamp"].year
-                    e_month = e["timestamp"].month
-                elif "T" in ts_str or "-" in ts_str:
-                    ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
-                    e_year = ts.year
-                    e_month = ts.month
-            except Exception:
-                pass
-        if (not year or e_year is None or e_year == year) and (not month or e_month is None or e_month == month):
-            filtered.append({
-                "id": e.get("id", ""),
-                "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
-                "text": (e.get("text", "") or "")[:60],
-                "intent": e.get("intent", ""),
-                "timestamp": (str(e.get("timestamp", "")) or "")[:10],
-                "source": e.get("source", ""),
-            })
+        filtered.append({
+            "id": e.get("id", ""),
+            "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
+            "text": (e.get("text", "") or "")[:60],
+            "intent": e.get("intent", ""),
+            "timestamp": (str(e.get("timestamp", "")) or "")[:10],
+            "source": e.get("source", ""),
+        })
 
     return jsonify({"entries": filtered})
 
