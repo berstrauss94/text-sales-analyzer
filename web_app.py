@@ -5117,25 +5117,33 @@ def debug_db():
     pg_status = "unknown"
     entry_count = 0
     error_msg = ""
+    all_users_counts = {}
     try:
         _hm._use_pg = None  # Force re-check
         _hm._pg_conn = None
-        from src.users.history_manager import _is_pg_available, get_flat_entries
+        from src.users.history_manager import _is_pg_available, get_flat_entries, _get_pg_conn
         pg_avail = _is_pg_available()
         pg_status = "available" if pg_avail else "unavailable"
         if pg_avail:
-            entries = get_flat_entries(session["username"], limit=5)
+            entries = get_flat_entries(session["username"], limit=500)
             entry_count = len(entries)
+            # Count all users in DB
+            conn = _get_pg_conn()
+            if conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT username, COUNT(*) FROM analysis_history GROUP BY username ORDER BY COUNT(*) DESC")
+                    rows = cur.fetchall()
+                    all_users_counts = {r[0]: r[1] for r in rows}
     except Exception as exc:
         pg_status = "error"
         error_msg = str(exc)
     return jsonify({
         "has_database_url": has_url,
         "pg_status": pg_status,
-        "entry_count": entry_count,
+        "entry_count_for_user": entry_count,
+        "all_users_in_db": all_users_counts,
         "error": error_msg,
         "username": session["username"],
-        "_use_pg_cached": _hm._use_pg,
     })
 
 
