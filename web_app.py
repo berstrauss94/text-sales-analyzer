@@ -3438,11 +3438,17 @@ async function loadSavedTexts() {
     }
 
     const url = adminUser
-        ? `/admin/user-texts/${adminUser}?year=${year}&month=${month}`
-        : `/saved-texts?year=${year}&month=${month}`;
+        ? '/admin/user-texts/' + adminUser + '?year=' + year + (month ? '&month=' + month : '')
+        : '/saved-texts?year=' + year + (month ? '&month=' + month : '');
 
     try {
         const response = await fetch(url);
+        if (!response.ok) {
+            console.error('loadSavedTexts HTTP error:', response.status);
+            const count = document.getElementById('savedTextsCount');
+            if (count) count.textContent = '(error ' + response.status + ')';
+            return;
+        }
         const data = await response.json();
         const select = document.getElementById('selectText');
         const count = document.getElementById('savedTextsCount');
@@ -3452,21 +3458,23 @@ async function loadSavedTexts() {
         select.innerHTML = '<option value="">-- Seleccionar texto --</option>';
 
         if (data.entries && data.entries.length > 0) {
-            count.textContent = `(${data.entries.length})`;
-            data.entries.forEach((e, i) => {
-                const rawName = e.entry_name || (e.text || '').substring(0, 16) || 'Texto #' + (i+1);
-                const name = rawName.length > 16 ? rawName.substring(0, 16) + '...' : rawName;
-                const opt = document.createElement('option');
+            count.textContent = '(' + data.entries.length + ')';
+            data.entries.forEach(function(e, i) {
+                var rawName = e.entry_name || (e.text || '').substring(0, 16) || 'Texto #' + (i+1);
+                var name = rawName.length > 16 ? rawName.substring(0, 16) + '...' : rawName;
+                var opt = document.createElement('option');
                 opt.value = e.id;
                 opt.textContent = name;
                 opt.setAttribute('data-fullname', e.entry_name || rawName);
                 select.appendChild(opt);
             });
         } else {
-            count.textContent = '(0)';
+            count.textContent = '(0 textos)';
         }
     } catch(e) {
         console.error('Error loading saved texts:', e);
+        var count = document.getElementById('savedTextsCount');
+        if (count) count.textContent = '(error de red)';
     }
 }
 

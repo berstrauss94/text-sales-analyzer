@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Validar JS antes de deploy",
+  "description": "Extrae el JavaScript de web_app.py y lo valida con Node.js antes de permitir el deploy. Previene errores de sintaxis que rompen la carga de textos y la torta gráfica.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "web_app.py"
+    ]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "python -c \"f=open('web_app.py','r',encoding='utf-8'); c=f.read(); js=c.split('<script>')[1].split('</script>')[0].replace('{{ indicador_categorias_json | safe }}', '{}'); open('_test_js.js','w',encoding='utf-8').write(js); print('JS extracted')\" && node --check _test_js.js && del _test_js.js && echo \"JS SYNTAX OK\""
+  }
+}
