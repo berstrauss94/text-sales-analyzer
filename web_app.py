@@ -2935,63 +2935,90 @@ function renderTextReport(data) {
     const intentEs = INTENT_ES[data.intent] || data.intent;
     const sentimentEs = SENTIMENT_ES[data.sentiment] || data.sentiment;
 
-    // Sales concepts summary
-    let salesSummary = 'Ninguno detectado';
+    // ML descriptions
+    var IDESC = {'OFFER':'El modelo detecta una propuesta activa: precio, condiciones o producto.','INQUIRY':'El modelo detecta preguntas o solicitudes de informacion.','NEGOTIATION':'El modelo detecta intercambio de condiciones o contrapropuestas.','CLOSING':'El modelo detecta senales de cierre: reserva, firma, confirmacion.','DESCRIPTION':'El modelo detecta descripcion de caracteristicas sin negociacion activa.','UNKNOWN':'El modelo no pudo clasificar la intencion con suficiente confianza.'};
+    var SDESC = {'POSITIVE':'Tono emocional positivo: entusiasmo, satisfaccion, acuerdo.','NEUTRAL':'Tono neutro o informativo. El cliente evalua sin emocion clara.','NEGATIVE':'Tono negativo: resistencia, insatisfaccion o rechazo.'};
+    var LDESC = {'CALIENTE':'Alta probabilidad de cierre (>70%). Prioridad maxima: presentar propuesta final.','TIBIO':'Probabilidad media (40-70%). Nutrir con informacion y resolver objeciones.','FRIO':'Baja probabilidad (<40%). Seguimiento a largo plazo.'};
+    var EDESC = {'AWARENESS':'Etapa inicial. Presentar valor y calificar necesidades.','CONSIDERATION':'Evaluacion activa. Resolver dudas y mostrar diferenciadores.','DECISION':'Listo para decidir. Facilitar cierre y crear urgencia.','CLOSED':'Operacion cerrada. Formalizar y solicitar referidos.'};
+    var UDESC = {'BAJA':'Sin urgencia. Mantener contacto periodico.','MEDIA':'Urgencia moderada. Propuestas concretas.','ALTA':'Urgencia clara. Actuar rapidamente.','CRITICA':'Urgencia maxima. Respuesta inmediata obligatoria.'};
+
+    // Expandable section helper
+    var _sid = 0;
+    function sec(icon, title, summary, detail, color) {
+        _sid++;
+        var id = 'rpt-' + _sid;
+        return '<div style="margin-top:5px;background:#0d1017;border-radius:6px;border-left:3px solid '+color+';overflow:hidden;">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;cursor:pointer;" onclick="var e=document.getElementById(\''+id+'\'),a=document.getElementById(\''+id+'-a\');if(e.style.display===\'none\'){e.style.display=\'block\';a.textContent=\'\\u25b2\';}else{e.style.display=\'none\';a.textContent=\'\\u25bc\';}">' +
+                '<div style="font-size:0.63rem;display:flex;align-items:center;gap:4px;"><span>'+icon+'</span><span style="color:#aaa;font-weight:600;">'+title+'</span> <span style="color:#e0e0e0;">'+summary+'</span></div>' +
+                '<span id="'+id+'-a" style="color:#7b5bf5;font-size:0.55rem;">&#9660;</span>' +
+            '</div>' +
+            '<div id="'+id+'" style="display:none;padding:6px 10px 8px;border-top:1px solid #1e2130;font-size:0.58rem;color:#aaa;line-height:1.5;">'+detail+'</div>' +
+        '</div>';
+    }
+
+    // Prepare data
+    var salesSummary = 'Ninguno';
+    var salesDetail = '<span style="color:#555;">Sin conceptos de venta detectados.</span>';
     if (data.sales_concepts && data.sales_concepts.length > 0) {
-        salesSummary = data.sales_concepts.map(sc => translateConcept(sc.concept, SALES_CONCEPTS_ES) + ' (' + Math.round(sc.confidence * 100) + '%)').join(', ');
+        salesSummary = data.sales_concepts.map(function(sc){return translateConcept(sc.concept, SALES_CONCEPTS_ES)+' ('+Math.round(sc.confidence*100)+'%)';}).join(', ');
+        salesDetail = data.sales_concepts.map(function(sc){var l=translateConcept(sc.concept,SALES_CONCEPTS_ES);var s=sc.source_text?sc.source_text.split(' /// ').slice(0,2).map(function(f){return '<em style="color:#666;">"'+f.substring(0,70)+(f.length>70?'...':'')+'"</em>';}).join('<br>'):'';return '<div style="margin-bottom:4px;"><strong style="color:#7b9cff;">'+l+'</strong> ('+Math.round(sc.confidence*100)+'%)'+(s?'<br>'+s:'')+'</div>';}).join('');
     }
-
-    // Real estate concepts summary
-    let reSummary = 'Ninguno detectado';
+    var reSummary = 'Ninguno';
+    var reDetail = '<span style="color:#555;">Sin conceptos inmobiliarios detectados.</span>';
     if (data.real_estate_concepts && data.real_estate_concepts.length > 0) {
-        reSummary = data.real_estate_concepts.map(rc => translateConcept(rc.concept, RE_CONCEPTS_ES) + ' (' + Math.round(rc.confidence * 100) + '%)').join(', ');
+        reSummary = data.real_estate_concepts.map(function(rc){return translateConcept(rc.concept, RE_CONCEPTS_ES)+' ('+Math.round(rc.confidence*100)+'%)';}).join(', ');
+        reDetail = data.real_estate_concepts.map(function(rc){var l=translateConcept(rc.concept,RE_CONCEPTS_ES);var s=rc.source_text?rc.source_text.split(' /// ').slice(0,2).map(function(f){return '<em style="color:#666;">"'+f.substring(0,70)+(f.length>70?'...':'')+'"</em>';}).join('<br>'):'';return '<div style="margin-bottom:4px;"><strong style="color:#b38bff;">'+l+'</strong> ('+Math.round(rc.confidence*100)+'%)'+(s?'<br>'+s:'')+'</div>';}).join('');
     }
-
-    // Entities summary
-    let entitiesSummary = '';
+    var entSummary = '';
+    var entDetail = '';
     if (data.entities && data.entities.length > 0) {
-        const grouped = {};
-        data.entities.forEach(e => { if (!grouped[e.concept]) grouped[e.concept] = []; grouped[e.concept].push(e); });
-        entitiesSummary = Object.entries(grouped).map(([concept, items]) => {
-            const label = (ENTITY_ES && ENTITY_ES[concept]) || concept;
-            return label + ': ' + items.slice(0, 3).map(e => e.raw_value).join(', ') + (items.length > 3 ? ' (+' + (items.length - 3) + ')' : '');
-        }).join(' | ');
+        var gr = {};
+        data.entities.forEach(function(e){if(!gr[e.concept])gr[e.concept]=[];gr[e.concept].push(e);});
+        entSummary = Object.keys(gr).length + ' tipos';
+        entDetail = Object.entries(gr).map(function(en){var lbl=(ENTITY_ES&&ENTITY_ES[en[0]])||en[0];var vals=en[1].slice(0,5).map(function(e){return e.raw_value;}).join(', ');return '<div style="margin-bottom:3px;"><span style="color:#888;">'+lbl+':</span> <span style="color:#ccc;">'+vals+(en[1].length>5?' (+' +(en[1].length-5)+')':'')+'</span></div>';}).join('');
     }
-
-    // Commercial indicators summary
-    const indLabels = { palabras_positivas: 'Positivas', respuestas_afirmativas: 'Afirmativas', indicios_cierre: 'Cierre', escasez_comercial: 'Escasez', pedidos_referidos: 'Referidos', objeciones: 'Objeciones', indicios_prospeccion: 'Prospeccion' };
-    const indSummary = Object.entries(indLabels).map(([k, label]) => label + ': ' + (c[k] || 0)).join(' | ');
+    var indSummary = 'P:' + (c.palabras_positivas||0) + ' A:' + (c.respuestas_afirmativas||0) + ' C:' + (c.indicios_cierre||0) + ' O:' + (c.objeciones||0);
+    var indDetail = '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+    var indN = {palabras_positivas:'Positivas',respuestas_afirmativas:'Afirmativas',indicios_cierre:'Cierre',escasez_comercial:'Escasez',pedidos_referidos:'Referidos',objeciones:'Objeciones',indicios_prospeccion:'Prospeccion'};
+    var indC = {palabras_positivas:'#5bf5a3',respuestas_afirmativas:'#7b9cff',indicios_cierre:'#f5d75b',escasez_comercial:'#f5a35b',pedidos_referidos:'#b38bff',objeciones:'#f55b5b',indicios_prospeccion:'#5bd4f5'};
+    Object.entries(indN).forEach(function(e){var k=e[0],l=e[1],v=c[k]||0,col=indC[k];indDetail+='<div style="background:#0a0c14;border:1px solid '+col+'33;border-radius:5px;padding:3px 6px;"><span style="color:'+col+';font-weight:700;">'+v+'</span> <span style="color:#888;">'+l+'</span></div>';});
+    indDetail += '</div>';
 
     // Build report
-    let report = '<div style="margin-top:16px;padding:16px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
-    report += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-size:0.75rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">📋 Informe del Texto</div><button onclick="copyReport()" style="background:#1a1d27;border:1px solid #2a2d3e;color:#aaa;padding:4px 10px;border-radius:6px;font-size:0.6rem;cursor:pointer;">📋 Copiar</button></div>';
+    var r = '<div style="margin-top:16px;padding:14px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
+    // Header with ML logo and (!) tooltip
+    r += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;position:relative;">';
+    r += '<div style="display:flex;align-items:center;gap:6px;">';
+    r += '<span style="font-size:1rem;">&#129302;</span>';
+    r += '<div><div style="font-size:0.73rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">Informe del Texto</div>';
+    r += '<div style="font-size:0.52rem;color:#555;">Analisis por Machine Learning</div></div>';
+    r += '<span class="card-info-icon" style="position:relative;top:0;right:0;font-size:0.5rem;width:14px;height:14px;line-height:14px;" onclick="event.stopPropagation()">!</span>';
+    r += '<div class="card-info-tooltip" style="top:20px;left:30px;right:auto;min-width:220px;font-size:0.58rem;z-index:100;">Este informe es generado por modelos de Machine Learning. Cada seccion se expande con la flecha morada para ver el detalle. Los porcentajes indican la confianza del modelo.</div>';
+    r += '</div>';
+    r += '<button onclick="copyReport()" style="background:#1a1d27;border:1px solid #2a2d3e;color:#aaa;padding:4px 10px;border-radius:6px;font-size:0.58rem;cursor:pointer;">Copiar</button>';
+    r += '</div>';
 
-    report += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.65rem;">';
-    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #4a6cf7;"><span style="color:#666;">Intencion:</span> <strong style="color:#e0e0e0;">' + intentEs + '</strong> (' + Math.round((data.intent_confidence || 0) * 100) + '%)</div>';
-    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid ' + (data.sentiment === 'POSITIVE' ? '#5bf5a3' : data.sentiment === 'NEGATIVE' ? '#f55b5b' : '#f5a35b') + ';"><span style="color:#666;">Sentimiento:</span> <strong style="color:#e0e0e0;">' + sentimentEs + '</strong> (' + Math.round((data.sentiment_confidence || 0) * 100) + '%)</div>';
-    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #f5d75b;"><span style="color:#666;">Lead:</span> <strong style="color:#e0e0e0;">' + (c.tipo_lead || '-') + '</strong></div>';
-    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #5bf5a3;"><span style="color:#666;">Prob. Cierre:</span> <strong style="color:#e0e0e0;">' + (c.probabilidad_cierre || 0).toFixed(1) + '%</strong></div>';
-    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #b38bff;"><span style="color:#666;">Etapa:</span> <strong style="color:#e0e0e0;">' + (c.etapa_funnel || '-') + '</strong></div>';
-    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #f5a35b;"><span style="color:#666;">Urgencia:</span> <strong style="color:#e0e0e0;">' + (c.urgencia || '-') + '</strong></div>';
-    report += '</div>';
+    // Sections
+    r += sec('&#128269;', 'Clasificacion', intentEs + ' | ' + sentimentEs,
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;"><div><strong style="color:#4a6cf7;">'+intentEs+'</strong> ('+Math.round((data.intent_confidence||0)*100)+'%)<br><span style="color:#555;">'+( IDESC[data.intent]||'')+'</span></div><div><strong style="color:'+(data.sentiment==='POSITIVE'?'#5bf5a3':data.sentiment==='NEGATIVE'?'#f55b5b':'#f5a35b')+';">'+sentimentEs+'</strong> ('+Math.round((data.sentiment_confidence||0)*100)+'%)<br><span style="color:#555;">'+(SDESC[data.sentiment]||'')+'</span></div></div>', '#4a6cf7');
 
-    report += '<div style="margin-top:8px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.63rem;"><span style="color:#666;">Indicadores:</span> <span style="color:#ccc;">' + indSummary + '</span></div>';
-    report += '<div style="margin-top:4px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.63rem;"><span style="color:#666;">Conceptos Venta:</span> <span style="color:#ccc;">' + salesSummary + '</span></div>';
-    report += '<div style="margin-top:4px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.63rem;"><span style="color:#666;">Conceptos Inmobiliarios:</span> <span style="color:#ccc;">' + reSummary + '</span></div>';
+    r += sec('&#127919;', 'Lead y Cierre', (c.tipo_lead||'-') + ' | ' + (c.probabilidad_cierre||0).toFixed(1) + '%',
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;"><div><strong style="color:'+(c.tipo_lead==='CALIENTE'?'#f55b5b':c.tipo_lead==='TIBIO'?'#f5a35b':'#5bd4f5')+';">Lead '+(c.tipo_lead||'-')+'</strong><br><span style="color:#555;">'+(LDESC[c.tipo_lead]||'')+'</span></div><div><strong style="color:#5bf5a3;">Prob: '+(c.probabilidad_cierre||0).toFixed(1)+'%</strong><br><span style="color:#555;">Formula: cierre(x5) + afirmativas(x2) - objeciones(x3)</span></div></div>', c.tipo_lead==='CALIENTE'?'#f55b5b':c.tipo_lead==='TIBIO'?'#f5a35b':'#5bd4f5');
 
-    if (entitiesSummary) {
-        report += '<div style="margin-top:4px;padding:6px 8px;background:#0d1017;border-radius:6px;font-size:0.63rem;"><span style="color:#666;">Datos Extraidos:</span> <span style="color:#ccc;">' + entitiesSummary + '</span></div>';
-    }
+    r += sec('&#128200;', 'Etapa y Urgencia', (c.etapa_funnel||'-') + ' | ' + (c.urgencia||'-'),
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;"><div><strong style="color:#b38bff;">'+(c.etapa_funnel||'-')+'</strong><br><span style="color:#555;">'+(EDESC[c.etapa_funnel]||'')+'</span></div><div><strong style="color:'+(c.urgencia==='CRITICA'?'#f55b5b':'#f5a35b')+';">'+(c.urgencia||'-')+'</strong><br><span style="color:#555;">'+(UDESC[c.urgencia]||'')+'</span></div></div>', '#b38bff');
 
-    if (c.recomendacion) {
-        report += '<div style="margin-top:8px;padding:8px;background:#0d1a0d;border:1px solid #1a3a1a;border-radius:6px;font-size:0.65rem;color:#5bf5a3;">💡 ' + c.recomendacion + '</div>';
-    }
-    if (c.accion_siguiente) {
-        report += '<div style="margin-top:4px;padding:8px;background:#0d0d1a;border:1px solid #1a1a3a;border-radius:6px;font-size:0.65rem;color:#7b9cff;">▶️ ' + c.accion_siguiente + '</div>';
-    }
+    r += sec('&#128202;', 'Indicadores', indSummary, indDetail, '#5bd4f5');
+    r += sec('&#127991;', 'Conceptos Venta', salesSummary, salesDetail, '#7b9cff');
+    r += sec('&#127968;', 'Conceptos Inmobiliarios', reSummary, reDetail, '#b38bff');
+    if (entSummary) r += sec('&#128202;', 'Datos Extraidos', entSummary, entDetail, '#f5a35b');
 
-    report += '</div>';
-    return report;
+    // Always visible: recommendation + next step
+    if (c.recomendacion) r += '<div style="margin-top:6px;padding:7px;background:#0d1a0d;border:1px solid #1a3a1a;border-radius:6px;font-size:0.63rem;color:#5bf5a3;">&#128161; ' + c.recomendacion + '</div>';
+    if (c.accion_siguiente) r += '<div style="margin-top:4px;padding:7px;background:#0d0d1a;border:1px solid #1a1a3a;border-radius:6px;font-size:0.63rem;color:#7b9cff;">&#9654; ' + c.accion_siguiente + '</div>';
+
+    r += '</div>';
+    return r;
 }
 
 function copyReport() {
