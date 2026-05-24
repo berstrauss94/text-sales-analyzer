@@ -4983,7 +4983,7 @@ def saved_texts():
                 except Exception:
                     pass
 
-            if e_year == year and e_month == month:
+            if (not year or e_year == year) and (not month or e_month is None or e_month == month):
                 entries_found.append(e)
     except Exception as exc:
         app.logger.warning(f"PG query failed for {username}: {exc}")
@@ -5320,7 +5320,7 @@ def admin_user_texts(username):
                     e_month = ts.month
             except Exception:
                 pass
-        if (not year or e_year == year) and (not month or e_month == month):
+        if (not year or e_year == year) and (not month or e_month is None or e_month == month):
             filtered.append({
                 "id": e.get("id", ""),
                 "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
