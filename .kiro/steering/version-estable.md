@@ -2,51 +2,60 @@
 inclusion: auto
 ---
 
-# VERSION ESTABLE DE REFERENCIA
+# VERSION ESTABLE Y REGLAS DE PROTECCION
 
-## Identificadores del respaldo
+## Version estable de referencia
 
-| Tipo | Nombre | Descripción |
-|------|--------|-------------|
-| Git Tag | `STABLE-v3-2026-05-23` | Tag principal de la versión estable |
-| Git Tag | `BACKUP-STABLE-001` | Tag de respaldo adicional |
-| Git Branch | `backup/stable-v3-2026-05-23` | Rama de respaldo en GitHub |
-| Commit Hash | `a84a024` | Hash del commit estable en master |
+| Tipo | Nombre |
+|------|--------|
+| Git Tag | `STABLE-v3-2026-05-23` |
+| Git Tag | `BACKUP-STABLE-001` |
+| Git Branch | `backup/stable-v3-2026-05-23` |
 
-## Fecha del respaldo
-23 de Mayo de 2026 — post-rollback de sesión problemática
+## REGLAS OBLIGATORIAS para cualquier cambio en web_app.py
 
-## Funcionalidades confirmadas en esta versión
-- ✅ Análisis de textos con ML (intención, sentimiento, conceptos)
-- ✅ Guardado de textos por admin (BaronVonBerna) asignados a usuarios
-- ✅ Carga de textos guardados en dropdown por usuario/mes
-- ✅ Torta gráfica general (Panel de Seguimiento Admin)
-- ✅ Torta gráfica unitaria por texto analizado
-- ✅ Informe completo por texto
-- ✅ Indicadores comerciales con detalle por categoría
-- ✅ Resaltado de palabras en texto con autoscroll
+1. **NUNCA** usar emojis directamente en strings JS concatenados con `+`. Usar HTML entities (`&#128161;` en vez de 💡).
+2. **NUNCA** usar `<script>` tags dentro de `innerHTML` — no se ejecutan y rompen el HTML.
+3. **NUNCA** declarar funciones con `function` dentro de bloques `try`.
+4. **NUNCA** usar IIFEs con MutationObserver.
+5. **NUNCA** modificar `loadSavedTexts`, `loadAdminStats`, ni los endpoints `/saved-texts` o `/admin/user-texts` sin verificar que siguen devolviendo datos.
+6. **SIEMPRE** validar JS con `node --check` antes de deployar (el test `test_js_syntax.py` lo hace automáticamente).
+7. **SIEMPRE** que se modifique `renderTextReport` o cualquier función de renderizado, verificar que NO afecta la carga de textos.
+8. **SIEMPRE** hacer deploy y esperar 5 minutos completos antes de verificar cambios en producción.
+9. **NUNCA** usar `\s` sin escapar dentro de strings Python que contengan regex JS — usar `\\s` para evitar SyntaxWarning.
+10. **NUNCA** agregar funciones nuevas en rutas admin sin agregar `_is_admin()` como primer guard.
 
-## Cómo restaurar esta versión
+## REGLAS OBLIGATORIAS para history_manager.py
 
-### Opción 1 — Restaurar archivos específicos:
+1. **NUNCA** definir `_save_json` más de una vez — la segunda definición silenciosamente sobreescribe la primera (que tiene escritura atómica + lock).
+2. **SIEMPRE** usar el pool de conexiones `_get_pg_conn()` / `_return_pg_conn()` — nunca crear conexiones directas con `psycopg2.connect()` en funciones del módulo.
+3. **SIEMPRE** que se añada una función `_pg_*` nueva, seguir el patrón: `conn = None` en el `except` antes de `_return_pg_conn(conn, close=True)` para evitar doble-release al pool.
+4. **NUNCA** liberar la conexión en un bloque `finally` si también se libera en `except` sin `conn = None` en el medio.
+
+## REGLAS OBLIGATORIAS para rutas en web_app.py
+
+1. **SIEMPRE** que se llame `add_entry()` en una ruta, incluir los 3 parámetros obligatorios: `username=`, `text=`, `analysis=`.
+2. **SIEMPRE** que se cree una ruta `/admin/*`, agregar `if not _is_admin(): return ..., 403` como primera línea del handler.
+3. **NUNCA** exponer `traceback.format_exc()` en endpoints accesibles a usuarios no-admin.
+
+## Cómo restaurar si algo se rompe
+
 ```bash
 git checkout STABLE-v3-2026-05-23 -- web_app.py src/users/history_manager.py src/components/commercial_analyzer.py src/components/concept_extractor.py
 python deploy.py
 ```
 
-### Opción 2 — Ver el código de esa versión:
+## Tests de protección — ejecutar SIEMPRE antes de deploy
+
 ```bash
-git show STABLE-v3-2026-05-23:web_app.py > web_app_stable.py
+python -m pytest tests/ -q
 ```
 
-### Opción 3 — Desde la rama de respaldo:
-```bash
-git checkout backup/stable-v3-2026-05-23
-```
+Cobertura de los tests:
 
-## REGLA IMPORTANTE
-Antes de hacer cambios grandes, crear un nuevo tag:
-```bash
-git tag -a "STABLE-vX-YYYY-MM-DD" -m "descripcion"
-git push origin STABLE-vX-YYYY-MM-DD
-```
+| Archivo | Qué protege |
+|---------|-------------|
+| `tests/test_js_syntax.py` | Sintaxis JS, sin surrogate pairs, `loadSavedTexts`, `loadAdminStats` |
+| `tests/test_structural_integrity.py` | Sin SyntaxWarnings Python, sin funciones duplicadas, `upload_audio` completo, guards admin en todos los endpoints, no double-release de conexiones PG, SECRET_KEY estable, rutas críticas presentes, `add_entry` re-lanza errores |
+
+Estos tests se ejecutan automáticamente en cada deploy via `deploy.py`.

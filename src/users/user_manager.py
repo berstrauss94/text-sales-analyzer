@@ -151,7 +151,20 @@ class UserManager:
         with open(self._user_file(username), "r", encoding="utf-8") as f:
             content = f.read()
 
-        if password_hash in content:
+        # Extract stored hash from the dedicated field to avoid false positives
+        # if the hash happens to appear in another field (empresa, direccion, etc.)
+        stored_hash = None
+        for line in content.splitlines():
+            if line.startswith("Contrasena (hash)"):
+                parts = line.split(":", 1)
+                if len(parts) == 2:
+                    stored_hash = parts[1].strip()
+                break
+
+        if stored_hash is not None and stored_hash == password_hash:
+            return {"ok": True, "username": username}
+        # Legacy fallback: files written before this fix used a looser check
+        if stored_hash is None and password_hash in content:
             return {"ok": True, "username": username}
         return {"ok": False, "error": "Usuario o contrasena incorrectos."}
 

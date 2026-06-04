@@ -27,9 +27,33 @@ from src.users.user_manager import UserManager
 from src.users.history_manager import add_entry, get_history, get_flat_entries
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
-# Allow large audio uploads (no size limit enforced here — handled by gunicorn/nginx)
-app.config["MAX_CONTENT_LENGTH"] = None
+
+# SECRET_KEY: use env var in production (Railway).
+# In development, use a stable hardcoded fallback so local sessions survive restarts.
+# NEVER use the dev fallback in production — set SECRET_KEY in Railway env vars.
+_SECRET_KEY = os.environ.get("SECRET_KEY")
+if not _SECRET_KEY:
+    _is_prod_env = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("PORT"))
+    if _is_prod_env:
+        # In production without SECRET_KEY, generate a random one and warn loudly.
+        # Sessions will break on restart, but at least the app won't crash.
+        _SECRET_KEY = secrets.token_hex(32)
+        import logging as _logging_init
+        _logging_init.warning(
+            "CRITICAL: SECRET_KEY not set in production. "
+            "All sessions will be invalidated on every restart. "
+            "Set SECRET_KEY in Railway environment variables immediately."
+        )
+    else:
+        # Local dev: stable key so sessions survive `python web_app.py` restarts.
+        # This is NOT a secret — do not use in production.
+        _SECRET_KEY = "dev-local-stable-key-not-for-production-analizador-v3"
+
+app.secret_key = _SECRET_KEY
+
+# Limit upload size to 200 MB to prevent out-of-memory crashes from large audio files.
+# Audio files larger than this should be split before uploading.
+app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # 200 MB
 commercial_analyzer = CommercialAnalyzer()
 user_manager = UserManager()
 audio_transcriber = AudioTranscriber(model_name="base")
@@ -3214,7 +3238,7 @@ function renderSaveConfirmation(data) {
     const monthName = months[savedMonth] || '';
 
     // Generate a default name from the first words of the text
-    const defaultName = (data.input_text || '').substring(0, 40).replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s]/g, '').trim() + '...';
+    const defaultName = (data.input_text || '').substring(0, 40).replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\\s]/g, '').trim() + '...';
 
     let yearOptions = '';
     for (let y = 2026; y <= 2030; y++) {
@@ -4039,7 +4063,7 @@ function buildHighlightedText(text, words, indicatorKey) {
 
     // Always highlight "Vendedor" and "Cliente X" labels in green for role identification
     result = result.replace(/(Vendedor)/g, '<span style="color:#5bf5a3;font-weight:700;">$1</span>');
-    result = result.replace(/(Cliente(?:\s*\d*)?)/g, '<span style="color:#5bf5a3;font-weight:700;">$1</span>');
+    result = result.replace(/(Cliente(?:\\s*\\d*)?)/g, '<span style="color:#5bf5a3;font-weight:700;">$1</span>');
 
     return result;
 }
@@ -4870,18 +4894,12 @@ def analyze():
     # Filter out consecutive repeated words/phrases from transcription artifacts
     clean_text = _dedup_transcription(data["text"])
 
-    # Prevent duplicate saves (same user + same text within 10 seconds)
-    import hashlib
-    _text_hash = hashlib.md5(f"{session['username']}:{clean_text[:200]}".encode()).hexdigest()
-    _now_ts = __import__('time').time()
-    if not hasattr(app, '_last_save_cache'):
-        app._last_save_cache = {}
-    if _text_hash in app._last_save_cache and (_now_ts - app._last_save_cache[_text_hash]) < 10:
-        # Skip save, just return the analysis
-        pass
-    else:
-        app._last_save_cache[_text_hash] = _now_ts
-    _should_save = _text_hash not in app._last_save_cache or app._last_save_cache[_text_hash] == _now_ts
+    # The old in-memory dedup cache (_last_save_cache) doesn't work with gunicorn
+    # multi-worker mode (each worker has a separate process/memory space).
+    # The real guard against duplicates is: entry_name is REQUIRED to save
+    # (enforced below), and ON CONFLICT DO NOTHING in PostgreSQL.
+    # So _should_save is simply True here — the DB handles idempotency.
+    _should_save = True
 
     result = analyzer.analyze(clean_text)
 
@@ -5180,6 +5198,9 @@ def upload_audio():
 
     # Save to history
     add_entry(
+        username=session["username"],
+        text=transcribed_text,
+        analysis=analysis_dict,
         source="audio",
         audio_filename=original_name,
     )
@@ -5434,7 +5455,7 @@ def admin_stats(username):
 @app.route("/admin/sync", methods=["POST"])
 def admin_sync():
     """Dispara una sincronización manual (solo admin)."""
-    if not session.get("username") or session["username"] != "admin":
+    if not _is_admin():
         return jsonify({"error": True, "error_message": "No autorizado"}), 403
 
     historical = request.json.get("historical", False) if request.is_json else False
@@ -5448,7 +5469,7 @@ def admin_sync():
 @app.route("/admin/sync/log")
 def admin_sync_log():
     """Retorna el log de sincronizaciones (solo admin)."""
-    if not session.get("username") or session["username"] != "admin":
+    if not _is_admin():
         return jsonify({"error": True, "error_message": "No autorizado"}), 403
 
     import json as _json
@@ -5463,9 +5484,12 @@ def admin_sync_log():
 def debug_sync_one():
     """
     Debug endpoint: cleans ALL entries for the logged-in user.
+    ADMIN ONLY — protegido para evitar borrado accidental.
     """
     if not session.get("username"):
         return jsonify({"error": "not logged in"}), 401
+    if not _is_admin():
+        return jsonify({"error": "unauthorized — solo admins pueden usar este endpoint"}), 403
 
     username = session["username"]
     import traceback
