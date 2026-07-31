@@ -66,6 +66,21 @@ class CommercialAnalysis:
     indicadores_detalle_categorias: dict = field(default_factory=dict)
     # Totales de frases por indicador (para calcular % del pie chart)
     indicadores_total_frases: dict = field(default_factory=dict)
+    # --- Reglas de negocio inmobiliarias ---
+    # Co-decisores detectados: lista de menciones ej. ["mi esposo", "mi socio"]
+    co_decisores: list = field(default_factory=list)
+    # True si hay más de un decisor involucrado en la compra
+    es_multi_decisor: bool = False
+    # Rango presupuestario clasificado: ENTRADA | CUOTAS | CONTADO | CREDITO | NO_DETECTADO
+    rango_presupuestario: str = "NO_DETECTADO"
+    # Montos monetarios detectados con contexto de financiamiento
+    presupuesto_detalle: dict = field(default_factory=dict)
+    # Alertas activas para el vendedor (lista de dicts con nivel+mensaje)
+    alertas_vendedor: list = field(default_factory=list)
+    # True si la conversación debe ir a revisión del coordinador
+    requiere_revision_coordinador: bool = False
+    # Motivo de revisión si requiere_revision_coordinador es True
+    motivo_revision: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -419,6 +434,97 @@ _PERSUASION_RECIPROCIDAD: list[str] = [
     "sin cargo", "te lo incluimos", "va de regalo",
 ]
 
+# ---------------------------------------------------------------------------
+# Co-decisor keywords — detectan que otra persona participa en la decisión
+# ---------------------------------------------------------------------------
+
+_CO_DECISOR_PATTERNS: list[tuple[str, str]] = [
+    # (regex_pattern, label)
+    (r'\b(mi\s+esposo|mi\s+esposa|con\s+mi\s+esposo|con\s+mi\s+esposa)\b', "Cónyuge"),
+    (r'\b(mi\s+marido|mi\s+mujer|mi\s+pareja|con\s+mi\s+pareja)\b', "Cónyuge"),
+    (r'\b(mi\s+socio|mi\s+socia|con\s+mi\s+socio|con\s+mi\s+socia)\b', "Socio/a"),
+    (r'\b(mis?\s+socios|mi\s+compan[eé]ro|mi\s+compan[eé]ra)\b', "Socio/a"),
+    (r'\b(con\s+mi\s+hermano|con\s+mi\s+hermana|mi\s+hermano|mi\s+hermana)\b', "Familiar"),
+    (r'\b(con\s+mi\s+pap[aá]|con\s+mi\s+mam[aá]|mis\s+padres|con\s+mis\s+padres)\b', "Familiar"),
+    (r'\b(con\s+mi\s+hijo|con\s+mi\s+hija|mis\s+hijos)\b', "Familiar"),
+    (r'\b(tengo\s+que\s+consultar|hay\s+que\s+consultar|debo\s+consultar)\b', "Consulta pendiente"),
+    (r'\b(no\s+puedo\s+decidir\s+solo|no\s+puedo\s+decidir\s+sola)\b', "Consulta pendiente"),
+    (r'\b(lo\s+hablamos|lo\s+vemos|lo\s+consultamos|lo\s+analizamos\s+juntos)\b', "Consulta pendiente"),
+]
+
+# ---------------------------------------------------------------------------
+# Rango presupuestario — cruza montos con contexto de financiamiento
+# ---------------------------------------------------------------------------
+
+_PRESUPUESTO_ENTRADA: list[str] = [
+    "entrada", "anticipo", "seña", "enganche", "reserva", "primer pago",
+    "pago inicial", "cuota inicial", "down payment",
+]
+
+_PRESUPUESTO_CUOTAS: list[str] = [
+    "cuota", "cuotas", "financiamiento directo", "pago en cuotas",
+    "facilidades de pago", "plan de pago", "financiacion propia",
+    "cuotas fijas", "cuotas variables",
+]
+
+_PRESUPUESTO_CONTADO: list[str] = [
+    "contado", "efectivo", "pago total", "pago completo",
+    "pago unico", "al contado", "cash",
+]
+
+_PRESUPUESTO_CREDITO: list[str] = [
+    "credito", "hipoteca", "banco", "prestamo", "hipotecario",
+    "financiamiento bancario", "pre-aprobado", "credito bancario",
+]
+
+# Guías de objeciones por tipo (para mostrar en el frontend)
+OBJECIONES_GUIA: dict[str, dict] = {
+    "Objecion de precio": {
+        "titulo": "Guía: Objeción de Precio",
+        "tecnicas": [
+            "Reformular el precio en cuotas mensuales: '¿Te parece mucho $X por mes?'",
+            "Comparar con costo de alquiler: 'Estás pagando arriendo todos los meses...'",
+            "Mostrar valorización: 'Este lote subió un 40% en 2 años'",
+            "Ofrecer plan de financiación alternativo",
+        ],
+    },
+    "Objecion de ubicacion": {
+        "titulo": "Guía: Objeción de Ubicación",
+        "tecnicas": [
+            "Destacar accesos y conectividad del barrio",
+            "Mostrar proyectos de infraestructura cercanos",
+            "Comparar con propiedades similares más caras en zonas 'mejores'",
+            "Resaltar la tranquilidad o exclusividad según el perfil",
+        ],
+    },
+    "Indecision": {
+        "titulo": "Guía: Indecisión del Cliente",
+        "tecnicas": [
+            "Identificar el co-decisor y proponer incluirlo en la siguiente llamada",
+            "Crear urgencia con disponibilidad limitada",
+            "Resumir los beneficios clave en 3 puntos concretos",
+            "Proponer una pequeña acción: 'Solo reservamos con $X, sin compromiso'",
+        ],
+    },
+    "Dudas generales": {
+        "titulo": "Guía: Dudas del Cliente",
+        "tecnicas": [
+            "Escuchar sin interrumpir — dejar que exprese todas las dudas",
+            "Validar la duda: 'Es una pregunta muy válida'",
+            "Responder con datos concretos y testimonios",
+            "Ofrecer material de apoyo: documentación, videos del proyecto",
+        ],
+    },
+    "Objecion legal/documental": {
+        "titulo": "Guía: Objeción Legal/Documental",
+        "tecnicas": [
+            "Ofrecer reunión con el equipo legal del proyecto",
+            "Enviar documentación completa de títulos y habilitaciones",
+            "Mostrar proyectos entregados anteriormente",
+        ],
+    },
+}
+
 # Stopwords for keyword extraction
 _STOPWORDS = {
     "el", "la", "los", "las", "un", "una", "unos", "unas", "de", "del",
@@ -760,6 +866,20 @@ class CommercialAnalyzer:
         ca.resumen = self._build_summary(ca)
         ca.accion_siguiente = self._build_next_action(ca)
 
+        # --- Reglas de negocio inmobiliarias ---
+        # Co-decisores
+        ca.co_decisores, ca.es_multi_decisor = self._detect_co_decisores(text)
+        # Rango presupuestario
+        ca.rango_presupuestario, ca.presupuesto_detalle = (
+            self._classify_rango_presupuestario(normalized, ca.financiamiento)
+        )
+        # Alertas para el vendedor (dependen de todo lo anterior)
+        ca.alertas_vendedor = self._build_alertas_vendedor(ca)
+        # Revisión del coordinador
+        ca.requiere_revision_coordinador, ca.motivo_revision = (
+            self._check_revision_coordinador(ca)
+        )
+
         return ca
 
     def _extract_objections(self, normalized: str, original: str) -> list[str]:
@@ -1026,3 +1146,200 @@ class CommercialAnalyzer:
         if ca.indicios_prospeccion > 0:
             return "Calificar al prospecto: presupuesto, plazo y necesidades. Agendar llamada de descubrimiento."
         return "Hacer seguimiento, enviar material informativo y agendar primera reunion."
+
+    def _detect_co_decisores(self, text: str) -> tuple[list[str], bool]:
+        """
+        Detect co-decision makers mentioned in the text.
+
+        Returns:
+            (co_decisores, es_multi_decisor)
+            co_decisores: list of raw mentions found, e.g. ["mi esposo", "mi socio"]
+            es_multi_decisor: True if at least one co-decisor was detected
+        """
+        found: list[str] = []
+        for pattern, label in _CO_DECISOR_PATTERNS:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for match in matches:
+                raw = match if isinstance(match, str) else match[0]
+                entry = f"{raw.strip()} [{label}]"
+                if entry not in found:
+                    found.append(entry)
+        return found, len(found) > 0
+
+    def _classify_rango_presupuestario(
+        self, normalized: str, financiamiento: str
+    ) -> tuple[str, dict]:
+        """
+        Classify the budget range based on detected payment keywords and financing type.
+
+        Returns:
+            (rango, presupuesto_detalle)
+            rango: ENTRADA | CUOTAS | CONTADO | CREDITO | NO_DETECTADO
+            presupuesto_detalle: {tipo: [frases_detectadas]}
+        """
+        detalle: dict[str, list[str]] = {}
+
+        entrada_found  = _find_phrases(normalized, _PRESUPUESTO_ENTRADA)
+        cuotas_found   = _find_phrases(normalized, _PRESUPUESTO_CUOTAS)
+        contado_found  = _find_phrases(normalized, _PRESUPUESTO_CONTADO)
+        credito_found  = _find_phrases(normalized, _PRESUPUESTO_CREDITO)
+
+        if entrada_found:
+            detalle["entrada"] = entrada_found
+        if cuotas_found:
+            detalle["cuotas"] = cuotas_found
+        if contado_found:
+            detalle["contado"] = contado_found
+        if credito_found:
+            detalle["credito"] = credito_found
+
+        # Priority: most explicit wins; fall back to financiamiento field
+        if contado_found:
+            return "CONTADO", detalle
+        if credito_found:
+            return "CREDITO", detalle
+        if cuotas_found:
+            return "CUOTAS", detalle
+        if entrada_found:
+            return "ENTRADA", detalle
+
+        # Mirror the financiamiento classification if nothing explicit
+        mapping = {
+            "CONTADO": "CONTADO",
+            "CREDITO": "CREDITO",
+            "FINANCIAMIENTO_DIRECTO": "CUOTAS",
+        }
+        if financiamiento in mapping:
+            return mapping[financiamiento], detalle
+
+        return "NO_DETECTADO", detalle
+
+    def _build_alertas_vendedor(self, ca: CommercialAnalysis) -> list[dict]:
+        """
+        Build a list of actionable alerts for the salesperson based on analysis results.
+
+        Each alert has:
+            nivel:   CRITICA | ALTA | MEDIA | INFO
+            tipo:    short machine-readable key
+            mensaje: human-readable Spanish message
+            guia:    optional dict with tips (from OBJECIONES_GUIA)
+
+        Alerts do NOT trigger external systems — they are displayed in the UI only.
+        """
+        alertas: list[dict] = []
+
+        # 1. Urgencia CRÍTICA + Etapa DECISIÓN — máxima prioridad
+        if ca.urgencia == "CRITICA" and ca.etapa_funnel == "DECISION":
+            alertas.append({
+                "nivel": "CRITICA",
+                "tipo": "cierre_inmediato",
+                "mensaje": (
+                    "🔴 LEAD CRÍTICO: Urgencia máxima + cliente en etapa de Decisión. "
+                    "Contactar ahora. No dejar pasar más de 2 horas."
+                ),
+            })
+
+        # 2. Multi-decisor detectado — el vendedor necesita saberlo
+        if ca.es_multi_decisor and ca.co_decisores:
+            nombres = ", ".join(
+                m.split("[")[0].strip() for m in ca.co_decisores[:3]
+            )
+            alertas.append({
+                "nivel": "ALTA",
+                "tipo": "multi_decisor",
+                "mensaje": (
+                    f"👥 Multi-decisor detectado: {nombres}. "
+                    "La decisión no depende de una sola persona. "
+                    "Proponer incluir al co-decisor en la próxima llamada."
+                ),
+            })
+
+        # 3. Objeciones > 2 — adjuntar guía relevante
+        if ca.objeciones > 2 or len(ca.objeciones_especificas) >= 2:
+            for obj_tipo in ca.objeciones_especificas:
+                guia = OBJECIONES_GUIA.get(obj_tipo)
+                alerta: dict = {
+                    "nivel": "ALTA",
+                    "tipo": "objecion_fuerte",
+                    "mensaje": (
+                        f"⚠️ Objeción fuerte detectada: {obj_tipo}. "
+                        "Revisar guía de manejo antes de responder."
+                    ),
+                }
+                if guia:
+                    alerta["guia"] = guia
+                alertas.append(alerta)
+
+        # 4. Sentimiento negativo implícito (objeciones altas sin señales de compra)
+        if ca.objeciones > 4 and not ca.senales_compra:
+            alertas.append({
+                "nivel": "ALTA",
+                "tipo": "sentimiento_negativo",
+                "mensaje": (
+                    "😟 Alto nivel de objeciones sin señales de compra. "
+                    "El cliente puede estar insatisfecho. "
+                    "Escuchar activamente antes de insistir."
+                ),
+            })
+
+        # 5. Acción comprometida detectada — recordatorio inline
+        if ca.senales_compra and ca.etapa_funnel in ("DECISION", "CLOSED"):
+            alertas.append({
+                "nivel": "MEDIA",
+                "tipo": "accion_comprometida",
+                "mensaje": (
+                    "✅ Señales de cierre activas. "
+                    "Si se acordó enviar documentación o datos, "
+                    "hacerlo dentro de las próximas 4 horas."
+                ),
+            })
+
+        # 6. INFO: rango presupuestario identificado
+        if ca.rango_presupuestario != "NO_DETECTADO":
+            labels = {
+                "CONTADO": "pago al contado",
+                "CREDITO": "financiamiento bancario",
+                "CUOTAS": "pago en cuotas",
+                "ENTRADA": "pago de entrada/anticipo",
+            }
+            alertas.append({
+                "nivel": "INFO",
+                "tipo": "presupuesto_identificado",
+                "mensaje": (
+                    f"💰 Modalidad de pago identificada: "
+                    f"{labels.get(ca.rango_presupuestario, ca.rango_presupuestario)}. "
+                    "Adaptar la propuesta a esta modalidad."
+                ),
+            })
+
+        return alertas
+
+    def _check_revision_coordinador(self, ca: CommercialAnalysis) -> tuple[bool, str]:
+        """
+        Determine if this conversation should be flagged for coordinator review.
+
+        Returns:
+            (requiere_revision, motivo)
+        """
+        # No hay ningún concepto de venta detectado y la conversación es larga
+        if (
+            ca.indicios_cierre == 0
+            and ca.indicios_prospeccion == 0
+            and ca.respuestas_afirmativas == 0
+            and ca.total_palabras > 100
+        ):
+            return (
+                True,
+                "Sin técnicas de venta detectadas en una conversación extensa. "
+                "Revisar si el vendedor aplicó metodología de prospección.",
+            )
+
+        # Muy baja densidad comercial en conversación larga
+        if ca.densidad_comercial < 0.005 and ca.total_palabras > 200:
+            return (
+                True,
+                "Densidad comercial extremadamente baja. "
+                "La conversación no muestra enfoque en la venta.",
+            )
+
+        return False, ""

@@ -175,6 +175,14 @@ def _build_commercial_dict(ca) -> dict:
         "prospeccion_detalle": ca.prospeccion_detalle,
         "indicadores_detalle_categorias": ca.indicadores_detalle_categorias,
         "indicadores_total_frases": ca.indicadores_total_frases,
+        # --- Reglas de negocio inmobiliarias ---
+        "co_decisores": ca.co_decisores,
+        "es_multi_decisor": ca.es_multi_decisor,
+        "rango_presupuestario": ca.rango_presupuestario,
+        "presupuesto_detalle": ca.presupuesto_detalle,
+        "alertas_vendedor": ca.alertas_vendedor,
+        "requiere_revision_coordinador": ca.requiere_revision_coordinador,
+        "motivo_revision": ca.motivo_revision,
     }
 
 # Load analyzer once at startup
@@ -2583,8 +2591,69 @@ function renderResults(data, inputText) {
         // Acción siguiente
         if (c.accion_siguiente) {
             extDataHtml += `<div class="ext-data-row ext-action-row">
-                <span class="ext-row-label">▶️ Accion siguiente</span>
+                <span class="ext-row-label">&#9654;&#65039; Accion siguiente</span>
                 <div class="ext-action-text">${c.accion_siguiente}</div>
+            </div>`;
+        }
+
+        // --- Alertas del vendedor ---
+        if (c.alertas_vendedor && c.alertas_vendedor.length > 0) {
+            const alertColors = { CRITICA: '#f55b5b', ALTA: '#f5a35b', MEDIA: '#f5d75b', INFO: '#5bd4f5' };
+            const alertBgs = { CRITICA: '#2a0d0d', ALTA: '#2a1a0d', MEDIA: '#2a2a0d', INFO: '#0d1a2a' };
+            const alertBorders = { CRITICA: '#4a1a1a', ALTA: '#4a2a1a', MEDIA: '#4a4a1a', INFO: '#1a2a4a' };
+            let alertasHtml = c.alertas_vendedor.map(a => {
+                const color = alertColors[a.nivel] || '#aaa';
+                const bg = alertBgs[a.nivel] || '#1a1d27';
+                const border = alertBorders[a.nivel] || '#2a2d3a';
+                let guiaHtml = '';
+                if (a.guia && a.guia.tecnicas) {
+                    guiaHtml = '<div style="margin-top:6px;padding:8px;background:#0a0c14;border-radius:6px;border-left:2px solid ' + color + ';">' +
+                        '<div style="font-size:0.65rem;color:#888;font-weight:600;margin-bottom:4px;">' + (a.guia.titulo || 'Guia') + '</div>' +
+                        a.guia.tecnicas.map(t => '<div style="font-size:0.68rem;color:#ccc;padding:2px 0;">&#8226; ' + t + '</div>').join('') +
+                    '</div>';
+                }
+                return '<div style="padding:10px 12px;background:' + bg + ';border:1px solid ' + border + ';border-left:3px solid ' + color + ';border-radius:8px;margin-bottom:6px;">' +
+                    '<div style="font-size:0.78rem;color:' + color + ';font-weight:600;">' + a.mensaje + '</div>' +
+                    guiaHtml +
+                '</div>';
+            }).join('');
+            extDataHtml += `<div class="ext-data-row" style="border-left:3px solid #f55b5b;background:#0d0a0a;">
+                <span class="ext-row-label" style="color:#f55b5b;">&#128680; Alertas para el vendedor</span>
+                ${alertasHtml}
+            </div>`;
+        }
+
+        // --- Co-decisores ---
+        if (c.es_multi_decisor && c.co_decisores && c.co_decisores.length > 0) {
+            extDataHtml += `<div class="ext-data-row" style="border-left:3px solid #b38bff;">
+                <span class="ext-row-label" style="color:#b38bff;">&#128101; Multi-decisor detectado</span>
+                <div style="font-size:0.78rem;color:#ccc;margin-bottom:6px;">La decision de compra involucra a mas de una persona:</div>
+                <div class="ext-row-tags">${c.co_decisores.map(d => '<span class="ext-tag ext-tag-purple">' + d + '</span>').join('')}</div>
+                <div style="margin-top:6px;font-size:0.72rem;color:#b38bff;font-style:italic;">Tip: Proponer incluir al co-decisor en la proxima reunion.</div>
+            </div>`;
+        }
+
+        // --- Rango presupuestario ---
+        if (c.rango_presupuestario && c.rango_presupuestario !== 'NO_DETECTADO') {
+            const rpLabels = { CONTADO: '&#128181; Contado', CREDITO: '&#127974; Credito', CUOTAS: '&#129309; Cuotas', ENTRADA: '&#128176; Entrada/Anticipo' };
+            let detalleHtml = '';
+            if (c.presupuesto_detalle && Object.keys(c.presupuesto_detalle).length > 0) {
+                detalleHtml = Object.entries(c.presupuesto_detalle).map(([tipo, frases]) =>
+                    '<div style="margin-top:4px;"><span style="font-size:0.65rem;color:#888;font-weight:600;">' + tipo + ':</span> ' +
+                    frases.map(f => '<span class="ext-tag ext-tag-blue">' + f + '</span>').join(' ') + '</div>'
+                ).join('');
+            }
+            extDataHtml += `<div class="ext-data-row" style="border-left:3px solid #5bf5a3;">
+                <span class="ext-row-label" style="color:#5bf5a3;">&#128176; Rango presupuestario: ${rpLabels[c.rango_presupuestario] || c.rango_presupuestario}</span>
+                ${detalleHtml}
+            </div>`;
+        }
+
+        // --- Revisión coordinador ---
+        if (c.requiere_revision_coordinador) {
+            extDataHtml += `<div class="ext-data-row" style="border-left:3px solid #f5a35b;background:#1a1000;">
+                <span class="ext-row-label" style="color:#f5a35b;">&#128209; Requiere revision del coordinador</span>
+                <div style="font-size:0.78rem;color:#f5a35b;">${c.motivo_revision || 'Sin detalle'}</div>
             </div>`;
         }
     }
