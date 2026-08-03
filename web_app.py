@@ -1916,7 +1916,10 @@ HTML = """
             </div>
             <div class="date-select-group">
                 <label for="selectFecha">Fecha</label>
-                <input type="date" id="selectFecha" onchange="loadSavedTexts()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:7px 10px;font-size:0.82rem;cursor:pointer;outline:none;min-width:130px;">
+                <div style="display:flex;align-items:center;gap:4px;">
+                    <input type="date" id="selectFecha" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:7px 10px;font-size:0.82rem;cursor:pointer;outline:none;min-width:130px;">
+                    <button id="updateFechaBtn" onclick="updateEntryFecha()" style="display:none;background:#1a2a3a;color:#5bd4f5;border:1px solid #2a3a4a;border-radius:6px;padding:6px 8px;font-size:0.7rem;cursor:pointer;white-space:nowrap;" title="Actualizar fecha del texto seleccionado">&#128197; Mover</button>
+                </div>
             </div>
             <div class="date-select-group">
                 <label for="selectText">Textos <span id="savedTextsCount" style="color:#555;"></span></label>
@@ -3359,7 +3362,6 @@ async function loadSavedTexts() {
     let url = adminUser
         ? `/admin/user-texts/${adminUser}?year=${year}&month=${month}`
         : `/saved-texts?year=${year}&month=${month}`;
-    if (fecha) url += '&fecha=' + fecha;
 
     try {
         const response = await fetch(url);
@@ -3380,6 +3382,7 @@ async function loadSavedTexts() {
                 opt.value = e.id;
                 opt.textContent = name;
                 opt.setAttribute('data-fullname', e.entry_name || rawName);
+                opt.setAttribute('data-timestamp', e.timestamp || '');
                 select.appendChild(opt);
             });
         } else {
@@ -3393,14 +3396,22 @@ async function loadSavedTexts() {
 function onTextSelected(entryId) {
     if (!entryId) {
         document.getElementById('deleteTextBtn').style.display = 'none';
+        document.getElementById('updateFechaBtn').style.display = 'none';
         return;
     }
     document.getElementById('deleteTextBtn').style.display = 'inline-block';
+    document.getElementById('updateFechaBtn').style.display = 'inline-block';
+    window._selectedEntryId = entryId;
     // Capture the full entry name from the selected option
     const select = document.getElementById('selectText');
     const selectedOpt = select.options[select.selectedIndex];
     if (selectedOpt) {
         window._currentEntryName = selectedOpt.getAttribute('data-fullname') || selectedOpt.textContent || '';
+        // Set date input to the entry's current date if available
+        const ts = selectedOpt.getAttribute('data-timestamp') || '';
+        if (ts && ts.length >= 10) {
+            document.getElementById('selectFecha').value = ts.substring(0, 10);
+        }
     }
     loadSavedText(entryId);
 }
@@ -3416,9 +3427,37 @@ async function deleteSelectedText() {
         const data = await response.json();
         if (data.success) {
             document.getElementById('deleteTextBtn').style.display = 'none';
+            document.getElementById('updateFechaBtn').style.display = 'none';
             loadSavedTexts();
         } else {
             alert('No se pudo eliminar.');
+        }
+    } catch(e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function updateEntryFecha() {
+    const entryId = window._selectedEntryId;
+    if (!entryId) { alert('Selecciona un texto primero.'); return; }
+    const newDate = document.getElementById('selectFecha').value;
+    if (!newDate) { alert('Selecciona una fecha.'); return; }
+    try {
+        const resp = await fetch('/update-entry-date/' + entryId, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date: newDate })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            const btn = document.getElementById('updateFechaBtn');
+            btn.textContent = '\\u2713 Movido';
+            btn.style.color = '#5bf5a3';
+            btn.style.borderColor = '#5bf5a3';
+            setTimeout(function() { btn.textContent = '\\ud83d\\udcc5 Mover'; btn.style.color = '#5bd4f5'; btn.style.borderColor = '#2a3a4a'; }, 2000);
+            loadSavedTexts();
+        } else {
+            alert('Error: ' + (data.error || 'No se pudo actualizar'));
         }
     } catch(e) {
         alert('Error: ' + e.message);
@@ -5422,6 +5461,50 @@ def delete_entry_route(entry_id):
     if success:
         return jsonify({"success": True})
     return jsonify({"success": False, "error": "Entry not found"}), 404
+
+
+@app.route("/update-entry-date/<entry_id>", methods=["PUT"])
+def update_entry_date(entry_id):
+    """Update the timestamp of an existing entry (move it to another date)."""
+    if not session.get("username"):
+        return jsonify({"error": "unauthorized"}), 401
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+
+    data = request.get_json()
+    new_date = data.get("date", "").strip() if data else ""
+    if not new_date or len(new_date) != 10:
+        return jsonify({"success": False, "error": "Fecha invalida"}), 400
+
+    try:
+        from datetime import datetime as _dt, timezone as _tz
+        # Parse date: YYYY-MM-DD
+        parsed = _dt.strptime(new_date, "%Y-%m-%d").replace(tzinfo=_tz.utc)
+
+        # Update in PostgreSQL directly
+        import psycopg2
+        db_url = os.environ.get("DATABASE_URL", "")
+        if not db_url:
+            return jsonify({"success": False, "error": "No database configured"})
+        if db_url.startswith("postgres://"):
+            db_url = "postgresql://" + db_url[len("postgres://"):]
+
+        conn = psycopg2.connect(db_url)
+        conn.autocommit = False
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE analysis_history SET timestamp = %s WHERE id = %s",
+                (parsed, entry_id)
+            )
+            conn.commit()
+            updated = cur.rowcount > 0
+        conn.close()
+
+        if updated:
+            return jsonify({"success": True, "new_date": new_date})
+        return jsonify({"success": False, "error": "Entry not found"}), 404
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
 
 
 @app.route("/upload-audio", methods=["POST"])
