@@ -1915,6 +1915,10 @@ HTML = """
                 </select>
             </div>
             <div class="date-select-group">
+                <label for="selectFecha">Fecha</label>
+                <input type="date" id="selectFecha" onchange="loadSavedTexts()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:7px 10px;font-size:0.82rem;cursor:pointer;outline:none;min-width:130px;">
+            </div>
+            <div class="date-select-group">
                 <label for="selectText">Textos <span id="savedTextsCount" style="color:#555;"></span></label>
                 <div style="display:flex;align-items:center;gap:6px;">
                     <select id="selectText" onchange="onTextSelected(this.value)" style="flex:1;">
@@ -3336,6 +3340,8 @@ function toggleSavedTexts() {
 async function loadSavedTexts() {
     const year = document.getElementById('selectYear').value;
     const month = document.getElementById('selectMonth').value;
+    const fechaInput = document.getElementById('selectFecha');
+    const fecha = fechaInput ? fechaInput.value : '';
 
     // If admin has a user selected, use admin endpoint
     const userSelect = document.getElementById('selectUser');
@@ -3350,9 +3356,10 @@ async function loadSavedTexts() {
         return;
     }
 
-    const url = adminUser
+    let url = adminUser
         ? `/admin/user-texts/${adminUser}?year=${year}&month=${month}`
         : `/saved-texts?year=${year}&month=${month}`;
+    if (fecha) url += '&fecha=' + fecha;
 
     try {
         const response = await fetch(url);
@@ -5260,12 +5267,13 @@ def analyze():
 
 @app.route("/saved-texts")
 def saved_texts():
-    """Return entries filtered by year/month for the saved texts panel."""
+    """Return entries filtered by year/month/fecha for the saved texts panel."""
     if not session.get("username"):
         return jsonify({"entries": []}), 401
 
     year = request.args.get("year", type=int)
     month = request.args.get("month", type=int)
+    fecha = request.args.get("fecha", "").strip()  # format: YYYY-MM-DD
 
     username = session["username"]
     entries_found = []
@@ -5293,6 +5301,11 @@ def saved_texts():
                     pass
 
             if e_year == year and e_month == month:
+                # Apply date filter if set
+                if fecha:
+                    ts_str = str(e.get("timestamp", ""))
+                    if fecha not in ts_str[:10]:
+                        continue
                 entries_found.append(e)
     except Exception as exc:
         app.logger.warning(f"PG query failed for {username}: {exc}")
@@ -5603,12 +5616,13 @@ def admin_users_list():
 
 @app.route("/admin/user-texts/<username>")
 def admin_user_texts(username):
-    """Return texts for a specific user filtered by year/month (admin only)."""
+    """Return texts for a specific user filtered by year/month/fecha (admin only)."""
     if not _is_admin():
         return jsonify({"error": "unauthorized"}), 403
 
     year = request.args.get("year", type=int)
     month = request.args.get("month", type=int)
+    fecha = request.args.get("fecha", "").strip()  # format: YYYY-MM-DD
 
     entries = get_flat_entries(username, limit=200)
 
@@ -5630,6 +5644,11 @@ def admin_user_texts(username):
             except Exception:
                 pass
         if (not year or e_year == year) and (not month or e_month == month):
+            # Apply date filter if set
+            if fecha:
+                ts_str = str(e.get("timestamp", ""))
+                if fecha not in ts_str[:10]:
+                    continue
             filtered.append({
                 "id": e.get("id", ""),
                 "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
