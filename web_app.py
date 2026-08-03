@@ -3029,6 +3029,74 @@ function renderTextReport(data) {
         report += '<div style="margin-top:4px;padding:8px;background:#0d0d1a;border:1px solid #1a1a3a;border-radius:6px;font-size:0.65rem;color:#7b9cff;">▶️ ' + c.accion_siguiente + '</div>';
     }
 
+    // --- Expanded Narrative Summary ---
+    report += '<div style="margin-top:14px;padding:14px;background:#080a10;border:1px solid #1e2130;border-radius:8px;border-left:3px solid #4a6cf7;">';
+    report += '<div style="font-size:0.7rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px;">Analisis Narrativo del Texto</div>';
+
+    // Intent analysis
+    const intentConf = Math.round((data.intent_confidence || 0) * 100);
+    report += '<p style="font-size:0.72rem;color:#ccc;line-height:1.7;margin-bottom:10px;text-align:justify;">';
+    report += 'La intencion principal del texto fue clasificada como <strong style="color:#e0e0e0;">' + intentEs + '</strong> con una confianza del <strong>' + intentConf + '%</strong>. ';
+    if (intentConf >= 50) {
+        report += 'Este nivel de confianza indica que el modelo identifico patrones claros y consistentes en el discurso que permiten afirmar con solidez la naturaleza de la interaccion. ';
+    } else if (intentConf >= 25) {
+        report += 'La confianza moderada sugiere que el texto contiene elementos mixtos que dificultan una clasificacion definitiva, posiblemente porque la conversacion transita entre multiples etapas del proceso de venta. ';
+    } else {
+        report += 'La baja confianza indica que el texto no presenta patrones claros de ninguna intencion especifica, lo cual puede deberse a una conversacion inicial sin foco comercial definido. ';
+    }
+    report += '</p>';
+
+    // Lead & probability analysis
+    const prob = (c.probabilidad_cierre || 0);
+    report += '<p style="font-size:0.72rem;color:#ccc;line-height:1.7;margin-bottom:10px;text-align:justify;">';
+    report += 'El lead fue clasificado como <strong style="color:' + (c.tipo_lead === 'CALIENTE' ? '#f55b5b' : c.tipo_lead === 'TIBIO' ? '#f5a35b' : '#5bd4f5') + ';">' + (c.tipo_lead || 'FRIO') + '</strong> con una probabilidad de cierre del <strong>' + prob.toFixed(1) + '%</strong>. ';
+    if (prob >= 60) {
+        report += 'Esta probabilidad elevada se sustenta en la presencia significativa de indicios de cierre (' + (c.indicios_cierre || 0) + '), respuestas afirmativas (' + (c.respuestas_afirmativas || 0) + ') y un bajo nivel de objeciones relativas. El prospecto demuestra disposicion activa para avanzar hacia la concrecion de la operacion.';
+    } else if (prob >= 30) {
+        report += 'La probabilidad moderada refleja un equilibrio entre senales positivas (indicios de cierre: ' + (c.indicios_cierre || 0) + ', afirmativas: ' + (c.respuestas_afirmativas || 0) + ') y factores de resistencia (objeciones: ' + (c.objeciones || 0) + '). El lead muestra interes pero requiere trabajo adicional para superar las barreras identificadas.';
+    } else {
+        report += 'La probabilidad baja se explica por la ausencia o escasez de senales de cierre (' + (c.indicios_cierre || 0) + ') combinada con un nivel de objeciones (' + (c.objeciones || 0) + ') que supera las respuestas afirmativas (' + (c.respuestas_afirmativas || 0) + '). Se recomienda un enfoque de nutricion y seguimiento antes de intentar el cierre.';
+    }
+    report += '</p>';
+
+    // Funnel + Urgency analysis
+    report += '<p style="font-size:0.72rem;color:#ccc;line-height:1.7;margin-bottom:10px;text-align:justify;">';
+    report += 'La etapa del funnel identificada es <strong style="color:#e0e0e0;">' + (c.etapa_funnel || 'AWARENESS') + '</strong> con urgencia <strong style="color:' + (c.urgencia === 'CRITICA' ? '#f55b5b' : c.urgencia === 'ALTA' ? '#f5a35b' : '#aaa') + ';">' + (c.urgencia || 'BAJA') + '</strong>. ';
+    if (c.etapa_funnel === 'DECISION' && (c.urgencia === 'CRITICA' || c.urgencia === 'ALTA')) {
+        report += 'La combinacion de etapa avanzada con urgencia elevada constituye una senal inequivoca de que el prospecto requiere atencion inmediata. Cada hora sin contacto reduce significativamente las probabilidades de conversion. Se requiere accion comercial dentro de las proximas 2-4 horas.';
+    } else if (c.etapa_funnel === 'CONSIDERATION') {
+        report += 'El prospecto se encuentra evaluando opciones activamente. En esta etapa es fundamental proveer informacion diferenciadora, resolver dudas pendientes y mantener un ritmo de seguimiento que no permita que el interes se enfrie.';
+    } else if (c.etapa_funnel === 'AWARENESS') {
+        report += 'El prospecto se encuentra en etapa inicial de conocimiento. La conversacion aun no ha generado compromiso concreto. Se recomienda calificar al lead (presupuesto, plazo, necesidades) y agendar un contacto de profundizacion.';
+    }
+    report += '</p>';
+
+    // Indicators deep analysis
+    const totalInd = (c.palabras_positivas || 0) + (c.respuestas_afirmativas || 0) + (c.indicios_cierre || 0) + (c.escasez_comercial || 0) + (c.pedidos_referidos || 0) + (c.objeciones || 0) + (c.indicios_prospeccion || 0);
+    report += '<p style="font-size:0.72rem;color:#ccc;line-height:1.7;margin-bottom:10px;text-align:justify;">';
+    report += 'El analisis de indicadores comerciales arrojo un total de <strong>' + totalInd + '</strong> marcadores detectados sobre <strong>' + (c.total_palabras || 0) + '</strong> palabras (densidad: ' + ((c.densidad_comercial || 0) * 100).toFixed(2) + '%). ';
+    if ((c.densidad_comercial || 0) > 0.04) {
+        report += 'La alta densidad comercial indica que la conversacion estuvo fuertemente orientada a la gestion de ventas, con un discurso cargado de tecnicas y respuestas comerciales activas.';
+    } else if ((c.densidad_comercial || 0) > 0.02) {
+        report += 'La densidad moderada sugiere una conversacion con contenido comercial presente pero no predominante. Existe espacio para intensificar el enfoque de ventas en futuras interacciones.';
+    } else {
+        report += 'La baja densidad comercial revela que la conversacion tuvo escaso contenido orientado a la venta. Esto puede indicar una llamada exploratoria, de servicio, o una oportunidad desaprovechada de aplicar tecnicas de prospeccion.';
+    }
+    report += '</p>';
+
+    // Conclusion
+    report += '<p style="font-size:0.72rem;color:#5bf5a3;line-height:1.7;padding:8px 10px;background:#0d1a0d;border-radius:6px;border-left:2px solid #5bf5a3;text-align:justify;">';
+    report += '<strong>Conclusion:</strong> ';
+    if (prob >= 60) {
+        report += 'La conversacion presenta un perfil de cierre avanzado. Se recomienda ejecutar la accion de cierre de forma inmediata, minimizando la friccion administrativa y facilitando el siguiente paso concreto para el prospecto.';
+    } else if (prob >= 30) {
+        report += 'La conversacion muestra potencial comercial con barreras identificables. El seguimiento estrategico, la resolucion de objeciones y el refuerzo de beneficios clave son las palancas principales para elevar la probabilidad de cierre en el proximo contacto.';
+    } else {
+        report += 'La conversacion no alcanzo un nivel de madurez comercial suficiente. Se sugiere clasificar este lead para nutricion, programar seguimiento en 48-72hs, y preparar material de valor que aborde las dudas implicitas detectadas en el texto.';
+    }
+    report += '</p>';
+    report += '</div>';
+
     report += '</div>';
     return report;
 }
