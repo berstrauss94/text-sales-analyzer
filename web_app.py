@@ -1916,10 +1916,7 @@ HTML = """
             </div>
             <div class="date-select-group">
                 <label for="selectFecha">Fecha</label>
-                <div style="display:flex;align-items:center;gap:4px;">
-                    <input type="date" id="selectFecha" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:7px 10px;font-size:0.82rem;cursor:pointer;outline:none;min-width:130px;">
-                    <button id="updateFechaBtn" onclick="updateEntryFecha()" style="display:none;background:#1a2a3a;color:#5bd4f5;border:1px solid #2a3a4a;border-radius:6px;padding:6px 8px;font-size:0.7rem;cursor:pointer;white-space:nowrap;" title="Actualizar fecha del texto seleccionado">&#128197; Mover</button>
-                </div>
+                <input type="date" id="selectFecha" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:7px 10px;font-size:0.82rem;cursor:pointer;outline:none;min-width:130px;">
             </div>
             <div class="date-select-group">
                 <label for="selectText">Textos <span id="savedTextsCount" style="color:#555;"></span></label>
@@ -2100,7 +2097,7 @@ async function saveEntry() {
         const response = await fetch('/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, year: parseInt(year), month: parseInt(month), entry_name: entryName, target_user: targetUser })
+            body: JSON.stringify({ text, year: parseInt(year), month: parseInt(month), entry_name: entryName, target_user: targetUser, fecha: document.getElementById('selectFecha') ? document.getElementById('selectFecha').value : '' })
         });
         const data = await response.json();
         _lastCommercialData = data.commercial || null;
@@ -3343,8 +3340,6 @@ function toggleSavedTexts() {
 async function loadSavedTexts() {
     const year = document.getElementById('selectYear').value;
     const month = document.getElementById('selectMonth').value;
-    const fechaInput = document.getElementById('selectFecha');
-    const fecha = fechaInput ? fechaInput.value : '';
 
     // If admin has a user selected, use admin endpoint
     const userSelect = document.getElementById('selectUser');
@@ -3396,18 +3391,15 @@ async function loadSavedTexts() {
 function onTextSelected(entryId) {
     if (!entryId) {
         document.getElementById('deleteTextBtn').style.display = 'none';
-        document.getElementById('updateFechaBtn').style.display = 'none';
         return;
     }
     document.getElementById('deleteTextBtn').style.display = 'inline-block';
-    document.getElementById('updateFechaBtn').style.display = 'inline-block';
-    window._selectedEntryId = entryId;
     // Capture the full entry name from the selected option
     const select = document.getElementById('selectText');
     const selectedOpt = select.options[select.selectedIndex];
     if (selectedOpt) {
         window._currentEntryName = selectedOpt.getAttribute('data-fullname') || selectedOpt.textContent || '';
-        // Set date input to the entry's current date if available
+        // Show the entry's date in the fecha input
         const ts = selectedOpt.getAttribute('data-timestamp') || '';
         if (ts && ts.length >= 10) {
             document.getElementById('selectFecha').value = ts.substring(0, 10);
@@ -3427,37 +3419,9 @@ async function deleteSelectedText() {
         const data = await response.json();
         if (data.success) {
             document.getElementById('deleteTextBtn').style.display = 'none';
-            document.getElementById('updateFechaBtn').style.display = 'none';
             loadSavedTexts();
         } else {
             alert('No se pudo eliminar.');
-        }
-    } catch(e) {
-        alert('Error: ' + e.message);
-    }
-}
-
-async function updateEntryFecha() {
-    const entryId = window._selectedEntryId;
-    if (!entryId) { alert('Selecciona un texto primero.'); return; }
-    const newDate = document.getElementById('selectFecha').value;
-    if (!newDate) { alert('Selecciona una fecha.'); return; }
-    try {
-        const resp = await fetch('/update-entry-date/' + entryId, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ date: newDate })
-        });
-        const data = await resp.json();
-        if (data.success) {
-            const btn = document.getElementById('updateFechaBtn');
-            btn.textContent = '\\u2713 Movido';
-            btn.style.color = '#5bf5a3';
-            btn.style.borderColor = '#5bf5a3';
-            setTimeout(function() { btn.textContent = '\\ud83d\\udcc5 Mover'; btn.style.color = '#5bd4f5'; btn.style.borderColor = '#2a3a4a'; }, 2000);
-            loadSavedTexts();
-        } else {
-            alert('Error: ' + (data.error || 'No se pudo actualizar'));
         }
     } catch(e) {
         alert('Error: ' + e.message);
@@ -5276,10 +5240,21 @@ def analyze():
     year = data.get("year")
     month = data.get("month")
     entry_name = data.get("entry_name", "").strip()
+    fecha_str = data.get("fecha", "").strip()  # YYYY-MM-DD from date input
     # Admin can save to another user's account
     target_user = data.get("target_user", "").strip() or session["username"]
     if target_user != session["username"] and not _is_admin():
         target_user = session["username"]  # Non-admins can only save to themselves
+
+    # If fecha is provided, override year/month from it
+    if fecha_str and len(fecha_str) == 10:
+        try:
+            from datetime import datetime as _dt_parse
+            parsed_fecha = _dt_parse.strptime(fecha_str, "%Y-%m-%d")
+            year = parsed_fecha.year
+            month = parsed_fecha.month
+        except Exception:
+            pass
 
     # Only save if entry_name is provided (mandatory) AND user is admin
     if entry_name and _should_save and _is_admin():
