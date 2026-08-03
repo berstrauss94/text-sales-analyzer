@@ -1990,12 +1990,32 @@ HTML = """
     <div class="input-section" id="informePanel" style="margin-top:20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
             <div style="font-size:0.85rem;font-weight:600;color:#5bf5a3;">&#128202; Informe de Seguimiento Anual</div>
-            <div style="display:flex;gap:8px;align-items:center;">
-                <select id="informeYear" onchange="loadInforme()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.8rem;">
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                <select id="informeYear" onchange="loadInforme()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.78rem;">
                     <option value="2026" selected>2026</option>
                     <option value="2025">2025</option>
                 </select>
-                <button onclick="loadInforme()" style="background:#1a3a2a;color:#5bf5a3;border:1px solid #2a5a3a;border-radius:6px;padding:6px 12px;font-size:0.75rem;cursor:pointer;">Actualizar</button>
+                <select id="informeMonth" onchange="loadInforme()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.78rem;">
+                    <option value="0">Todos los meses</option>
+                    <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+                    <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+                    <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+                    <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+                </select>
+                <select id="informeWeek" onchange="loadInforme()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.78rem;">
+                    <option value="0">Todas las semanas</option>
+                    <option value="1">Semana 1 (1-7)</option>
+                    <option value="2">Semana 2 (8-14)</option>
+                    <option value="3">Semana 3 (15-21)</option>
+                    <option value="4">Semana 4 (22-31)</option>
+                </select>
+                <select id="informeSeller" onchange="loadInforme()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.78rem;">
+                    <option value="_all">Todos los vendedores</option>
+                    {% for u in all_users %}
+                    <option value="{{ u }}">{{ u }}</option>
+                    {% endfor %}
+                </select>
+                <button onclick="printInforme()" style="background:#1a2a3a;color:#5bd4f5;border:1px solid #2a3a4a;border-radius:6px;padding:6px 12px;font-size:0.75rem;cursor:pointer;" title="Imprimir informe">&#128424; Imprimir</button>
             </div>
         </div>
         <div id="informeContent" style="font-size:0.78rem;color:#aaa;">Cargando informe...</div>
@@ -4240,12 +4260,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadInforme() {
     const year = document.getElementById('informeYear') ? document.getElementById('informeYear').value : '2026';
+    const month = document.getElementById('informeMonth') ? document.getElementById('informeMonth').value : '0';
+    const week = document.getElementById('informeWeek') ? document.getElementById('informeWeek').value : '0';
+    const seller = document.getElementById('informeSeller') ? document.getElementById('informeSeller').value : '_all';
     const container = document.getElementById('informeContent');
     if (!container) return;
     container.innerHTML = '<div style="color:#555;">Cargando informe...</div>';
 
     try {
-        const resp = await fetch('/admin/informe?year=' + year);
+        const resp = await fetch('/admin/informe?year=' + year + '&month=' + month + '&week=' + week + '&seller=' + seller);
         if (!resp.ok) { container.innerHTML = '<div style="color:#f55b5b;">Error ' + resp.status + '</div>'; return; }
         const data = await resp.json();
         if (data.error) { container.innerHTML = '<div style="color:#f55b5b;">' + data.error + '</div>'; return; }
@@ -4400,10 +4423,72 @@ async function loadInforme() {
         synthesisHtml += '</p>';
         synthesisHtml += '</div>';
 
-        container.innerHTML = tableHtml + totalsHtml + pieHtml + complianceHtml + synthesisHtml;
+        // --- Card 2: Detailed Observations & Recommendations ---
+        let card2Html = '<div style="margin-top:14px;padding:14px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;border-left:3px solid #b38bff;">';
+        card2Html += '<div style="font-size:0.75rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px;">Observaciones y Recomendaciones</div>';
+
+        // Observation 1: Volume analysis
+        card2Html += '<p style="font-size:0.76rem;color:#ccc;line-height:1.7;margin-bottom:10px;text-align:justify;">';
+        card2Html += 'A traves de la presente auditoria se busca determinar el nivel de calidad de las interacciones comerciales, comunicacionales y operativas registradas en los audios cargados al sistema, permitiendo identificar fortalezas, oportunidades de mejora y patrones de desempeno relevantes para el desarrollo profesional de los Vendedores.';
+        card2Html += '</p>';
+
+        // Observation 2: Methodology
+        card2Html += '<p style="font-size:0.76rem;color:#ccc;line-height:1.7;margin-bottom:10px;text-align:justify;">';
+        card2Html += 'El sistema realiza un analisis integral de cada grabacion considerando las respuestas emitidas, la estructura de la conversacion, la capacidad de deteccion de necesidades, el manejo de objeciones, la claridad del mensaje, el nivel de escucha activa, el grado de vinculacion con el interlocutor y otros indicadores previamente definidos dentro de los criterios de evaluacion establecidos.';
+        card2Html += '</p>';
+
+        // Observation 3: Dynamic based on data
+        card2Html += '<p style="font-size:0.76rem;color:#ccc;line-height:1.7;margin-bottom:10px;text-align:justify;">';
+        if (data.total_general > 200) {
+            card2Html += 'El volumen total de <strong style="color:#5bf5a3;">' + data.total_general + '</strong> registros acumulados en el periodo ' + year + ' permite establecer una base estadistica solida para la generacion de conclusiones objetivas. La muestra es representativa y permite identificar tendencias claras de comportamiento comercial a nivel individual y grupal.';
+        } else if (data.total_general > 50) {
+            card2Html += 'Con <strong style="color:#f5d75b;">' + data.total_general + '</strong> registros acumulados en ' + year + ', la muestra permite identificar patrones iniciales de comportamiento. Se recomienda incrementar el volumen de cargas para consolidar conclusiones estadisticamente robustas.';
+        } else {
+            card2Html += 'El volumen de <strong style="color:#f55b5b;">' + data.total_general + '</strong> registros en ' + year + ' resulta insuficiente para generar conclusiones estadisticas definitivas. Se requiere un compromiso urgente del equipo para aumentar el numero de grabaciones cargadas al sistema.';
+        }
+        card2Html += '</p>';
+
+        // Observation 4: Purpose and next steps
+        card2Html += '<p style="font-size:0.76rem;color:#ccc;line-height:1.7;margin-bottom:10px;text-align:justify;">';
+        card2Html += 'Los hallazgos aqui desarrollados deberan interpretarse como un insumo de apoyo para la toma de decisiones, la optimizacion de procesos de atencion y ventas, y la consolidacion de estandares de calidad en las interacciones evaluadas. La auditoria de grabaciones constituye una herramienta de retroalimentacion sistematica orientada al fortalecimiento de habilidades comunicacionales y comerciales.';
+        card2Html += '</p>';
+
+        // Weekly breakdown if filter active
+        if (data.filter_month > 0 && data.weekly) {
+            card2Html += '<div style="margin-top:10px;padding:10px;background:#0d1018;border-radius:6px;border:1px solid #1a1d2e;">';
+            card2Html += '<div style="font-size:0.7rem;color:#888;font-weight:600;margin-bottom:6px;">Desglose semanal - ' + months[data.filter_month] + ':</div>';
+            const weekNames = ['', 'S1 (1-7)', 'S2 (8-14)', 'S3 (15-21)', 'S4 (22-31)'];
+            Object.keys(data.weekly).forEach(u => {
+                const wdata = data.weekly[u][data.filter_month];
+                if (wdata) {
+                    const wvals = weekNames.slice(1).map((wn, wi) => wn + ': ' + (wdata[wi+1] || 0)).join(' | ');
+                    card2Html += '<div style="font-size:0.68rem;color:#aaa;padding:2px 0;">' + u + ': ' + wvals + '</div>';
+                }
+            });
+            card2Html += '</div>';
+        }
+
+        card2Html += '</div>';
+
+        container.innerHTML = tableHtml + totalsHtml + pieHtml + complianceHtml + synthesisHtml + card2Html;
     } catch (e) {
         container.innerHTML = '<div style="color:#f55b5b;">Error: ' + e.message + '</div>';
     }
+}
+
+function printInforme() {
+    const content = document.getElementById('informeContent');
+    if (!content) return;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write('<html><head><title>Informe de Seguimiento - Mi Primer Casa S.A.</title>');
+    printWindow.document.write('<style>body{font-family:-apple-system,sans-serif;padding:40px;color:#222;line-height:1.6;max-width:900px;margin:0 auto}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:center}th{background:#f0f0f0}h1{font-size:18px;margin-bottom:4px}h2{font-size:14px;color:#555;margin-top:20px}p{text-align:justify;font-size:13px;margin-bottom:10px}.green{color:#2a8a4a}.red{color:#c03030}.yellow{color:#b08000}</style>');
+    printWindow.document.write('</head><body>');
+    printWindow.document.write('<h1>Mi Primer Casa S.A.</h1>');
+    printWindow.document.write('<p style="color:#888;font-size:12px;">Informe de Auditoria de Grabacion y Transcripciones - ' + new Date().toLocaleDateString('es-AR') + '</p><hr>');
+    printWindow.document.write(content.innerHTML.replace(/style="[^"]*"/g, '').replace(/background:[^;]*;?/g, '').replace(/color:[^;]*;?/g, ''));
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    printWindow.print();
 }
 
 // Load informe on page load if admin
@@ -5703,6 +5788,7 @@ def admin_informe():
     """
     Return aggregated report data for the informe panel.
     Groups entries by username and month for annual tracking.
+    Supports filters: year, month, week, seller.
     Admin only.
     """
     if not _is_admin():
@@ -5710,58 +5796,88 @@ def admin_informe():
 
     year = request.args.get("year", type=int) or 2026
     meta_mensual = request.args.get("meta", type=int) or 30
+    filter_month = request.args.get("month", type=int) or 0  # 0 = all months
+    filter_week = request.args.get("week", type=int) or 0    # 0 = all weeks
+    filter_seller = request.args.get("seller", "") or "_all"
 
     from src.users.history_manager import get_flat_entries
     from datetime import datetime as _dt
 
     all_users = user_manager.list_users()
-    # Build matrix: {username: {month: count}}
-    matrix = {}
-    totals_per_month = {}
+    if filter_seller != "_all" and filter_seller in all_users:
+        target_users = [filter_seller]
+    else:
+        target_users = all_users
 
-    for u in all_users:
+    # Build matrix: {username: {month: count}}
+    # Also build weekly breakdown: {username: {month: {week: count}}}
+    matrix = {}
+    weekly = {}
+
+    for u in target_users:
         entries = get_flat_entries(u, limit=500)
         matrix[u] = {m: 0 for m in range(1, 13)}
+        weekly[u] = {m: {1: 0, 2: 0, 3: 0, 4: 0} for m in range(1, 13)}
         for e in entries:
             e_year = e.get("year")
             e_month = e.get("month")
+            e_day = None
             if e_year is None and e.get("timestamp"):
                 try:
                     ts_str = str(e["timestamp"])
                     if hasattr(e["timestamp"], "year"):
                         e_year = e["timestamp"].year
                         e_month = e["timestamp"].month
+                        e_day = e["timestamp"].day if hasattr(e["timestamp"], "day") else None
                     elif "T" in ts_str or "-" in ts_str:
                         ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
                         e_year = ts.year
                         e_month = ts.month
+                        e_day = ts.day
                 except Exception:
                     pass
             if e_year == year and e_month and 1 <= e_month <= 12:
+                # Week filter
+                if e_day:
+                    w = min(4, (e_day - 1) // 7 + 1)
+                else:
+                    w = 1  # default to week 1 if no day info
+                # Apply week filter
+                if filter_week > 0 and w != filter_week:
+                    continue
+                # Apply month filter
+                if filter_month > 0 and e_month != filter_month:
+                    continue
                 matrix[u][e_month] = matrix[u].get(e_month, 0) + 1
+                weekly[u][e_month][w] = weekly[u][e_month].get(w, 0) + 1
 
     # Totals per month
+    totals_per_month = {}
     for m in range(1, 13):
-        totals_per_month[m] = sum(matrix[u].get(m, 0) for u in all_users)
+        totals_per_month[m] = sum(matrix[u].get(m, 0) for u in target_users)
 
     # Per-user total
-    user_totals = {u: sum(matrix[u].values()) for u in all_users}
+    user_totals = {u: sum(matrix[u].values()) for u in target_users}
 
-    # Compliance stats
-    current_month = _dt.now().month
-    cumplen = [u for u in all_users if matrix[u].get(current_month, 0) >= meta_mensual]
-    no_cumplen = [u for u in all_users if matrix[u].get(current_month, 0) < meta_mensual and user_totals[u] > 0]
+    # Compliance stats (based on filter_month or current_month)
+    eval_month = filter_month if filter_month > 0 else _dt.now().month
+    cumplen = [u for u in target_users if matrix[u].get(eval_month, 0) >= meta_mensual]
+    no_cumplen = [u for u in target_users if matrix[u].get(eval_month, 0) < meta_mensual and user_totals[u] > 0]
 
     return jsonify({
         "year": year,
         "meta_mensual": meta_mensual,
         "matrix": matrix,
+        "weekly": weekly,
         "totals_per_month": totals_per_month,
         "user_totals": user_totals,
-        "current_month": current_month,
+        "current_month": eval_month,
         "cumplen": cumplen,
         "no_cumplen": no_cumplen,
         "total_general": sum(totals_per_month.values()),
+        "filter_month": filter_month,
+        "filter_week": filter_week,
+        "filter_seller": filter_seller,
     })
 
 
