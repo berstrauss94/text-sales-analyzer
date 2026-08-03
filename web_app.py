@@ -3351,7 +3351,7 @@ async function loadSavedTexts() {
                 html += '<div style="font-size:0.78rem;color:#e0e0e0;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + displayName + '</div>';
                 html += '<div style="display:flex;gap:6px;align-items:center;margin-top:3px;">' + intentBadge + dateBadge + '</div>';
                 html += '</div>';
-                html += '<button onclick="event.stopPropagation();deleteTextCard(\'' + e.id + '\',\'' + displayName.replace(/'/g, "\\'") + '\')" style="background:none;border:none;color:#555;font-size:0.75rem;cursor:pointer;padding:4px;opacity:0.5;transition:opacity 0.2s;" onmouseenter="this.style.opacity=1;this.style.color=\'#f55b5b\'" onmouseleave="this.style.opacity=0.5;this.style.color=\'#555\'" title="Eliminar">&#128465;</button>';
+                html += '<button onclick="event.stopPropagation();deleteTextCard(this.parentElement.parentElement.getAttribute(\'data-id\'),this.parentElement.parentElement.querySelector(\'div\').textContent)" style="background:none;border:none;color:#555;font-size:0.75rem;cursor:pointer;padding:4px;opacity:0.5;transition:opacity 0.2s;" title="Eliminar">&#128465;</button>';
                 html += '</div></div>';
             });
             list.innerHTML = html;
@@ -3392,7 +3392,7 @@ function selectTextCard(cardEl) {
 }
 
 async function deleteTextCard(entryId, name) {
-    if (!confirm('Eliminar "' + name + '"?')) return;
+    if (!confirm('Eliminar "' + (name || 'este texto') + '"?')) return;
     try {
         const response = await fetch('/delete-entry/' + entryId, { method: 'DELETE' });
         const data = await response.json();
