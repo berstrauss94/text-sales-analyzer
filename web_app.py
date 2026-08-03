@@ -4328,7 +4328,79 @@ async function loadInforme() {
         }
         complianceHtml += '</div>';
 
-        container.innerHTML = tableHtml + totalsHtml + pieHtml + complianceHtml;
+        // --- Synthesis Text (auto-generated narrative) ---
+        const cm = data.current_month;
+        const cmName = months[cm] || 'mes actual';
+        const cmTotal = data.totals_per_month[cm] || 0;
+        const activeUsers = users.length;
+        const cumpleCount = data.cumplen.length;
+        const noCumpleCount = data.no_cumplen.length;
+        const cumplePct = activeUsers > 0 ? Math.round((cumpleCount / activeUsers) * 100) : 0;
+        const noCumplePct = 100 - cumplePct;
+
+        // Find top performer this month
+        let topUser = '';
+        let topCount = 0;
+        users.forEach(u => {
+            const val = data.matrix[u][cm] || 0;
+            if (val > topCount) { topCount = val; topUser = u; }
+        });
+
+        // Find worst performers
+        const lowPerformers = users.filter(u => (data.matrix[u][cm] || 0) < meta && (data.matrix[u][cm] || 0) > 0);
+        const zeroPerformers = users.filter(u => (data.matrix[u][cm] || 0) === 0);
+
+        let synthesisHtml = '<div style="margin-top:14px;padding:14px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;border-left:3px solid #4a6cf7;">';
+        synthesisHtml += '<div style="font-size:0.75rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px;">Sintesis del Informe - ' + cmName + ' ' + year + '</div>';
+
+        // Paragraph 1: General status
+        synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.6;margin-bottom:8px;">';
+        synthesisHtml += 'El consolidado correspondiente al mes de <strong style="color:#e0e0e0;">' + cmName + '</strong> registra un total de <strong style="color:#5bf5a3;">' + cmTotal + '</strong> audios cargados al sistema por parte de los vendedores. ';
+        if (cumpleCount > 0) {
+            synthesisHtml += 'El <strong style="color:#5bf5a3;">' + cumplePct + '%</strong> (' + cumpleCount + ' de ' + activeUsers + ') del equipo auditado logro alcanzar y superar la meta establecida de ' + meta + ' audios mensuales.';
+        } else {
+            synthesisHtml += 'Ningun vendedor alcanzo la meta mensual de <strong style="color:#f55b5b;">' + meta + ' audios</strong>. El cumplimiento es <strong style="color:#f55b5b;">Insuficiente</strong> frente a las metas institucionales.';
+        }
+        synthesisHtml += '</p>';
+
+        // Paragraph 2: Top performer
+        if (topUser && topCount > 0) {
+            synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.6;margin-bottom:8px;">';
+            if (topCount >= meta) {
+                synthesisHtml += 'El desempeno positivo corresponde a <strong style="color:#4a6cf7;">' + topUser + '</strong>, quien lidero la gestion comercial con un total de <strong style="color:#5bf5a3;">' + topCount + '</strong> grabaciones acumuladas en el periodo.';
+            } else {
+                synthesisHtml += 'El mayor aporte corresponde a <strong style="color:#4a6cf7;">' + topUser + '</strong> con <strong style="color:#f5d75b;">' + topCount + '</strong> grabaciones, aun por debajo de la meta de ' + meta + '.';
+            }
+            synthesisHtml += '</p>';
+        }
+
+        // Paragraph 3: Non-compliance
+        if (noCumpleCount > 0 || zeroPerformers.length > 0) {
+            synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.6;margin-bottom:8px;">';
+            synthesisHtml += 'El <strong style="color:#f55b5b;">' + noCumplePct + '%</strong> restante del equipo presenta incumplimiento de la cuota mensual. ';
+            if (zeroPerformers.length > 0) {
+                synthesisHtml += 'Los siguientes vendedores registraron <strong style="color:#f55b5b;">0 cargas</strong>: ' + zeroPerformers.join(', ') + '. ';
+            }
+            if (lowPerformers.length > 0) {
+                const lowDetails = lowPerformers.map(u => u + ' (' + (data.matrix[u][cm] || 0) + ')').join(', ');
+                synthesisHtml += 'Con cargas parciales: ' + lowDetails + '.';
+            }
+            synthesisHtml += '</p>';
+        }
+
+        // Paragraph 4: Recommendation
+        synthesisHtml += '<p style="font-size:0.76rem;color:#5bf5a3;line-height:1.6;margin-top:10px;padding:8px;background:#0d1a0d;border-radius:6px;border-left:2px solid #5bf5a3;">';
+        if (cumplePct >= 70) {
+            synthesisHtml += '<strong>Evaluacion:</strong> Cumplimiento satisfactorio. Mantener el ritmo y reforzar con seguimiento a los vendedores rezagados.';
+        } else if (cumplePct >= 30) {
+            synthesisHtml += '<strong>Evaluacion:</strong> Cumplimiento parcial. Se requiere seguimiento activo y capacitacion para elevar la tasa de carga del equipo.';
+        } else {
+            synthesisHtml += '<strong>Evaluacion:</strong> Cumplimiento insuficiente. Se requiere la aplicacion urgente de planes de contingencia y capacitaciones para revertir este comportamiento en el proximo ciclo.';
+        }
+        synthesisHtml += '</p>';
+        synthesisHtml += '</div>';
+
+        container.innerHTML = tableHtml + totalsHtml + pieHtml + complianceHtml + synthesisHtml;
     } catch (e) {
         container.innerHTML = '<div style="color:#f55b5b;">Error: ' + e.message + '</div>';
     }
