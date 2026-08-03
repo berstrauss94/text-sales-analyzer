@@ -4373,52 +4373,86 @@ async function loadInforme() {
         const lowPerformers = users.filter(u => (data.matrix[u][cm] || 0) < meta && (data.matrix[u][cm] || 0) > 0);
         const zeroPerformers = users.filter(u => (data.matrix[u][cm] || 0) === 0);
 
-        let synthesisHtml = '<div style="margin-top:14px;padding:14px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;border-left:3px solid #4a6cf7;">';
-        synthesisHtml += '<div style="font-size:0.75rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px;">Sintesis del Informe - ' + cmName + ' ' + year + '</div>';
+        let synthesisHtml = '<div style="margin-top:14px;padding:18px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;border-left:3px solid #4a6cf7;">';
+        synthesisHtml += '<div style="font-size:0.78rem;color:#e0e0e0;font-weight:600;margin-bottom:6px;">Mi Primer Casa S.A.</div>';
+        synthesisHtml += '<div style="font-size:0.68rem;color:#888;margin-bottom:14px;">Informe de Auditoria de Grabacion y Transcripciones - ' + cmName + ' ' + year + '</div>';
+        synthesisHtml += '<hr style="border:none;border-top:1px solid #2a2d3a;margin-bottom:14px;">';
 
-        // Paragraph 1: General status
-        synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.6;margin-bottom:8px;">';
-        synthesisHtml += 'El consolidado correspondiente al mes de <strong style="color:#e0e0e0;">' + cmName + '</strong> registra un total de <strong style="color:#5bf5a3;">' + cmTotal + '</strong> audios cargados al sistema por parte de los vendedores. ';
-        if (cumpleCount > 0) {
-            synthesisHtml += 'El <strong style="color:#5bf5a3;">' + cumplePct + '%</strong> (' + cumpleCount + ' de ' + activeUsers + ') del equipo auditado logro alcanzar y superar la meta establecida de ' + meta + ' audios mensuales.';
+        // Paragraph 1: Introduction
+        synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.8;margin-bottom:12px;text-align:justify;">';
+        synthesisHtml += 'El presente informe tiene como finalidad documentar el proceso de seguimiento, evaluacion y analisis de las grabaciones de audio proporcionadas voluntariamente por los clientes al sistema de autoevaluacion. A traves de esta auditoria se busca determinar el nivel de calidad de las interacciones comerciales, comunicacionales y operativas registradas en dichos audios, permitiendo identificar fortalezas, oportunidades de mejora y patrones de desempeno relevantes para el desarrollo profesional de los Vendedores.';
+        synthesisHtml += '</p>';
+
+        // Paragraph 2: Methodology
+        synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.8;margin-bottom:12px;text-align:justify;">';
+        synthesisHtml += 'El sistema realiza un analisis integral de cada grabacion considerando las respuestas emitidas, la estructura de la conversacion, la capacidad de deteccion de necesidades, el manejo de objeciones, la claridad del mensaje, el nivel de escucha activa, el grado de vinculacion con el interlocutor y otros indicadores previamente definidos dentro de los criterios de evaluacion establecidos.';
+        synthesisHtml += '</p>';
+
+        // Paragraph 3: Purpose
+        synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.8;margin-bottom:12px;text-align:justify;">';
+        synthesisHtml += 'Asimismo, el presente documento expone los resultados obtenidos a partir de la informacion procesada, proporcionando observaciones objetivas, metricas de desempeno y conclusiones fundamentadas que permitan al usuario comprender su situacion actual, medir su evolucion a lo largo del tiempo y disenar estrategias concretas de mejora continua.';
+        synthesisHtml += '</p>';
+
+        // Paragraph 4: Data-driven analysis
+        synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.8;margin-bottom:12px;text-align:justify;">';
+        synthesisHtml += 'Como puede observarse en el consolidado final correspondiente al mes de <strong style="color:#e0e0e0;">' + cmName + '</strong>, el volumen total de audios cargados al sistema por parte de los vendedores ';
+        if (cmTotal >= meta * activeUsers * 0.7) {
+            synthesisHtml += 'muestra un cumplimiento <strong style="color:#5bf5a3;">satisfactorio</strong> frente a las metas institucionales.';
+        } else if (cmTotal >= meta * activeUsers * 0.3) {
+            synthesisHtml += 'muestra un cumplimiento <strong style="color:#f5d75b;">parcial</strong> frente a las metas institucionales.';
         } else {
-            synthesisHtml += 'Ningun vendedor alcanzo la meta mensual de <strong style="color:#f55b5b;">' + meta + ' audios</strong>. El cumplimiento es <strong style="color:#f55b5b;">Insuficiente</strong> frente a las metas institucionales.';
+            synthesisHtml += 'muestra un cumplimiento <strong style="color:#f55b5b;">Insuficiente</strong> frente a las metas institucionales.';
+        }
+        synthesisHtml += ' Considerando que la metrica minima exigida para el cierre mensual es de <strong style="color:#5bf5a3;">' + meta + '</strong> audios por vendedor, ';
+        if (cumpleCount > 0) {
+            synthesisHtml += 'se constata que solo el <strong style="color:#5bf5a3;">' + cumplePct + '%</strong> (' + cumpleCount + ' de ' + activeUsers + ') del equipo auditado logro alcanzar y superar el objetivo establecido.';
+        } else {
+            synthesisHtml += 'se constata que <strong style="color:#f55b5b;">ningun vendedor</strong> del equipo auditado logro alcanzar el objetivo establecido.';
         }
         synthesisHtml += '</p>';
 
-        // Paragraph 2: Top performer
+        // Paragraph 5: Top performer detail
         if (topUser && topCount > 0) {
-            synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.6;margin-bottom:8px;">';
+            synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.8;margin-bottom:12px;text-align:justify;">';
             if (topCount >= meta) {
-                synthesisHtml += 'El desempeno positivo corresponde a <strong style="color:#4a6cf7;">' + topUser + '</strong>, quien lidero la gestion comercial con un total de <strong style="color:#5bf5a3;">' + topCount + '</strong> grabaciones acumuladas en el periodo.';
+                synthesisHtml += 'Este desempeno positivo corresponde a <strong style="color:#4a6cf7;">' + topUser + '</strong>, quien lidero la gestion comercial con un total de <strong style="color:#5bf5a3;">' + topCount + '</strong> grabaciones acumuladas. ';
             } else {
-                synthesisHtml += 'El mayor aporte corresponde a <strong style="color:#4a6cf7;">' + topUser + '</strong> con <strong style="color:#f5d75b;">' + topCount + '</strong> grabaciones, aun por debajo de la meta de ' + meta + '.';
+                synthesisHtml += 'El mayor aporte del periodo corresponde a <strong style="color:#4a6cf7;">' + topUser + '</strong> con <strong style="color:#f5d75b;">' + topCount + '</strong> grabaciones acumuladas, aun por debajo de la meta de ' + meta + '. ';
             }
             synthesisHtml += '</p>';
         }
 
-        // Paragraph 3: Non-compliance
+        // Paragraph 6: Non-compliance detail
         if (noCumpleCount > 0 || zeroPerformers.length > 0) {
-            synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.6;margin-bottom:8px;">';
-            synthesisHtml += 'El <strong style="color:#f55b5b;">' + noCumplePct + '%</strong> restante del equipo presenta incumplimiento de la cuota mensual. ';
-            if (zeroPerformers.length > 0) {
-                synthesisHtml += 'Los siguientes vendedores registraron <strong style="color:#f55b5b;">0 cargas</strong>: ' + zeroPerformers.join(', ') + '. ';
-            }
+            synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.8;margin-bottom:12px;text-align:justify;">';
+            synthesisHtml += 'Por el contrario, el <strong style="color:#f55b5b;">' + noCumplePct + '%</strong> restante del equipo presenta un incumplimiento severo de la cuota mensual. ';
             if (lowPerformers.length > 0) {
-                const lowDetails = lowPerformers.map(u => u + ' (' + (data.matrix[u][cm] || 0) + ')').join(', ');
-                synthesisHtml += 'Con cargas parciales: ' + lowDetails + '.';
+                const secondBest = lowPerformers.sort((a, b) => (data.matrix[b][cm] || 0) - (data.matrix[a][cm] || 0))[0];
+                const secondCount = data.matrix[secondBest] ? data.matrix[secondBest][cm] || 0 : 0;
+                if (secondCount > 0) {
+                    synthesisHtml += 'A excepcion de <strong style="color:#4a6cf7;">' + secondBest + '</strong>, quien finalizo con <strong style="color:#f5d75b;">' + secondCount + '</strong> cargas, ';
+                }
+                synthesisHtml += 'el resto de los colaboradores registro un volumen critico y marcadamente insuficiente que oscila entre <strong style="color:#f55b5b;">0</strong> y <strong style="color:#f55b5b;">' + Math.max(...lowPerformers.map(u => data.matrix[u][cm] || 0)) + '</strong> audios totales al concluir el mes.';
             }
             synthesisHtml += '</p>';
         }
 
-        // Paragraph 4: Recommendation
-        synthesisHtml += '<p style="font-size:0.76rem;color:#5bf5a3;line-height:1.6;margin-top:10px;padding:8px;background:#0d1a0d;border-radius:6px;border-left:2px solid #5bf5a3;">';
+        // Paragraph 7: Conclusion
+        synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.8;margin-bottom:12px;text-align:justify;">';
+        synthesisHtml += 'Esta situacion evidencia una brecha profunda respecto a los indicadores de seguimiento definidos por la organizacion. La falta de registros por parte de la mayoria del personal impacta de forma directa y negativa en los procesos de evaluacion de calidad, limitando la disponibilidad de informacion para la mejora continua.';
+        synthesisHtml += '</p>';
+
+        // Evaluation box
+        synthesisHtml += '<p style="font-size:0.76rem;line-height:1.8;margin-top:12px;padding:10px 14px;border-radius:6px;text-align:justify;';
         if (cumplePct >= 70) {
-            synthesisHtml += '<strong>Evaluacion:</strong> Cumplimiento satisfactorio. Mantener el ritmo y reforzar con seguimiento a los vendedores rezagados.';
+            synthesisHtml += 'color:#5bf5a3;background:#0d1a0d;border-left:3px solid #5bf5a3;">';
+            synthesisHtml += '<strong>Evaluacion Final:</strong> El equipo demuestra un compromiso adecuado con el sistema de carga de audios. Se recomienda mantener el ritmo actual y reforzar el seguimiento a los vendedores que presentan rezago para consolidar el cumplimiento pleno.';
         } else if (cumplePct >= 30) {
-            synthesisHtml += '<strong>Evaluacion:</strong> Cumplimiento parcial. Se requiere seguimiento activo y capacitacion para elevar la tasa de carga del equipo.';
+            synthesisHtml += 'color:#f5d75b;background:#1a1a0d;border-left:3px solid #f5d75b;">';
+            synthesisHtml += '<strong>Evaluacion Final:</strong> El cumplimiento es parcial. Se requiere la implementacion de seguimiento activo, reuniones de retroalimentacion y capacitaciones orientadas a elevar la tasa de carga del equipo en el proximo periodo.';
         } else {
-            synthesisHtml += '<strong>Evaluacion:</strong> Cumplimiento insuficiente. Se requiere la aplicacion urgente de planes de contingencia y capacitaciones para revertir este comportamiento en el proximo ciclo.';
+            synthesisHtml += 'color:#f5a35b;background:#1a0d0d;border-left:3px solid #f55b5b;">';
+            synthesisHtml += '<strong>Evaluacion Final:</strong> Se requiere la aplicacion urgente de planes de contingencia y capacitaciones para revertir este comportamiento en el proximo ciclo. La auditoria de grabaciones constituye una herramienta de retroalimentacion sistematica orientada al fortalecimiento de habilidades comunicacionales y comerciales, promoviendo procesos de aprendizaje basados en evidencia, autoanalisis y seguimiento permanente del desempeno individual.';
         }
         synthesisHtml += '</p>';
         synthesisHtml += '</div>';
