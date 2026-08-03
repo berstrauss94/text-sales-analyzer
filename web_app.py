@@ -1914,13 +1914,14 @@ HTML = """
                     <option value="12">Diciembre</option>
                 </select>
             </div>
-            <div class="date-select-group">
-                <label for="selectText">Textos <span id="savedTextsCount" style="color:#555;"></span></label>
-                <div style="display:flex;align-items:center;gap:6px;">
-                    <select id="selectText" onchange="onTextSelected(this.value)" style="flex:1;">
-                        <option value="">-- Seleccionar texto --</option>
-                    </select>
-                    <button id="deleteTextBtn" onclick="deleteSelectedText()" style="display:none;background:transparent;border:1px solid #f55b5b;color:#f55b5b;border-radius:6px;padding:5px 8px;font-size:0.75rem;cursor:pointer;white-space:nowrap;" title="Eliminar texto seleccionado">🗑️</button>
+            <div class="date-select-group" style="flex:1;min-width:200px;">
+                <label>Textos <span id="savedTextsCount" style="color:#555;"></span></label>
+                <button id="textsToggleBtn" onclick="toggleTextsPanel()" style="width:100%;background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:8px 12px;font-size:0.82rem;cursor:pointer;text-align:left;transition:border-color 0.2s;">
+                    -- Seleccionar texto --
+                </button>
+                <div id="textsPanel" style="display:none;position:relative;">
+                    <div id="textsList" style="position:absolute;z-index:100;top:4px;left:0;right:0;background:#0d0f18;border:1px solid #4a6cf7;border-radius:8px;max-height:320px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.5);">
+                    </div>
                 </div>
             </div>
         </div>
@@ -2619,17 +2620,13 @@ function renderResults(data, inputText) {
 
     const iDetail = intentDetail[data.intent] || intentDetail['UNKNOWN'];
 
-    // Get the title: from input field (admin), from selected dropdown option, or from global var
+    // Get the title: from input field (admin), from global var (set by card click), or preview
     const entryNameInputEl = document.getElementById('entryNameInput');
-    const selectTextEl = document.getElementById('selectText');
     let entryTitle = '';
     if (entryNameInputEl && entryNameInputEl.value.trim()) {
         entryTitle = entryNameInputEl.value.trim();
     } else if (window._currentEntryName) {
         entryTitle = window._currentEntryName;
-    } else if (selectTextEl && selectTextEl.value) {
-        const selOpt = selectTextEl.options[selectTextEl.selectedIndex];
-        if (selOpt) entryTitle = selOpt.getAttribute('data-fullname') || selOpt.textContent || '';
     }
     const displayTitle = entryTitle || preview;
 
@@ -3298,6 +3295,18 @@ function toggleSavedTexts() {
     loadSavedTexts();
 }
 
+function toggleTextsPanel() {
+    const panel = document.getElementById('textsPanel');
+    const btn = document.getElementById('textsToggleBtn');
+    if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+        btn.style.borderColor = '#4a6cf7';
+    } else {
+        panel.style.display = 'none';
+        btn.style.borderColor = '#2a2d3e';
+    }
+}
+
 async function loadSavedTexts() {
     const year = document.getElementById('selectYear').value;
     const month = document.getElementById('selectMonth').value;
@@ -3306,12 +3315,15 @@ async function loadSavedTexts() {
     const userSelect = document.getElementById('selectUser');
     const adminUser = userSelect ? userSelect.value : '';
 
+    const btn = document.getElementById('textsToggleBtn');
+    const count = document.getElementById('savedTextsCount');
+    const list = document.getElementById('textsList');
+
     // For admin: if no user selected, can't load texts
     if (userSelect && !adminUser) {
-        const select = document.getElementById('selectText');
-        const count = document.getElementById('savedTextsCount');
-        if (select) select.innerHTML = '<option value="">-- Seleccionar usuario primero --</option>';
+        if (btn) btn.textContent = '-- Seleccionar usuario primero --';
         if (count) count.textContent = '';
+        if (list) list.innerHTML = '<div style="padding:12px;color:#555;font-size:0.78rem;text-align:center;">Selecciona un usuario para ver sus textos.</div>';
         return;
     }
 
@@ -3322,58 +3334,69 @@ async function loadSavedTexts() {
     try {
         const response = await fetch(url);
         const data = await response.json();
-        const select = document.getElementById('selectText');
-        const count = document.getElementById('savedTextsCount');
-        if (!select) return;
-
-        // Clear existing options except the first placeholder
-        select.innerHTML = '<option value="">-- Seleccionar texto --</option>';
+        if (!list) return;
 
         if (data.entries && data.entries.length > 0) {
-            count.textContent = `(${data.entries.length})`;
+            if (count) count.textContent = `(${data.entries.length})`;
+            if (btn) btn.textContent = data.entries.length + ' textos disponibles';
+            let html = '';
             data.entries.forEach((e, i) => {
-                const rawName = e.entry_name || (e.text || '').substring(0, 16) || 'Texto #' + (i+1);
-                const name = rawName.length > 16 ? rawName.substring(0, 16) + '...' : rawName;
-                const opt = document.createElement('option');
-                opt.value = e.id;
-                opt.textContent = name;
-                opt.setAttribute('data-fullname', e.entry_name || rawName);
-                select.appendChild(opt);
+                const rawName = e.entry_name || (e.text || '').substring(0, 30) || 'Texto #' + (i+1);
+                const displayName = rawName.length > 35 ? rawName.substring(0, 35) + '...' : rawName;
+                const intentBadge = e.intent ? '<span style="background:#1a2a3a;color:#5bd4f5;padding:1px 6px;border-radius:8px;font-size:0.6rem;">' + e.intent + '</span>' : '';
+                const dateBadge = e.timestamp ? '<span style="color:#555;font-size:0.62rem;">' + e.timestamp + '</span>' : '';
+                html += '<div class="text-card-item" data-id="' + e.id + '" data-fullname="' + (e.entry_name || rawName).replace(/"/g, '&quot;') + '" onclick="selectTextCard(this)" style="padding:8px 12px;margin:4px 6px;background:#111828;border:1px solid #1e2130;border-radius:6px;cursor:pointer;transition:border-color 0.2s,background 0.2s;">';
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">';
+                html += '<div style="flex:1;min-width:0;">';
+                html += '<div style="font-size:0.78rem;color:#e0e0e0;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + displayName + '</div>';
+                html += '<div style="display:flex;gap:6px;align-items:center;margin-top:3px;">' + intentBadge + dateBadge + '</div>';
+                html += '</div>';
+                html += '<button onclick="event.stopPropagation();deleteTextCard(\'' + e.id + '\',\'' + displayName.replace(/'/g, "\\'") + '\')" style="background:none;border:none;color:#555;font-size:0.75rem;cursor:pointer;padding:4px;opacity:0.5;transition:opacity 0.2s;" onmouseenter="this.style.opacity=1;this.style.color=\'#f55b5b\'" onmouseleave="this.style.opacity=0.5;this.style.color=\'#555\'" title="Eliminar">&#128465;</button>';
+                html += '</div></div>';
             });
+            list.innerHTML = html;
         } else {
-            count.textContent = '(0)';
+            if (count) count.textContent = '(0)';
+            if (btn) btn.textContent = '-- Sin textos en este periodo --';
+            list.innerHTML = '<div style="padding:16px;color:#555;font-size:0.78rem;text-align:center;font-style:italic;">No hay textos guardados en este periodo.</div>';
         }
     } catch(e) {
         console.error('Error loading saved texts:', e);
+        if (list) list.innerHTML = '<div style="padding:12px;color:#f55b5b;font-size:0.78rem;text-align:center;">Error cargando textos.</div>';
     }
 }
 
-function onTextSelected(entryId) {
-    if (!entryId) {
-        document.getElementById('deleteTextBtn').style.display = 'none';
-        return;
-    }
-    document.getElementById('deleteTextBtn').style.display = 'inline-block';
-    // Capture the full entry name from the selected option
-    const select = document.getElementById('selectText');
-    const selectedOpt = select.options[select.selectedIndex];
-    if (selectedOpt) {
-        window._currentEntryName = selectedOpt.getAttribute('data-fullname') || selectedOpt.textContent || '';
-    }
+function selectTextCard(cardEl) {
+    const entryId = cardEl.getAttribute('data-id');
+    const fullname = cardEl.getAttribute('data-fullname');
+    if (!entryId) return;
+
+    // Visual feedback
+    document.querySelectorAll('.text-card-item').forEach(c => { c.style.borderColor = '#1e2130'; c.style.background = '#111828'; });
+    cardEl.style.borderColor = '#4a6cf7';
+    cardEl.style.background = '#0d1a2a';
+
+    // Update button text
+    const btn = document.getElementById('textsToggleBtn');
+    if (btn) btn.textContent = fullname || 'Texto seleccionado';
+
+    // Store name globally
+    window._currentEntryName = fullname || '';
+
+    // Close panel
+    document.getElementById('textsPanel').style.display = 'none';
+    btn.style.borderColor = '#2a2d3e';
+
+    // Load the text
     loadSavedText(entryId);
 }
 
-async function deleteSelectedText() {
-    const select = document.getElementById('selectText');
-    const entryId = select.value;
-    if (!entryId) return;
-    const name = select.options[select.selectedIndex].textContent;
-    if (!confirm('¿Eliminar "' + name + '"?')) return;
+async function deleteTextCard(entryId, name) {
+    if (!confirm('Eliminar "' + name + '"?')) return;
     try {
         const response = await fetch('/delete-entry/' + entryId, { method: 'DELETE' });
         const data = await response.json();
         if (data.success) {
-            document.getElementById('deleteTextBtn').style.display = 'none';
             loadSavedTexts();
         } else {
             alert('No se pudo eliminar.');
@@ -3381,6 +3404,16 @@ async function deleteSelectedText() {
     } catch(e) {
         alert('Error: ' + e.message);
     }
+}
+
+function onTextSelected(entryId) {
+    if (!entryId) return;
+    loadSavedText(entryId);
+}
+
+async function deleteSelectedText() {
+    // Legacy compatibility — now handled by deleteTextCard
+    loadSavedTexts();
 }
 
 async function loadSavedText(entryId) {
