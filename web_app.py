@@ -1985,6 +1985,21 @@ HTML = """
             <div style="color:#555;font-size:0.8rem;">Selecciona un usuario y periodo para ver estadisticas.</div>
         </div>
     </div>
+
+    <!-- ── INFORME DE SEGUIMIENTO ── -->
+    <div class="input-section" id="informePanel" style="margin-top:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:0.85rem;font-weight:600;color:#5bf5a3;">&#128202; Informe de Seguimiento Anual</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <select id="informeYear" onchange="loadInforme()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.8rem;">
+                    <option value="2026" selected>2026</option>
+                    <option value="2025">2025</option>
+                </select>
+                <button onclick="loadInforme()" style="background:#1a3a2a;color:#5bf5a3;border:1px solid #2a5a3a;border-radius:6px;padding:6px 12px;font-size:0.75rem;cursor:pointer;">Actualizar</button>
+            </div>
+        </div>
+        <div id="informeContent" style="font-size:0.78rem;color:#aaa;">Cargando informe...</div>
+    </div>
     {% endif %}
 
     <!-- ── HISTORY ── -->
@@ -4221,6 +4236,109 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// ── Informe de Seguimiento ────────────────────────────────────────────────
+
+async function loadInforme() {
+    const year = document.getElementById('informeYear') ? document.getElementById('informeYear').value : '2026';
+    const container = document.getElementById('informeContent');
+    if (!container) return;
+    container.innerHTML = '<div style="color:#555;">Cargando informe...</div>';
+
+    try {
+        const resp = await fetch('/admin/informe?year=' + year);
+        if (!resp.ok) { container.innerHTML = '<div style="color:#f55b5b;">Error ' + resp.status + '</div>'; return; }
+        const data = await resp.json();
+        if (data.error) { container.innerHTML = '<div style="color:#f55b5b;">' + data.error + '</div>'; return; }
+
+        const months = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        const users = Object.keys(data.matrix).filter(u => data.user_totals[u] > 0).sort((a, b) => data.user_totals[b] - data.user_totals[a]);
+        const meta = data.meta_mensual;
+
+        // Table header
+        let tableHtml = '<div style="overflow-x:auto;max-height:400px;border:1px solid #2a2d3a;border-radius:8px;">';
+        tableHtml += '<table style="width:100%;border-collapse:collapse;font-size:0.72rem;">';
+        tableHtml += '<thead><tr style="background:#111828;position:sticky;top:0;">';
+        tableHtml += '<th style="padding:6px 8px;text-align:left;color:#888;border-bottom:1px solid #2a2d3a;">Vendedor</th>';
+        for (let m = 1; m <= 12; m++) {
+            tableHtml += '<th style="padding:6px 4px;text-align:center;color:#888;border-bottom:1px solid #2a2d3a;">' + months[m] + '</th>';
+        }
+        tableHtml += '<th style="padding:6px 8px;text-align:center;color:#fff;border-bottom:1px solid #2a2d3a;font-weight:700;">Total</th>';
+        tableHtml += '</tr></thead><tbody>';
+
+        // Rows
+        users.forEach(u => {
+            tableHtml += '<tr style="border-bottom:1px solid #1e2130;">';
+            tableHtml += '<td style="padding:5px 8px;color:#e0e0e0;font-weight:500;white-space:nowrap;">' + u + '</td>';
+            for (let m = 1; m <= 12; m++) {
+                const val = data.matrix[u][m] || 0;
+                let color = '#555';
+                if (val >= meta) color = '#5bf5a3';
+                else if (val >= meta * 0.7) color = '#f5d75b';
+                else if (val >= meta * 0.3) color = '#f5a35b';
+                else if (val > 0) color = '#f55b5b';
+                tableHtml += '<td style="padding:5px 4px;text-align:center;color:' + color + ';font-weight:600;">' + val + '</td>';
+            }
+            tableHtml += '<td style="padding:5px 8px;text-align:center;color:#fff;font-weight:700;">' + data.user_totals[u] + '</td>';
+            tableHtml += '</tr>';
+        });
+
+        tableHtml += '</tbody></table></div>';
+
+        // Monthly totals
+        let totalsHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">';
+        for (let m = 1; m <= 12; m++) {
+            const t = data.totals_per_month[m] || 0;
+            if (t > 0) totalsHtml += '<span style="background:#0d0f18;border:1px solid #2a2d3a;border-radius:6px;padding:3px 8px;font-size:0.68rem;color:#aaa;">' + months[m] + ': <strong style="color:#e0e0e0;">' + t + '</strong></span>';
+        }
+        totalsHtml += '<span style="background:#1a3a2a;border:1px solid #2a5a3a;border-radius:6px;padding:3px 10px;font-size:0.68rem;color:#5bf5a3;font-weight:700;">Total ' + year + ': ' + data.total_general + '</span>';
+        totalsHtml += '</div>';
+
+        // Pie chart (monthly distribution)
+        const monthsWithData = [];
+        for (let m = 1; m <= 12; m++) {
+            if ((data.totals_per_month[m] || 0) > 0) monthsWithData.push(m);
+        }
+        const pieColors = ['#4a6cf7', '#f5a35b', '#7b9cff', '#f5d75b', '#5bf5a3', '#f55b5b', '#b38bff', '#5bd4f5', '#ff8c00', '#a35bf5', '#88cc88', '#cc8888'];
+        let pieGradient = [];
+        let pieLegend = '';
+        let currentDeg = 0;
+        const totalForPie = data.total_general || 1;
+        monthsWithData.forEach((m, i) => {
+            const val = data.totals_per_month[m];
+            const pct = (val / totalForPie * 100).toFixed(1);
+            const deg = val / totalForPie * 360;
+            pieGradient.push(pieColors[i % pieColors.length] + ' ' + currentDeg + 'deg ' + (currentDeg + deg) + 'deg');
+            pieLegend += '<div style="display:flex;align-items:center;gap:4px;font-size:0.65rem;"><div style="width:8px;height:8px;border-radius:2px;background:' + pieColors[i % pieColors.length] + ';"></div><span style="color:#aaa;">' + months[m] + ': ' + pct + '% (' + val + ')</span></div>';
+            currentDeg += deg;
+        });
+
+        let pieHtml = '<div style="display:flex;align-items:center;gap:20px;justify-content:center;margin-top:14px;flex-wrap:wrap;">';
+        pieHtml += '<div style="width:140px;height:140px;border-radius:50%;background:conic-gradient(' + pieGradient.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">';
+        pieHtml += '<div style="width:60px;height:60px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;"><span style="font-size:0.6rem;color:#aaa;">' + data.total_general + '</span></div></div>';
+        pieHtml += '<div style="display:flex;flex-direction:column;gap:3px;">' + pieLegend + '</div></div>';
+
+        // Compliance summary
+        let complianceHtml = '<div style="margin-top:12px;padding:10px;background:#0a0c14;border:1px solid #1e2130;border-radius:8px;font-size:0.72rem;">';
+        complianceHtml += '<div style="color:#888;margin-bottom:6px;">Meta mensual: <strong style="color:#5bf5a3;">' + meta + ' audios/vendedor</strong></div>';
+        if (data.cumplen.length > 0) {
+            complianceHtml += '<div style="color:#5bf5a3;margin-bottom:4px;">Cumplen (' + data.cumplen.length + '): ' + data.cumplen.join(', ') + '</div>';
+        }
+        if (data.no_cumplen.length > 0) {
+            complianceHtml += '<div style="color:#f55b5b;">No cumplen (' + data.no_cumplen.length + '): ' + data.no_cumplen.join(', ') + '</div>';
+        }
+        complianceHtml += '</div>';
+
+        container.innerHTML = tableHtml + totalsHtml + pieHtml + complianceHtml;
+    } catch (e) {
+        container.innerHTML = '<div style="color:#f55b5b;">Error: ' + e.message + '</div>';
+    }
+}
+
+// Load informe on page load if admin
+if (document.getElementById('informePanel')) {
+    loadInforme();
+}
+
 // ── History ───────────────────────────────────────────────────────────────
 
 let historyOpen = false;
@@ -5506,6 +5624,73 @@ def debug_sync_one():
             "error": str(exc),
             "traceback": traceback.format_exc(),
         })
+
+
+@app.route("/admin/informe")
+def admin_informe():
+    """
+    Return aggregated report data for the informe panel.
+    Groups entries by username and month for annual tracking.
+    Admin only.
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+
+    year = request.args.get("year", type=int) or 2026
+    meta_mensual = request.args.get("meta", type=int) or 30
+
+    from src.users.history_manager import get_flat_entries
+    from datetime import datetime as _dt
+
+    all_users = user_manager.list_users()
+    # Build matrix: {username: {month: count}}
+    matrix = {}
+    totals_per_month = {}
+
+    for u in all_users:
+        entries = get_flat_entries(u, limit=500)
+        matrix[u] = {m: 0 for m in range(1, 13)}
+        for e in entries:
+            e_year = e.get("year")
+            e_month = e.get("month")
+            if e_year is None and e.get("timestamp"):
+                try:
+                    ts_str = str(e["timestamp"])
+                    if hasattr(e["timestamp"], "year"):
+                        e_year = e["timestamp"].year
+                        e_month = e["timestamp"].month
+                    elif "T" in ts_str or "-" in ts_str:
+                        ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
+                        e_year = ts.year
+                        e_month = ts.month
+                except Exception:
+                    pass
+            if e_year == year and e_month and 1 <= e_month <= 12:
+                matrix[u][e_month] = matrix[u].get(e_month, 0) + 1
+
+    # Totals per month
+    for m in range(1, 13):
+        totals_per_month[m] = sum(matrix[u].get(m, 0) for u in all_users)
+
+    # Per-user total
+    user_totals = {u: sum(matrix[u].values()) for u in all_users}
+
+    # Compliance stats
+    current_month = _dt.now().month
+    cumplen = [u for u in all_users if matrix[u].get(current_month, 0) >= meta_mensual]
+    no_cumplen = [u for u in all_users if matrix[u].get(current_month, 0) < meta_mensual and user_totals[u] > 0]
+
+    return jsonify({
+        "year": year,
+        "meta_mensual": meta_mensual,
+        "matrix": matrix,
+        "totals_per_month": totals_per_month,
+        "user_totals": user_totals,
+        "current_month": current_month,
+        "cumplen": cumplen,
+        "no_cumplen": no_cumplen,
+        "total_general": sum(totals_per_month.values()),
+    })
 
 
 if __name__ == "__main__":
