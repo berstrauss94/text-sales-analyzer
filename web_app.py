@@ -4150,9 +4150,9 @@ function buildHighlightedText(text, words, indicatorKey) {
     }
     result += escapeHtml(text.substring(lastIdx));
 
-    // Always highlight "Vendedor" and "Cliente X" labels in green for role identification
+    // Highlight roles: Vendedor=green, Cliente=orange
     result = result.replace(/(Vendedor)/g, '<span style="color:#5bf5a3;font-weight:700;">$1</span>');
-    result = result.replace(/(Cliente(?:\s*\d*)?)/g, '<span style="color:#5bf5a3;font-weight:700;">$1</span>');
+    result = result.replace(/(Cliente(?:\s*\d*)?)/g, '<span style="color:#f5a35b;font-weight:700;">$1</span>');
 
     return result;
 }
@@ -4591,16 +4591,43 @@ async function loadInforme() {
 function printInforme() {
     const content = document.getElementById('informeContent');
     if (!content) return;
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+    const monthNames = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    const periodo = monthNames[now.getMonth() + 1] + ' ' + now.getFullYear();
+
     const printWindow = window.open('', '_blank');
-    printWindow.document.write('<html><head><title>Informe de Seguimiento - Mi Primer Casa S.A.</title>');
-    printWindow.document.write('<style>body{font-family:-apple-system,sans-serif;padding:40px;color:#222;line-height:1.6;max-width:900px;margin:0 auto}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:center}th{background:#f0f0f0}h1{font-size:18px;margin-bottom:4px}h2{font-size:14px;color:#555;margin-top:20px}p{text-align:justify;font-size:13px;margin-bottom:10px}.green{color:#2a8a4a}.red{color:#c03030}.yellow{color:#b08000}</style>');
-    printWindow.document.write('</head><body>');
-    printWindow.document.write('<h1>Mi Primer Casa S.A.</h1>');
-    printWindow.document.write('<p style="color:#888;font-size:12px;">Informe de Auditoria de Grabacion y Transcripciones - ' + new Date().toLocaleDateString('es-AR') + '</p><hr>');
-    printWindow.document.write(content.innerHTML.replace(/style="[^"]*"/g, '').replace(/background:[^;]*;?/g, '').replace(/color:[^;]*;?/g, ''));
+    printWindow.document.write('<html><head><title>Informe Mi Primer Casa S.A.</title>');
+    printWindow.document.write('<style>');
+    printWindow.document.write('@page { size: A4; margin: 2cm 2.5cm; }');
+    printWindow.document.write('body { font-family: "Segoe UI", -apple-system, sans-serif; color: #222; line-height: 1.7; font-size: 12px; max-width: 100%; }');
+    printWindow.document.write('.header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }');
+    printWindow.document.write('.header h1 { font-size: 18px; font-weight: 400; color: #333; margin: 0; }');
+    printWindow.document.write('.header .date { font-size: 12px; color: #888; }');
+    printWindow.document.write('.subtitle { font-size: 11px; color: #666; margin-bottom: 6px; text-decoration: underline; }');
+    printWindow.document.write('.auditor { font-size: 10px; color: #888; margin-bottom: 16px; text-decoration: underline; }');
+    printWindow.document.write('hr { border: none; border-top: 1px solid #4a6cf7; margin: 12px 0; }');
+    printWindow.document.write('table { width: 100%; border-collapse: collapse; font-size: 11px; margin: 12px 0; }');
+    printWindow.document.write('th, td { border: 1px solid #ccc; padding: 5px 8px; text-align: center; }');
+    printWindow.document.write('th { background: #f5f5f5; font-weight: 600; }');
+    printWindow.document.write('p { text-align: justify; font-size: 12px; margin-bottom: 10px; }');
+    printWindow.document.write('strong { color: #111; }');
+    printWindow.document.write('.green { color: #1a7a3a; } .red { color: #c03030; } .yellow { color: #b08000; } .blue { color: #2a5af5; }');
+    printWindow.document.write('</style></head><body>');
+    printWindow.document.write('<div class="header"><h1>Mi Primer Casa S.A.</h1><span class="date">' + dateStr + '</span></div>');
+    printWindow.document.write('<div class="auditor">Auditor: Bernardo Strauss.</div>');
+    printWindow.document.write('<div class="subtitle">Informe de Auditoria de Grabacion y Transcripciones ' + periodo + '.</div>');
+    printWindow.document.write('<hr>');
+    // Strip dark-mode inline styles but preserve structure
+    let cleanHtml = content.innerHTML;
+    cleanHtml = cleanHtml.replace(/style="[^"]*background:[^"]*"/g, '');
+    cleanHtml = cleanHtml.replace(/style="[^"]*color:#[0-9a-f]{3,6}[^"]*"/g, '');
+    cleanHtml = cleanHtml.replace(/border-left:[^;]*;?/g, '');
+    cleanHtml = cleanHtml.replace(/border-radius:[^;]*;?/g, '');
+    printWindow.document.write(cleanHtml);
     printWindow.document.write('</body></html>');
     printWindow.document.close();
-    printWindow.print();
+    setTimeout(function() { printWindow.print(); }, 300);
 }
 
 // Load informe on page load if admin
