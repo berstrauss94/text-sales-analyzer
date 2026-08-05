@@ -5267,7 +5267,7 @@ def logout():
 def index():
     if not session.get("username"):
         return redirect(url_for("login_page"))
-    return render_template_string(HTML, username=session["username"], indicador_categorias_json=_INDICADOR_CATEGORIAS_JSON, all_users=[u for u in user_manager.list_users() if u not in ('admin', 'Vanesa_Admin', 'FedericoCeballos', 'MartinianoSosa', 'GarciaTania')])
+    return render_template_string(HTML, username=session["username"], indicador_categorias_json=_INDICADOR_CATEGORIAS_JSON, all_users=[u for u in user_manager.list_users() if u not in ('admin', 'Vanesa_Admin', 'FedericoCeballos', 'MartinianoSosa', 'GarciaTania', 'BaronVonBerna')])
 
 
 @app.route("/analyze", methods=["POST"])
