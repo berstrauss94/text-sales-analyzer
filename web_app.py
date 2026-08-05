@@ -27,9 +27,33 @@ from src.users.user_manager import UserManager
 from src.users.history_manager import add_entry, get_history, get_flat_entries
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
-# Allow large audio uploads (no size limit enforced here — handled by gunicorn/nginx)
-app.config["MAX_CONTENT_LENGTH"] = None
+
+# SECRET_KEY: use env var in production (Railway).
+# In development, use a stable hardcoded fallback so local sessions survive restarts.
+# NEVER use the dev fallback in production — set SECRET_KEY in Railway env vars.
+_SECRET_KEY = os.environ.get("SECRET_KEY")
+if not _SECRET_KEY:
+    _is_prod_env = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("PORT"))
+    if _is_prod_env:
+        # In production without SECRET_KEY, generate a random one and warn loudly.
+        # Sessions will break on restart, but at least the app won't crash.
+        _SECRET_KEY = secrets.token_hex(32)
+        import logging as _logging_init
+        _logging_init.warning(
+            "CRITICAL: SECRET_KEY not set in production. "
+            "All sessions will be invalidated on every restart. "
+            "Set SECRET_KEY in Railway environment variables immediately."
+        )
+    else:
+        # Local dev: stable key so sessions survive `python web_app.py` restarts.
+        # This is NOT a secret — do not use in production.
+        _SECRET_KEY = "dev-local-stable-key-not-for-production-analizador-v3"
+
+app.secret_key = _SECRET_KEY
+
+# Limit upload size to 200 MB to prevent out-of-memory crashes from large audio files.
+# Audio files larger than this should be split before uploading.
+app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # 200 MB
 commercial_analyzer = CommercialAnalyzer()
 user_manager = UserManager()
 audio_transcriber = AudioTranscriber(model_name="base")
@@ -151,6 +175,14 @@ def _build_commercial_dict(ca) -> dict:
         "prospeccion_detalle": ca.prospeccion_detalle,
         "indicadores_detalle_categorias": ca.indicadores_detalle_categorias,
         "indicadores_total_frases": ca.indicadores_total_frases,
+        # --- Reglas de negocio inmobiliarias ---
+        "co_decisores": ca.co_decisores,
+        "es_multi_decisor": ca.es_multi_decisor,
+        "rango_presupuestario": ca.rango_presupuestario,
+        "presupuesto_detalle": ca.presupuesto_detalle,
+        "alertas_vendedor": ca.alertas_vendedor,
+        "requiere_revision_coordinador": ca.requiere_revision_coordinador,
+        "motivo_revision": ca.motivo_revision,
     }
 
 # Load analyzer once at startup
@@ -2598,8 +2630,69 @@ function renderResults(data, inputText) {
         // Acción siguiente
         if (c.accion_siguiente) {
             extDataHtml += `<div class="ext-data-row ext-action-row">
-                <span class="ext-row-label">▶️ Accion siguiente</span>
+                <span class="ext-row-label">&#9654;&#65039; Accion siguiente</span>
                 <div class="ext-action-text">${c.accion_siguiente}</div>
+            </div>`;
+        }
+
+        // --- Alertas del vendedor ---
+        if (c.alertas_vendedor && c.alertas_vendedor.length > 0) {
+            const alertColors = { CRITICA: '#f55b5b', ALTA: '#f5a35b', MEDIA: '#f5d75b', INFO: '#5bd4f5' };
+            const alertBgs = { CRITICA: '#2a0d0d', ALTA: '#2a1a0d', MEDIA: '#2a2a0d', INFO: '#0d1a2a' };
+            const alertBorders = { CRITICA: '#4a1a1a', ALTA: '#4a2a1a', MEDIA: '#4a4a1a', INFO: '#1a2a4a' };
+            let alertasHtml = c.alertas_vendedor.map(a => {
+                const color = alertColors[a.nivel] || '#aaa';
+                const bg = alertBgs[a.nivel] || '#1a1d27';
+                const border = alertBorders[a.nivel] || '#2a2d3a';
+                let guiaHtml = '';
+                if (a.guia && a.guia.tecnicas) {
+                    guiaHtml = '<div style="margin-top:6px;padding:8px;background:#0a0c14;border-radius:6px;border-left:2px solid ' + color + ';">' +
+                        '<div style="font-size:0.65rem;color:#888;font-weight:600;margin-bottom:4px;">' + (a.guia.titulo || 'Guia') + '</div>' +
+                        a.guia.tecnicas.map(t => '<div style="font-size:0.68rem;color:#ccc;padding:2px 0;">&#8226; ' + t + '</div>').join('') +
+                    '</div>';
+                }
+                return '<div style="padding:10px 12px;background:' + bg + ';border:1px solid ' + border + ';border-left:3px solid ' + color + ';border-radius:8px;margin-bottom:6px;">' +
+                    '<div style="font-size:0.78rem;color:' + color + ';font-weight:600;">' + a.mensaje + '</div>' +
+                    guiaHtml +
+                '</div>';
+            }).join('');
+            extDataHtml += `<div class="ext-data-row" style="border-left:3px solid #f55b5b;background:#0d0a0a;">
+                <span class="ext-row-label" style="color:#f55b5b;">&#128680; Alertas para el vendedor</span>
+                ${alertasHtml}
+            </div>`;
+        }
+
+        // --- Co-decisores ---
+        if (c.es_multi_decisor && c.co_decisores && c.co_decisores.length > 0) {
+            extDataHtml += `<div class="ext-data-row" style="border-left:3px solid #b38bff;">
+                <span class="ext-row-label" style="color:#b38bff;">&#128101; Multi-decisor detectado</span>
+                <div style="font-size:0.78rem;color:#ccc;margin-bottom:6px;">La decision de compra involucra a mas de una persona:</div>
+                <div class="ext-row-tags">${c.co_decisores.map(d => '<span class="ext-tag ext-tag-purple">' + d + '</span>').join('')}</div>
+                <div style="margin-top:6px;font-size:0.72rem;color:#b38bff;font-style:italic;">Tip: Proponer incluir al co-decisor en la proxima reunion.</div>
+            </div>`;
+        }
+
+        // --- Rango presupuestario ---
+        if (c.rango_presupuestario && c.rango_presupuestario !== 'NO_DETECTADO') {
+            const rpLabels = { CONTADO: '&#128181; Contado', CREDITO: '&#127974; Credito', CUOTAS: '&#129309; Cuotas', ENTRADA: '&#128176; Entrada/Anticipo' };
+            let detalleHtml = '';
+            if (c.presupuesto_detalle && Object.keys(c.presupuesto_detalle).length > 0) {
+                detalleHtml = Object.entries(c.presupuesto_detalle).map(([tipo, frases]) =>
+                    '<div style="margin-top:4px;"><span style="font-size:0.65rem;color:#888;font-weight:600;">' + tipo + ':</span> ' +
+                    frases.map(f => '<span class="ext-tag ext-tag-blue">' + f + '</span>').join(' ') + '</div>'
+                ).join('');
+            }
+            extDataHtml += `<div class="ext-data-row" style="border-left:3px solid #5bf5a3;">
+                <span class="ext-row-label" style="color:#5bf5a3;">&#128176; Rango presupuestario: ${rpLabels[c.rango_presupuestario] || c.rango_presupuestario}</span>
+                ${detalleHtml}
+            </div>`;
+        }
+
+        // --- Revisión coordinador ---
+        if (c.requiere_revision_coordinador) {
+            extDataHtml += `<div class="ext-data-row" style="border-left:3px solid #f5a35b;background:#1a1000;">
+                <span class="ext-row-label" style="color:#f5a35b;">&#128209; Requiere revision del coordinador</span>
+                <div style="font-size:0.78rem;color:#f5a35b;">${c.motivo_revision || 'Sin detalle'}</div>
             </div>`;
         }
     }
@@ -5284,18 +5377,12 @@ def analyze():
     # Filter out consecutive repeated words/phrases from transcription artifacts
     clean_text = _dedup_transcription(data["text"])
 
-    # Prevent duplicate saves (same user + same text within 10 seconds)
-    import hashlib
-    _text_hash = hashlib.md5(f"{session['username']}:{clean_text[:200]}".encode()).hexdigest()
-    _now_ts = __import__('time').time()
-    if not hasattr(app, '_last_save_cache'):
-        app._last_save_cache = {}
-    if _text_hash in app._last_save_cache and (_now_ts - app._last_save_cache[_text_hash]) < 10:
-        # Skip save, just return the analysis
-        pass
-    else:
-        app._last_save_cache[_text_hash] = _now_ts
-    _should_save = _text_hash not in app._last_save_cache or app._last_save_cache[_text_hash] == _now_ts
+    # The old in-memory dedup cache (_last_save_cache) doesn't work with gunicorn
+    # multi-worker mode (each worker has a separate process/memory space).
+    # The real guard against duplicates is: entry_name is REQUIRED to save
+    # (enforced below), and ON CONFLICT DO NOTHING in PostgreSQL.
+    # So _should_save is simply True here — the DB handles idempotency.
+    _should_save = True
 
     result = analyzer.analyze(clean_text)
 
@@ -5409,12 +5496,7 @@ def saved_texts():
                 except Exception:
                     pass
 
-            if e_year == year and e_month == month:
-                # Apply date filter if set
-                if fecha:
-                    ts_str = str(e.get("timestamp", ""))
-                    if fecha not in ts_str[:10]:
-                        continue
+            if (not year or e_year == year) and (not month or e_month is None or e_month == month):
                 entries_found.append(e)
     except Exception as exc:
         app.logger.warning(f"PG query failed for {username}: {exc}")
@@ -5655,6 +5737,9 @@ def upload_audio():
 
     # Save to history
     add_entry(
+        username=session["username"],
+        text=transcribed_text,
+        analysis=analysis_dict,
         source="audio",
         audio_filename=original_name,
     )
@@ -5796,12 +5881,7 @@ def admin_user_texts(username):
                     e_month = ts.month
             except Exception:
                 pass
-        if (not year or e_year == year) and (not month or e_month == month):
-            # Apply date filter if set
-            if fecha:
-                ts_str = str(e.get("timestamp", ""))
-                if fecha not in ts_str[:10]:
-                    continue
+        if (not year or e_year == year) and (not month or e_month is None or e_month == month):
             filtered.append({
                 "id": e.get("id", ""),
                 "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
@@ -5915,7 +5995,7 @@ def admin_stats(username):
 @app.route("/admin/sync", methods=["POST"])
 def admin_sync():
     """Dispara una sincronización manual (solo admin)."""
-    if not session.get("username") or session["username"] != "admin":
+    if not _is_admin():
         return jsonify({"error": True, "error_message": "No autorizado"}), 403
 
     historical = request.json.get("historical", False) if request.is_json else False
@@ -5929,7 +6009,7 @@ def admin_sync():
 @app.route("/admin/sync/log")
 def admin_sync_log():
     """Retorna el log de sincronizaciones (solo admin)."""
-    if not session.get("username") or session["username"] != "admin":
+    if not _is_admin():
         return jsonify({"error": True, "error_message": "No autorizado"}), 403
 
     import json as _json
@@ -5944,9 +6024,12 @@ def admin_sync_log():
 def debug_sync_one():
     """
     Debug endpoint: cleans ALL entries for the logged-in user.
+    ADMIN ONLY — protegido para evitar borrado accidental.
     """
     if not session.get("username"):
         return jsonify({"error": "not logged in"}), 401
+    if not _is_admin():
+        return jsonify({"error": "unauthorized — solo admins pueden usar este endpoint"}), 403
 
     username = session["username"]
     import traceback

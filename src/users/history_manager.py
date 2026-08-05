@@ -36,38 +36,75 @@ MONTH_NAMES = {
 }
 
 # ---------------------------------------------------------------------------
-# PostgreSQL backend
+# PostgreSQL backend — thread-safe connection pool
+# ---------------------------------------------------------------------------
+# Uses psycopg2 ThreadedConnectionPool instead of a single shared connection.
+# This is safe across gunicorn workers because each worker is a separate process
+# (pool is per-process). Within a process, the pool handles concurrent threads.
 # ---------------------------------------------------------------------------
 
-_pg_conn = None          # module-level connection (lazy)
-_use_pg: bool | None = None  # None = not yet determined
+import threading as _threading
+
+_pg_pool = None           # psycopg2 ThreadedConnectionPool (lazy)
+_pg_pool_lock = _threading.Lock()
+_use_pg: bool | None = None
+
+
+def _get_pg_pool():
+    """Return a live ThreadedConnectionPool, creating it if needed. Process-safe."""
+    global _pg_pool
+    with _pg_pool_lock:
+        try:
+            import psycopg2
+            import psycopg2.pool
+            db_url = os.environ.get("DATABASE_URL", "")
+            if not db_url:
+                return None
+            if db_url.startswith("postgres://"):
+                db_url = "postgresql://" + db_url[len("postgres://"):]
+            # Recreate pool if it's been closed or never created
+            if _pg_pool is None or _pg_pool.closed:
+                _pg_pool = psycopg2.pool.ThreadedConnectionPool(
+                    minconn=1,
+                    maxconn=5,  # safe for gunicorn --workers 2 + threads
+                    dsn=db_url,
+                )
+                logger.info("PostgreSQL: pool de conexiones creado (min=1, max=5).")
+            return _pg_pool
+        except Exception as exc:
+            logger.warning(f"PostgreSQL pool no disponible: {exc}")
+            return None
 
 
 def _get_pg_conn():
-    """Return a live psycopg2 connection, creating it if needed."""
-    global _pg_conn
-    try:
-        import psycopg2
-        import psycopg2.extras
-        db_url = os.environ.get("DATABASE_URL", "")
-        if not db_url:
-            return None
-        # Railway sometimes gives postgres:// but psycopg2 needs postgresql://
-        if db_url.startswith("postgres://"):
-            db_url = "postgresql://" + db_url[len("postgres://"):]
-        if _pg_conn is None or _pg_conn.closed:
-            _pg_conn = psycopg2.connect(db_url)
-            _pg_conn.autocommit = False
-        # Quick liveness check
-        try:
-            _pg_conn.cursor().execute("SELECT 1")
-        except Exception:
-            _pg_conn = psycopg2.connect(db_url)
-            _pg_conn.autocommit = False
-        return _pg_conn
-    except Exception as exc:
-        logger.warning(f"PostgreSQL no disponible: {exc}")
+    """
+    Borrow a connection from the pool.
+    IMPORTANT: caller MUST call _return_pg_conn(conn) in a finally block.
+    Returns None if the pool is unavailable.
+    """
+    pool = _get_pg_pool()
+    if pool is None:
         return None
+    try:
+        conn = pool.getconn()
+        conn.autocommit = False
+        return conn
+    except Exception as exc:
+        logger.warning(f"No se pudo obtener conexión del pool: {exc}")
+        return None
+
+
+def _return_pg_conn(conn, close: bool = False) -> None:
+    """Return a connection to the pool (or discard it on error)."""
+    if conn is None:
+        return
+    pool = _pg_pool  # read without lock — pool object is stable once created
+    if pool is None:
+        return
+    try:
+        pool.putconn(conn, close=close)
+    except Exception:
+        pass
 
 
 def _ensure_pg_table(conn) -> None:
@@ -119,6 +156,8 @@ def _is_pg_available() -> bool:
         logger.warning(f"No se pudo inicializar tabla PostgreSQL: {exc}")
         _use_pg = False
         return False
+    finally:
+        _return_pg_conn(conn)
 
 
 # ---------------------------------------------------------------------------
@@ -138,14 +177,34 @@ def _load_json(username: str, users_dir: str = USERS_DIR) -> dict:
         try:
             return json.load(f)
         except json.JSONDecodeError:
+            logger.warning(f"JSON history file for {username} is corrupted — returning empty history.")
             return {}
 
 
+# Per-user write locks to prevent concurrent writes from corrupting JSON files.
+import threading as _threading
+_json_write_locks: dict[str, _threading.Lock] = {}
+_json_write_locks_mutex = _threading.Lock()
+
+
+def _get_json_lock(username: str) -> "_threading.Lock":
+    """Return a per-user write lock, creating it if necessary."""
+    with _json_write_locks_mutex:
+        if username not in _json_write_locks:
+            _json_write_locks[username] = _threading.Lock()
+        return _json_write_locks[username]
+
+
 def _save_json(username: str, data: dict, users_dir: str = USERS_DIR) -> None:
+    """Write user history JSON atomically using a temp file + rename."""
     os.makedirs(users_dir, exist_ok=True)
     path = _history_file(username, users_dir)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    tmp_path = path + ".tmp"
+    with _get_json_lock(username):
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        # Atomic replace: on all platforms, os.replace is atomic within same filesystem
+        os.replace(tmp_path, path)
 
 
 # ---------------------------------------------------------------------------
@@ -301,8 +360,17 @@ def _pg_delete_entry(username: str, entry_id: str) -> bool:
             return cur.rowcount > 0
     except Exception as exc:
         logger.error(f"PG delete error: {exc}")
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        # Mark connection as bad so pool discards it
+        _return_pg_conn(conn, close=True)
+        conn = None  # prevent double-release in finally
         return False
+    finally:
+        if conn is not None:
+            _return_pg_conn(conn)
 
 
 def _json_delete_entry(username: str, entry_id: str, users_dir: str) -> bool:
@@ -344,15 +412,8 @@ def _json_delete_entry(username: str, entry_id: str, users_dir: str) -> bool:
     return found
 
 
-def _save_json(username: str, data: dict, users_dir: str) -> None:
-    """Save the full history tree to JSON."""
-    import json
-    user_dir = os.path.join(users_dir, username)
-    path = os.path.join(user_dir, "history.json")
-    os.makedirs(user_dir, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
+# NOTE: _save_json is defined above (line ~170) with atomic write + per-user lock.
+# The duplicate definition that was here has been removed to prevent silent overwrite.
 
 # ---------------------------------------------------------------------------
 # PostgreSQL implementation
@@ -393,8 +454,16 @@ def _pg_add_entry(entry: dict, username: str) -> None:
             ))
         conn.commit()
     except Exception as exc:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        _return_pg_conn(conn, close=True)
+        conn = None
         raise exc
+    finally:
+        if conn is not None:
+            _return_pg_conn(conn)
 
 
 def _pg_upsert_entry(entry: dict, username: str) -> None:
@@ -433,8 +502,16 @@ def _pg_upsert_entry(entry: dict, username: str) -> None:
             ))
         conn.commit()
     except Exception as exc:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        _return_pg_conn(conn, close=True)
+        conn = None
         raise exc
+    finally:
+        if conn is not None:
+            _return_pg_conn(conn)
 
 
 def _pg_row_to_entry(row) -> dict:
@@ -484,6 +561,7 @@ def _pg_get_history(username: str) -> dict:
     conn = _get_pg_conn()
     if conn is None:
         return {}
+    rows = []
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -496,10 +574,17 @@ def _pg_get_history(username: str) -> dict:
                 ORDER BY timestamp ASC
             """, (username,))
             rows = cur.fetchall()
+        _return_pg_conn(conn)      # success path: return to pool immediately
     except Exception as exc:
         logger.error(f"Error leyendo historial PG: {exc}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        _return_pg_conn(conn, close=True)
         return {}
 
+    # Rows are already in memory — build dict without holding the connection
     history: dict = {}
     for row in rows:
         entry = _pg_row_to_entry(row)
@@ -532,11 +617,6 @@ def _pg_get_flat(username: str, limit: int = 50) -> list[dict]:
     if conn is None:
         return []
     try:
-        # Ensure any pending transaction is committed before reading
-        try:
-            conn.commit()
-        except Exception:
-            pass
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT id, username, timestamp, source, audio_filename,
@@ -549,6 +629,7 @@ def _pg_get_flat(username: str, limit: int = 50) -> list[dict]:
                 LIMIT %s
             """, (username, limit))
             rows = cur.fetchall()
+        _return_pg_conn(conn)
         return [_pg_row_to_entry(r) for r in rows]
     except Exception as exc:
         logger.error(f"Error leyendo flat PG: {exc}")
@@ -556,6 +637,7 @@ def _pg_get_flat(username: str, limit: int = 50) -> list[dict]:
             conn.rollback()
         except Exception:
             pass
+        _return_pg_conn(conn, close=True)
         return []
 
 
@@ -565,10 +647,6 @@ def _pg_get_entry_by_id(username: str, entry_id: str) -> dict | None:
     if conn is None:
         return None
     try:
-        try:
-            conn.commit()
-        except Exception:
-            pass
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT id, username, timestamp, source, audio_filename,
@@ -580,15 +658,15 @@ def _pg_get_entry_by_id(username: str, entry_id: str) -> dict | None:
                 LIMIT 1
             """, (username, entry_id))
             row = cur.fetchone()
-        if row:
-            return _pg_row_to_entry(row)
-        return None
+        _return_pg_conn(conn)
+        return _pg_row_to_entry(row) if row else None
     except Exception as exc:
         logger.error(f"Error buscando entry por ID en PG: {exc}")
         try:
             conn.rollback()
         except Exception:
             pass
+        _return_pg_conn(conn, close=True)
         return None
 
 
@@ -600,10 +678,6 @@ def _pg_get_entries_by_month(username: str, year: int | None, month: int | None)
     if not year or not month:
         return []
     try:
-        try:
-            conn.commit()
-        except Exception:
-            pass
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT id, username, timestamp, source, audio_filename,
@@ -618,6 +692,7 @@ def _pg_get_entries_by_month(username: str, year: int | None, month: int | None)
                 LIMIT 100
             """, (username, year, month))
             rows = cur.fetchall()
+        _return_pg_conn(conn)
         return [_pg_row_to_entry(r) for r in rows]
     except Exception as exc:
         logger.error(f"Error leyendo entries por mes en PG: {exc}")
@@ -625,6 +700,7 @@ def _pg_get_entries_by_month(username: str, year: int | None, month: int | None)
             conn.rollback()
         except Exception:
             pass
+        _return_pg_conn(conn, close=True)
         return []
 
 

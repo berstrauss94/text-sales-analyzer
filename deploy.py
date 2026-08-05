@@ -62,8 +62,25 @@ def main() -> None:
     print(SEP)
 
     if status_only:
-        run("git status")
-        run("git log --oneline -5")
+        step("Estado del repositorio")
+        _, branch_out = run("git branch --show-current", capture=True)
+        print(f"  Rama actual  : {branch_out.strip()}")
+        print()
+        _, status_out = run("git status --short", capture=True)
+        if status_out.strip():
+            print("  Cambios pendientes:")
+            for line in status_out.strip().splitlines():
+                print(f"    {line}")
+        else:
+            print("  Sin cambios pendientes (working tree limpio)")
+        print()
+        _, log_out = run("git log --oneline -5", capture=True)
+        print("  Últimos commits:")
+        for line in log_out.strip().splitlines():
+            print(f"    {line}")
+        print()
+        _, master_out = run('git log master --oneline -1 --format="%cr | %s"', capture=True)
+        print(f"  Último deploy en master : {master_out.strip()}")
         return
 
     # Step 1: Syntax check
