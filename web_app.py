@@ -3321,7 +3321,7 @@ function renderSaveConfirmation(data) {
     const monthName = months[savedMonth] || '';
 
     // Generate a default name from the first words of the text
-    const defaultName = (data.input_text || '').substring(0, 40).replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s]/g, '').trim() + '...';
+    const defaultName = (data.input_text || '').substring(0, 40).replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\\s]/g, '').trim() + '...';
 
     let yearOptions = '';
     for (let y = 2026; y <= 2030; y++) {
@@ -4152,7 +4152,7 @@ function buildHighlightedText(text, words, indicatorKey) {
 
     // Highlight roles: Vendedor=green, Cliente=orange
     result = result.replace(/(Vendedor)/g, '<span style="color:#5bf5a3;font-weight:700;">$1</span>');
-    result = result.replace(/(Cliente(?:\s*\d*)?)/g, '<span style="color:#f5a35b;font-weight:700;">$1</span>');
+    result = result.replace(/(Cliente(?:\\s*\\d*)?)/g, '<span style="color:#f5a35b;font-weight:700;">$1</span>');
 
     return result;
 }
