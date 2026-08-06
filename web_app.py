@@ -2742,7 +2742,7 @@ function renderResults(data, inputText) {
                     <span class="card-info-icon" onclick="event.stopPropagation()">!</span>
                     <div class="card-info-tooltip">Clasifica la intencion principal del texto: si es una oferta, consulta, negociacion, cierre o descripcion. Ayuda a entender en que etapa de la venta esta la conversacion.</div>
                 </div>
-                <div class="card-collapsible-content" id="intencion-content">
+                <div class="card-collapsible-content closed" id="intencion-content">
                     <span class="badge badge-${data.intent}">${intentEs}</span>
                     ${confBar(data.intent_confidence)}
                     <div class="intent-detail-panel">
@@ -2783,7 +2783,7 @@ function renderResults(data, inputText) {
                     <span class="card-info-icon" onclick="event.stopPropagation()">!</span>
                     <div class="card-info-tooltip">Evalua el tono emocional del texto: positivo, neutral o negativo. Indica si el cliente esta contento, indiferente o insatisfecho con la propuesta.</div>
                 </div>
-                <div class="card-collapsible-content" id="sentimiento-content">
+                <div class="card-collapsible-content closed" id="sentimiento-content">
                     <span class="badge badge-${data.sentiment}">${sentimentEs}</span>
                     ${confBar(data.sentiment_confidence)}
                     ${renderSentimentDetail(data.sentiment)}
@@ -2795,7 +2795,7 @@ function renderResults(data, inputText) {
                     <span class="card-info-icon" onclick="event.stopPropagation()">!</span>
                     <div class="card-info-tooltip">Detecta conceptos del proceso de venta usando Machine Learning: ofertas, descuentos, comisiones, cierres, prospectos, objeciones, seguimiento y negociacion. El modelo analiza el 100% del texto buscando patrones y frases clave, extrae los fragmentos relevantes y calcula la confianza de cada deteccion. A mayor confianza, mas clara es la presencia del concepto en la conversacion.</div>
                 </div>
-                <div class="card-collapsible-content" id="ventas-content">
+                <div class="card-collapsible-content closed" id="ventas-content">
                     ${salesHtml}
                     ${renderSalesConceptsDetail(data.sales_concepts)}
                 </div>
@@ -2806,7 +2806,7 @@ function renderResults(data, inputText) {
                     <span class="card-info-icon" onclick="event.stopPropagation()">!</span>
                     <div class="card-info-tooltip">Identifica conceptos inmobiliarios: tipo de propiedad, precio, metraje, habitaciones, ubicacion, amenidades, zonificacion y estado. Extrae los fragmentos relevantes del texto.</div>
                 </div>
-                <div class="card-collapsible-content" id="bienes-raices-content">
+                <div class="card-collapsible-content closed" id="bienes-raices-content">
                     ${reHtml}
                     ${renderRealEstateConceptsDetail(data.real_estate_concepts)}
                 </div>
@@ -2817,7 +2817,7 @@ function renderResults(data, inputText) {
                     <span class="card-info-icon" onclick="event.stopPropagation()">!</span>
                     <div class="card-info-tooltip">Extrae datos concretos del texto: precios, metrajes, ubicaciones, fechas, horarios, porcentajes, acciones comprometidas y personas mencionadas. Haz clic en cada dato para verlo resaltado en el texto.</div>
                 </div>
-                <div class="card-collapsible-content" id="datos-extraidos-content">
+                <div class="card-collapsible-content closed" id="datos-extraidos-content">
                     ${entitiesHtml}
                     ${extDataHtml}
                 </div>
