@@ -80,33 +80,40 @@ def _dedup_transcription(text: str) -> str:
 
     result = text
 
-    # Pass 1: Remove consecutive repeated single words (any number of repetitions)
+    # Pass 1: Remove consecutive repeated single words separated by commas/spaces
+    # Handles: "no, no, no, no, no" → "no"
+    # Handles: "si, si, si, si" → "si"
+    for _ in range(5):
+        prev = result
+        result = re.sub(r'\b(\w+)([,;.\s]+\1)+\b', r'\1', result, flags=re.IGNORECASE)
+        if result == prev:
+            break
+
+    # Pass 2: Remove consecutive repeated single words (space-only separated)
     for _ in range(3):
         prev = result
         result = re.sub(r'\b(\w+)(\s+\1)+\b', r'\1', result, flags=re.IGNORECASE)
         if result == prev:
             break
 
-    # Pass 2: Remove consecutive repeated two-word phrases
+    # Pass 3: Remove consecutive repeated two-word phrases (with comma/space separators)
     for _ in range(3):
         prev = result
-        result = re.sub(r'\b(\w+\s+\w+)(\s+\1)+\b', r'\1', result, flags=re.IGNORECASE)
+        result = re.sub(r'\b(\w+\s+\w+)([,;.\s]+\1)+\b', r'\1', result, flags=re.IGNORECASE)
         if result == prev:
             break
 
-    # Pass 3: Remove consecutive repeated three-word phrases
+    # Pass 4: Remove consecutive repeated three-word phrases
     for _ in range(2):
         prev = result
-        result = re.sub(r'\b(\w+\s+\w+\s+\w+)(\s+\1)+\b', r'\1', result, flags=re.IGNORECASE)
+        result = re.sub(r'\b(\w+\s+\w+\s+\w+)([,;.\s]+\1)+\b', r'\1', result, flags=re.IGNORECASE)
         if result == prev:
             break
 
-    # Pass 4: Remove repeated short sentences/phrases separated by punctuation
+    # Pass 5: Remove repeated short sentences/phrases separated by punctuation
     # Handles: "Si, si. Si, si. Si, si." → "Si, si."
-    # Handles: "Ah, ese modelo, sí. Si, si. Si, si." repeated patterns
     for _ in range(3):
         prev = result
-        # Match a short phrase (up to ~30 chars) followed by itself with optional space/punctuation
         result = re.sub(
             r'((?:\w+[,.]?\s*){1,5}[.!?])\s*(\1\s*)+',
             r'\1 ',
