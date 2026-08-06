@@ -2971,11 +2971,12 @@ function renderCommercial(c) {
 
     return `
     <div class="commercial-section">
-        <div class="commercial-title" style="position:relative;">Analisis Comercial Inmobiliario
-            <span class="card-info-icon" style="position:absolute; top:2px; right:0;">!</span>
+        <div class="commercial-title card-title-collapsible" style="position:relative;" onclick="toggleCardContent('commercial-content')">Analisis Comercial Inmobiliario &nbsp;<span class="card-arrow" id="commercial-arrow">&#9660;</span>
+            <span class="card-info-icon" style="position:absolute; top:2px; right:28px;" onclick="event.stopPropagation()">!</span>
             <div class="card-info-tooltip" style="top:22px; right:0;">Analiza indicadores comerciales de la conversacion: palabras positivas, respuestas afirmativas, indicios de cierre, objeciones y mas. Calcula la probabilidad de cierre y clasifica el lead.</div>
         </div>
 
+        <div class="card-collapsible-content closed" id="commercial-content">
         <div style="margin-bottom:4px;">
             <span class="lead-badge lead-${c.tipo_lead}" style="cursor:pointer;"
                   onclick="toggleLeadDetail('lead-detail-panel')">
@@ -3015,6 +3016,7 @@ function renderCommercial(c) {
 
         <div style="font-size:0.7rem; color:#444; margin-top:10px; text-align:right;">
             Densidad comercial: ${c.densidad_comercial.toFixed(4)} &nbsp;|&nbsp; Total palabras: ${c.total_palabras}
+        </div>
         </div>
     </div>`;
 }
