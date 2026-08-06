@@ -1939,6 +1939,7 @@ HTML = """
             <div class="date-select-group">
                 <label for="selectMonth">Mes</label>
                 <select id="selectMonth" onchange="loadSavedTexts()">
+                    <option value="">-- Todos --</option>
                     <option value="1">Enero</option>
                     <option value="2">Febrero</option>
                     <option value="3">Marzo</option>
