@@ -5333,10 +5333,55 @@ def status():
 @app.route("/debug/entries/<username>")
 def debug_entries(username):
     """Temporary debug endpoint to check what entries exist for a user."""
-    # No auth required temporarily for debugging
+    import traceback
+    errors = []
 
-    # Check PG
-    pg_entries = get_flat_entries(username, limit=50)
+    # Check PG connection
+    pg_ok = False
+    pg_entries = []
+    try:
+        from src.users.history_manager import _is_pg_available, _get_pg_conn
+        pg_ok = _is_pg_available()
+        if pg_ok:
+            conn = _get_pg_conn()
+            if conn:
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT COUNT(*) FROM analysis_history WHERE username = %s", (username,))
+                        total_count = cur.fetchone()[0]
+                        cur.execute("SELECT id, timestamp, audio_filename FROM analysis_history WHERE username = %s ORDER BY timestamp DESC LIMIT 5", (username,))
+                        sample = cur.fetchall()
+                    from src.users.history_manager import _return_pg_conn
+                    _return_pg_conn(conn)
+                except Exception as e:
+                    errors.append(f"PG query error: {e}")
+                    traceback.print_exc()
+                    try:
+                        conn.rollback()
+                    except:
+                        pass
+                    from src.users.history_manager import _return_pg_conn
+                    _return_pg_conn(conn, close=True)
+                    total_count = -1
+                    sample = []
+            else:
+                errors.append("PG conn is None")
+                total_count = -1
+                sample = []
+        else:
+            total_count = -1
+            sample = []
+    except Exception as e:
+        errors.append(f"PG check error: {e}")
+        total_count = -1
+        sample = []
+
+    # Try get_flat_entries
+    try:
+        pg_entries = get_flat_entries(username, limit=50)
+    except Exception as e:
+        errors.append(f"get_flat_entries error: {e}")
+
     pg_summary = [{"id": e.get("id","")[:12], "year": e.get("year"), "month": e.get("month"),
                    "ts": str(e.get("timestamp",""))[:19], "name": e.get("entry_name","") or e.get("audio_filename","")}
                   for e in pg_entries]
@@ -5366,11 +5411,15 @@ def debug_entries(username):
 
     return jsonify({
         "username": username,
-        "pg_count": len(pg_entries),
+        "pg_available": pg_ok,
+        "pg_total_count": total_count,
+        "pg_sample": [{"id": r[0][:12], "ts": str(r[1])[:19], "name": r[2]} for r in sample] if sample else [],
+        "pg_flat_count": len(pg_entries),
         "pg_entries": pg_summary[:20],
         "json_path": json_path,
         "json_exists": json_exists,
         "json_count": json_count,
+        "errors": errors,
     })
 
 
