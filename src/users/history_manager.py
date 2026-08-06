@@ -136,39 +136,7 @@ def _ensure_pg_table(conn) -> None:
             CREATE INDEX IF NOT EXISTS idx_ah_username_ts
             ON analysis_history (username, timestamp DESC)
         """)
-        # Unique constraint to prevent duplicates: same entry_name + username = same entry
-        # First remove existing duplicates (keep the most recent by timestamp)
-        try:
-            cur.execute("""
-                DELETE FROM analysis_history a
-                USING (
-                    SELECT audio_filename, username,
-                           MAX(timestamp) as max_ts
-                    FROM analysis_history
-                    WHERE audio_filename != ''
-                    GROUP BY audio_filename, username
-                    HAVING COUNT(*) > 1
-                ) dupes
-                WHERE a.audio_filename = dupes.audio_filename
-                  AND a.username = dupes.username
-                  AND a.timestamp < dupes.max_ts
-                  AND a.audio_filename != ''
-            """)
-            conn.commit()
-            cur.execute("""
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_ah_unique_name_user
-                ON analysis_history (audio_filename, username)
-                WHERE audio_filename != ''
-            """)
-            conn.commit()
-        except Exception as idx_err:
-            try:
-                conn.rollback()
-            except Exception:
-                pass
-            # Index creation failed — continue without it; UPSERT will fallback
-            import logging
-            logging.getLogger(__name__).warning(f"Could not create unique index: {idx_err}")
+    conn.commit()
 
 
 def _is_pg_available() -> bool:
@@ -460,105 +428,38 @@ def _pg_add_entry(entry: dict, username: str) -> None:
         audio_fname = entry.get("audio_filename", "")
         with conn.cursor() as cur:
             if audio_fname:
-                # UPSERT: if same entry_name + username exists, update in-place
-                try:
-                    cur.execute("""
-                        INSERT INTO analysis_history
-                            (id, username, timestamp, source, audio_filename,
-                             text_short, text_full, intent, intent_conf,
-                             sentiment, sentiment_conf, sales_concepts, re_concepts,
-                             entities, commercial, day_label)
-                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                        ON CONFLICT (audio_filename, username) WHERE audio_filename != ''
-                        DO UPDATE SET
-                            timestamp = EXCLUDED.timestamp,
-                            source = EXCLUDED.source,
-                            text_short = EXCLUDED.text_short,
-                            text_full = EXCLUDED.text_full,
-                            intent = EXCLUDED.intent,
-                            intent_conf = EXCLUDED.intent_conf,
-                            sentiment = EXCLUDED.sentiment,
-                            sentiment_conf = EXCLUDED.sentiment_conf,
-                            sales_concepts = EXCLUDED.sales_concepts,
-                            re_concepts = EXCLUDED.re_concepts,
-                            entities = EXCLUDED.entities,
-                            commercial = EXCLUDED.commercial,
-                            day_label = EXCLUDED.day_label
-                    """, (
-                        entry["id"],
-                        username,
-                        entry["timestamp"],
-                        entry["source"],
-                        audio_fname,
-                        entry["text"],
-                        entry.get("text_full", entry["text"]),
-                        entry["intent"],
-                        entry.get("intent_confidence", 0.0),
-                        entry["sentiment"],
-                        entry.get("sentiment_confidence", 0.0),
-                        json.dumps(entry.get("sales_concepts", []), ensure_ascii=False),
-                        json.dumps(entry.get("real_estate_concepts", []), ensure_ascii=False),
-                        json.dumps(entry.get("entities", []), ensure_ascii=False),
-                        json.dumps(entry.get("commercial"), ensure_ascii=False) if entry.get("commercial") else None,
-                        entry.get("day_label", ""),
-                    ))
-                except Exception:
-                    # Fallback if unique index doesn't exist yet
-                    conn.rollback()
-                    cur.execute("""
-                        INSERT INTO analysis_history
-                            (id, username, timestamp, source, audio_filename,
-                             text_short, text_full, intent, intent_conf,
-                             sentiment, sentiment_conf, sales_concepts, re_concepts,
-                             entities, commercial, day_label)
-                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                        ON CONFLICT (id, username) DO NOTHING
-                    """, (
-                        entry["id"],
-                        username,
-                        entry["timestamp"],
-                        entry["source"],
-                        audio_fname,
-                        entry["text"],
-                        entry.get("text_full", entry["text"]),
-                        entry["intent"],
-                        entry.get("intent_confidence", 0.0),
-                        entry["sentiment"],
-                        entry.get("sentiment_confidence", 0.0),
-                        json.dumps(entry.get("sales_concepts", []), ensure_ascii=False),
-                        json.dumps(entry.get("real_estate_concepts", []), ensure_ascii=False),
-                        json.dumps(entry.get("entities", []), ensure_ascii=False),
-                        json.dumps(entry.get("commercial"), ensure_ascii=False) if entry.get("commercial") else None,
-                        entry.get("day_label", ""),
-                    ))
-            else:
-                # No entry_name — insert new (legacy behavior)
+                # UPSERT via DELETE+INSERT: remove existing entry with same name for this user
                 cur.execute("""
-                    INSERT INTO analysis_history
-                        (id, username, timestamp, source, audio_filename,
-                         text_short, text_full, intent, intent_conf,
-                         sentiment, sentiment_conf, sales_concepts, re_concepts,
-                         entities, commercial, day_label)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                    ON CONFLICT (id, username) DO NOTHING
-                """, (
-                    entry["id"],
-                    username,
-                    entry["timestamp"],
-                    entry["source"],
-                    audio_fname,
-                    entry["text"],
-                    entry.get("text_full", entry["text"]),
-                    entry["intent"],
-                    entry.get("intent_confidence", 0.0),
-                    entry["sentiment"],
-                    entry.get("sentiment_confidence", 0.0),
-                    json.dumps(entry.get("sales_concepts", []), ensure_ascii=False),
-                    json.dumps(entry.get("real_estate_concepts", []), ensure_ascii=False),
-                    json.dumps(entry.get("entities", []), ensure_ascii=False),
-                    json.dumps(entry.get("commercial"), ensure_ascii=False) if entry.get("commercial") else None,
-                    entry.get("day_label", ""),
-                ))
+                    DELETE FROM analysis_history
+                    WHERE audio_filename = %s AND username = %s
+                """, (audio_fname, username))
+            # Insert the new/updated entry
+            cur.execute("""
+                INSERT INTO analysis_history
+                    (id, username, timestamp, source, audio_filename,
+                     text_short, text_full, intent, intent_conf,
+                     sentiment, sentiment_conf, sales_concepts, re_concepts,
+                     entities, commercial, day_label)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (id, username) DO NOTHING
+            """, (
+                entry["id"],
+                username,
+                entry["timestamp"],
+                entry["source"],
+                audio_fname,
+                entry["text"],
+                entry.get("text_full", entry["text"]),
+                entry["intent"],
+                entry.get("intent_confidence", 0.0),
+                entry["sentiment"],
+                entry.get("sentiment_confidence", 0.0),
+                json.dumps(entry.get("sales_concepts", []), ensure_ascii=False),
+                json.dumps(entry.get("real_estate_concepts", []), ensure_ascii=False),
+                json.dumps(entry.get("entities", []), ensure_ascii=False),
+                json.dumps(entry.get("commercial"), ensure_ascii=False) if entry.get("commercial") else None,
+                entry.get("day_label", ""),
+            ))
         conn.commit()
     except Exception as exc:
         try:
