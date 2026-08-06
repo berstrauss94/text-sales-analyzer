@@ -136,6 +136,11 @@ def _ensure_pg_table(conn) -> None:
             CREATE INDEX IF NOT EXISTS idx_ah_username_ts
             ON analysis_history (username, timestamp DESC)
         """)
+        # Cleanup: drop the problematic unique index if it exists from previous deploy
+        try:
+            cur.execute("DROP INDEX IF EXISTS idx_ah_unique_name_user")
+        except Exception:
+            pass
     conn.commit()
 
 
