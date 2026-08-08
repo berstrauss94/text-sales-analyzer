@@ -1897,6 +1897,54 @@ HTML = """
         }
 
         .history-entry-detail.open { display: block; }
+
+        /* ═══════════════════════════════════════════════════════════════
+           RESPONSIVE: Tablet (≤768px) y Móvil (≤480px)
+           ═══════════════════════════════════════════════════════════════ */
+        @media (max-width: 768px) {
+            .container { padding: 10px; max-width: 100%; }
+            .top-bar { flex-direction: column; gap: 8px; align-items: stretch; }
+            .btn-row { flex-wrap: wrap; gap: 6px; }
+            .btn-row button, .btn-row input { font-size: 0.75rem; }
+            textarea { font-size: 0.85rem; min-height: 150px; }
+            .result-grid { grid-template-columns: 1fr; gap: 10px; }
+            .indicators-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+            .commercial-section { padding: 12px; }
+            .date-select-group select { font-size: 0.8rem; min-width: 80px; }
+            .date-select-group label { font-size: 0.7rem; }
+            .save-name-input { font-size: 0.8rem; }
+            .card { padding: 12px; }
+            .card-title { font-size: 0.7rem; }
+        }
+
+        @media (max-width: 480px) {
+            body { font-size: 13px; }
+            .container { padding: 6px; }
+            .top-bar { padding: 8px; }
+            h1 { font-size: 1.1rem; }
+            textarea { font-size: 0.8rem; min-height: 120px; }
+            .btn-row { flex-direction: column; }
+            .btn-row button { width: 100%; padding: 10px; }
+            .result-grid { grid-template-columns: 1fr; }
+            .indicators-grid { grid-template-columns: repeat(2, 1fr); gap: 4px; }
+            .indicator-item { padding: 6px 4px; }
+            .indicator-label { font-size: 0.6rem; }
+            .indicator-value { font-size: 1rem; }
+            .commercial-title { font-size: 0.85rem; }
+            .date-select-group { min-width: 0; }
+            .date-select-group select { width: 100%; font-size: 0.78rem; }
+            .card { padding: 10px; border-radius: 8px; }
+            .card-title { font-size: 0.68rem; }
+            .badge { font-size: 0.75rem; padding: 3px 8px; }
+            .prob-bar-container { margin: 8px 0; }
+            .save-relocate-panel { padding: 8px; }
+            .save-relocate-selects { flex-direction: column; gap: 6px; }
+            .save-relocate-selects select { width: 100%; }
+            .save-relocate-selects button { width: 100%; }
+        }
+
+        /* Utility: prevent horizontal scroll on mobile */
+        html, body { overflow-x: hidden; }
     </style>
 </head>
 <body>
