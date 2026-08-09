@@ -1945,6 +1945,68 @@ HTML = """
 
         /* Utility: prevent horizontal scroll on mobile */
         html, body { overflow-x: hidden; }
+
+        /* ── Sales Simulator Styles ── */
+        .sim-diff-btn {
+            background: #1a1d27;
+            border: 1px solid #2a2d3a;
+            color: #ccc;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .sim-diff-btn:hover {
+            border-color: #4a6cf7;
+            background: #1e2235;
+        }
+        .sim-diff-btn.active {
+            border-color: #4a6cf7;
+            background: #2a3a6a;
+            color: #fff;
+            font-weight: 600;
+        }
+        .sim-msg {
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.84rem;
+            line-height: 1.4;
+            max-width: 85%;
+            word-wrap: break-word;
+        }
+        .sim-msg-client {
+            background: rgba(91, 245, 163, 0.12);
+            border: 1px solid rgba(91, 245, 163, 0.25);
+            color: #a8f0c8;
+            margin-right: auto;
+        }
+        .sim-msg-vendor {
+            background: rgba(74, 108, 247, 0.12);
+            border: 1px solid rgba(74, 108, 247, 0.25);
+            color: #a8c4ff;
+            margin-left: auto;
+        }
+        .sim-msg-system {
+            background: rgba(245, 215, 91, 0.1);
+            border: 1px solid rgba(245, 215, 91, 0.2);
+            color: #f5d75b;
+            text-align: center;
+            font-size: 0.76rem;
+            max-width: 100%;
+        }
+        .sim-typing {
+            font-size: 0.76rem;
+            color: #888;
+            font-style: italic;
+            padding: 6px 12px;
+            animation: simPulse 1.2s infinite;
+        }
+        @keyframes simPulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -2114,14 +2176,40 @@ HTML = """
     </div>
     {% endif %}
 
-    <!-- ── HISTORY ── -->
-    <div class="history-section" id="historySection">
-        <div class="history-header" onclick="toggleHistory()">
-            <div class="history-title">&#128197; Historial de Analisis</div>
-            <div class="history-toggle" id="historyToggleIcon">&#9660; Ver historial</div>
+    <!-- ── SALES SIMULATOR ── -->
+    <div class="history-section" id="simulatorSection">
+        <div class="history-header" onclick="toggleSimulator()">
+            <div class="history-title">&#129302; Simulador de Ventas IA</div>
+            <div class="history-toggle" id="simToggleIcon">&#9660; Abrir simulador</div>
         </div>
-        <div class="history-tree" id="historyTree">
-            <div class="history-empty" id="historyEmpty">Cargando historial...</div>
+        <div id="simulatorPanel" style="display:none; padding: 16px;">
+            <!-- Setup panel -->
+            <div id="simSetup">
+                <p style="font-size:0.82rem; color:#aaa; margin-bottom:12px;">Selecciona la dificultad del cliente simulado:</p>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+                    <button class="sim-diff-btn" data-level="facil" onclick="selectDifficulty('facil')">F&aacute;cil</button>
+                    <button class="sim-diff-btn" data-level="mediano" onclick="selectDifficulty('mediano')">Mediano</button>
+                    <button class="sim-diff-btn" data-level="dificil" onclick="selectDifficulty('dificil')">Dif&iacute;cil</button>
+                    <button class="sim-diff-btn" data-level="muy_dificil" onclick="selectDifficulty('muy_dificil')">Muy Dif&iacute;cil</button>
+                    <button class="sim-diff-btn" data-level="veterano" onclick="selectDifficulty('veterano')">Veterano</button>
+                </div>
+                <button id="simStartBtn" class="btn-primary" onclick="startSimulation()" disabled style="width:100%;">Iniciar Simulaci&oacute;n</button>
+            </div>
+            <!-- Chat panel -->
+            <div id="simChat" style="display:none;">
+                <div id="simMessages" style="height:320px; overflow-y:auto; background:#0f1117; border:1px solid #2a2d3a; border-radius:8px; padding:12px; margin-bottom:10px;"></div>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="simInput" placeholder="Escribe tu mensaje de vendedor..." style="flex:1; background:#0f1117; border:1px solid #2a2d3a; border-radius:6px; color:#e0e0e0; padding:10px; font-size:0.88rem; outline:none;" onkeydown="if(event.key==='Enter')sendSimMessage()">
+                    <button class="btn-primary" onclick="sendSimMessage()" style="padding:10px 18px;">Enviar</button>
+                    <button class="btn-secondary" onclick="endSimulation()" style="padding:10px 14px;">Terminar</button>
+                </div>
+            </div>
+            <!-- Feedback panel -->
+            <div id="simFeedback" style="display:none; margin-top:14px;">
+                <label style="font-size:0.8rem; color:#aaa; display:block; margin-bottom:6px;">&iquest;Qu&eacute; te pareci&oacute; la simulaci&oacute;n?</label>
+                <textarea id="simFeedbackText" style="width:100%; height:16cm; background:#0f1117; border:1px solid #2a2d3a; border-radius:8px; color:#e0e0e0; padding:10px; font-size:0.85rem; resize:vertical; outline:none;" placeholder="Escribe tu feedback aqui..."></textarea>
+                <button class="btn-save" onclick="submitFeedback()" style="margin-top:8px; width:100%;">Enviar Feedback</button>
+            </div>
         </div>
     </div>
 </div>
@@ -4786,189 +4874,120 @@ if (document.getElementById('informePanel')) {
     loadInforme();
 }
 
-// ── History ───────────────────────────────────────────────────────────────
+// ── Sales Simulator ──────────────────────────────────────────────────────
+let simOpen = false;
+let simActive = false;
+let simDifficulty = '';
+let simMessages = [];
 
-let historyOpen = false;
-
-function toggleHistory() {
-    historyOpen = !historyOpen;
-    document.getElementById('historyTree').classList.toggle('open', historyOpen);
-    document.getElementById('historyToggleIcon').textContent =
-        historyOpen ? '▲ Ocultar historial' : '▼ Ver historial';
-    if (historyOpen) loadHistory();
+function toggleSimulator() {
+    simOpen = !simOpen;
+    document.getElementById('simulatorPanel').style.display = simOpen ? 'block' : 'none';
+    document.getElementById('simToggleIcon').textContent = simOpen ? '\u25B2 Cerrar simulador' : '\u25BC Abrir simulador';
 }
 
-async function loadHistory() {
+function selectDifficulty(level) {
+    simDifficulty = level;
+    document.querySelectorAll('.sim-diff-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`[data-level="${level}"]`).classList.add('active');
+    document.getElementById('simStartBtn').disabled = false;
+}
+
+async function startSimulation() {
+    if (!simDifficulty) return;
+    simActive = true;
+    simMessages = [];
+    document.getElementById('simSetup').style.display = 'none';
+    document.getElementById('simChat').style.display = 'block';
+    document.getElementById('simFeedback').style.display = 'none';
+    addSimMessage('system', 'Simulaci\u00f3n iniciada. Nivel: ' + simDifficulty.replace('_', ' ') + '. Eres el vendedor, el cliente IA te responder\u00e1.');
+    // Get initial client greeting
+    await sendToSimulator('[INICIO]');
+}
+
+function addSimMessage(role, text) {
+    simMessages.push({role, text});
+    const container = document.getElementById('simMessages');
+    const div = document.createElement('div');
+    div.className = 'sim-msg sim-msg-' + (role === 'client' ? 'client' : role === 'vendor' ? 'vendor' : 'system');
+    div.textContent = text;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
+async function sendSimMessage() {
+    const input = document.getElementById('simInput');
+    const text = input.value.trim();
+    if (!text || !simActive) return;
+    input.value = '';
+    addSimMessage('vendor', text);
+    await sendToSimulator(text);
+}
+
+async function sendToSimulator(message) {
+    const container = document.getElementById('simMessages');
+    const typing = document.createElement('div');
+    typing.className = 'sim-typing';
+    typing.textContent = 'Cliente escribiendo...';
+    typing.id = 'simTyping';
+    container.appendChild(typing);
+    container.scrollTop = container.scrollHeight;
+
     try {
-        const resp = await fetch('/history');
+        const resp = await fetch('/api/simulator/chat', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({message, difficulty: simDifficulty, history: simMessages})
+        });
         const data = await resp.json();
-        renderHistoryTree(data);
-    } catch (e) {
-        document.getElementById('historyEmpty').textContent = 'Error al cargar historial.';
+        const typingEl = document.getElementById('simTyping');
+        if (typingEl) typingEl.remove();
+        if (data.response) {
+            addSimMessage('client', data.response);
+        }
+        if (data.ended) {
+            endSimulation();
+        }
+    } catch(e) {
+        const typingEl = document.getElementById('simTyping');
+        if (typingEl) typingEl.remove();
+        addSimMessage('system', 'Error de conexi\u00f3n. Intenta de nuevo.');
     }
 }
 
-function renderHistoryTree(history) {
-    const container = document.getElementById('historyTree');
-    const emptyEl = document.getElementById('historyEmpty');
-
-    const years = Object.keys(history).sort().reverse();
-    if (years.length === 0) {
-        emptyEl.style.display = 'block';
-        emptyEl.textContent = 'Aun no hay analisis guardados.';
-        return;
-    }
-    emptyEl.style.display = 'none';
-
-    // Remove old rendered nodes (keep emptyEl)
-    Array.from(container.children).forEach(c => {
-        if (c.id !== 'historyEmpty') c.remove();
-    });
-
-    years.forEach(year => {
-        const yearDiv = document.createElement('div');
-        yearDiv.className = 'history-year';
-
-        const months = Object.keys(history[year]).sort().reverse();
-        let totalYear = 0;
-        months.forEach(m => {
-            Object.values(history[year][m]).forEach(w => {
-                Object.values(w).forEach(d => { totalYear += (d.entries || []).length; });
-            });
-        });
-
-        const yearLabel = document.createElement('div');
-        yearLabel.className = 'history-year-label';
-        yearLabel.innerHTML = `<span>&#128197; ${year}</span><span style="color:#555">${totalYear} analisis &#9660;</span>`;
-        let yearOpen = true;
-        const yearContent = document.createElement('div');
-
-        yearLabel.onclick = () => {
-            yearOpen = !yearOpen;
-            yearContent.style.display = yearOpen ? '' : 'none';
-            yearLabel.querySelector('span:last-child').innerHTML =
-                `${totalYear} analisis ${yearOpen ? '&#9650;' : '&#9660;'}`;
-        };
-
-        yearDiv.appendChild(yearLabel);
-        yearDiv.appendChild(yearContent);
-
-        months.forEach(monthKey => {
-            const monthDiv = document.createElement('div');
-            monthDiv.className = 'history-month';
-
-            const weeks = Object.keys(history[year][monthKey]).sort().reverse();
-            let totalMonth = 0;
-            weeks.forEach(w => {
-                Object.values(history[year][monthKey][w]).forEach(d => {
-                    totalMonth += (d.entries || []).length;
-                });
-            });
-
-            const monthLabel = document.createElement('div');
-            monthLabel.className = 'history-month-label';
-            const mName = monthKey.split('-').slice(1).join('-');
-            monthLabel.innerHTML = `<span>&#128198; ${mName}</span><span style="color:#444">${totalMonth} &#9660;</span>`;
-            let monthOpen = false;
-            const monthContent = document.createElement('div');
-            monthContent.style.display = 'none';
-
-            monthLabel.onclick = () => {
-                monthOpen = !monthOpen;
-                monthContent.style.display = monthOpen ? '' : 'none';
-                monthLabel.querySelector('span:last-child').innerHTML =
-                    `${totalMonth} ${monthOpen ? '&#9650;' : '&#9660;'}`;
-            };
-
-            monthDiv.appendChild(monthLabel);
-            monthDiv.appendChild(monthContent);
-
-            weeks.forEach(weekKey => {
-                const weekDiv = document.createElement('div');
-                weekDiv.className = 'history-week';
-
-                const days = Object.keys(history[year][monthKey][weekKey]).sort().reverse();
-                let totalWeek = 0;
-                days.forEach(d => { totalWeek += (history[year][monthKey][weekKey][d].entries || []).length; });
-
-                const weekLabel = document.createElement('div');
-                weekLabel.className = 'history-week-label';
-                weekLabel.innerHTML = `<span>&#128336; ${weekKey.replace('-', ' ')}</span><span style="color:#333">${totalWeek} &#9660;</span>`;
-                let weekOpen = false;
-                const weekContent = document.createElement('div');
-                weekContent.style.display = 'none';
-
-                weekLabel.onclick = () => {
-                    weekOpen = !weekOpen;
-                    weekContent.style.display = weekOpen ? '' : 'none';
-                    weekLabel.querySelector('span:last-child').innerHTML =
-                        `${totalWeek} ${weekOpen ? '&#9650;' : '&#9660;'}`;
-                };
-
-                weekDiv.appendChild(weekLabel);
-                weekDiv.appendChild(weekContent);
-
-                days.forEach(dayKey => {
-                    const dayData = history[year][monthKey][weekKey][dayKey];
-                    const dayDiv = document.createElement('div');
-                    dayDiv.className = 'history-day';
-
-                    const dayLabel = document.createElement('div');
-                    dayLabel.className = 'history-day-label';
-                    dayLabel.textContent = '📅 ' + (dayData.label || dayKey) +
-                        ' — ' + (dayData.entries || []).length + ' analisis';
-                    dayDiv.appendChild(dayLabel);
-
-                    (dayData.entries || []).forEach(entry => {
-                        const entryEl = document.createElement('div');
-                        entryEl.className = 'history-entry';
-
-                        const time = entry.timestamp
-                            ? new Date(entry.timestamp).toLocaleTimeString('es', {hour:'2-digit', minute:'2-digit'})
-                            : '';
-
-                        const intentEs = INTENT_ES[entry.intent] || entry.intent || '';
-                        const sentEs   = SENTIMENT_ES[entry.sentiment] || entry.sentiment || '';
-                        const srcClass = entry.source === 'audio' ? 'source-audio' : 'source-text';
-                        const srcLabel = entry.source === 'audio' ? '&#127908; Audio' : '&#128221; Texto';
-
-                        entryEl.innerHTML = `
-                            <div class="history-entry-header">
-                                <div class="history-entry-badges">
-                                    <span class="source-badge ${srcClass}">${srcLabel}</span>
-                                    <span class="badge badge-${entry.intent}" style="font-size:0.7rem;padding:2px 8px;">${intentEs}</span>
-                                    <span class="badge badge-${entry.sentiment}" style="font-size:0.7rem;padding:2px 8px;">${sentEs}</span>
-                                </div>
-                                <span class="history-entry-time">${time}</span>
-                            </div>
-                            <div class="history-entry-text">${entry.text || ''}</div>
-                            <div class="history-entry-detail" id="hdet-${entry.id}">
-                                ${entry.audio_filename ? '<div style="font-size:0.72rem;color:#a35bf5;margin-bottom:4px;">&#127908; ' + entry.audio_filename + '</div>' : ''}
-                                <div style="margin-bottom:4px;"><strong style="color:#888">Texto completo:</strong><br>${entry.text_full || entry.text || ''}</div>
-                                ${entry.commercial ? '<div style="font-size:0.72rem;color:#666;">Prob. cierre: <strong style="color:#e0e0e0">' + (entry.commercial.probabilidad_cierre || 0).toFixed(1) + '%</strong> &nbsp;|&nbsp; Lead: <strong style="color:#e0e0e0">' + (entry.commercial.tipo_lead || '') + '</strong></div>' : ''}
-                            </div>
-                        `;
-
-                        entryEl.onclick = () => {
-                            const det = document.getElementById('hdet-' + entry.id);
-                            if (det) det.classList.toggle('open');
-                        };
-
-                        dayDiv.appendChild(entryEl);
-                    });
-
-                    weekContent.appendChild(dayDiv);
-                });
-
-                monthContent.appendChild(weekDiv);
-            });
-
-            yearContent.appendChild(monthDiv);
-        });
-
-        container.appendChild(yearDiv);
-    });
+function endSimulation() {
+    simActive = false;
+    addSimMessage('system', '\u2014 Simulaci\u00f3n finalizada \u2014');
+    document.getElementById('simFeedback').style.display = 'block';
 }
+
+async function submitFeedback() {
+    const text = document.getElementById('simFeedbackText').value.trim();
+    try {
+        await fetch('/api/simulator/feedback', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({feedback: text, difficulty: simDifficulty, messages_count: simMessages.length})
+        });
+    } catch(e) {}
+    document.getElementById('simFeedbackText').value = '';
+    document.getElementById('simFeedback').style.display = 'none';
+    addSimMessage('system', '\u00a1Gracias por tu feedback!');
+    // Reset for new session
+    setTimeout(() => {
+        document.getElementById('simChat').style.display = 'none';
+        document.getElementById('simSetup').style.display = 'block';
+        document.getElementById('simMessages').innerHTML = '';
+        simMessages = [];
+        simDifficulty = '';
+        document.querySelectorAll('.sim-diff-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('simStartBtn').disabled = true;
+    }, 2000);
+}
+
+// Keep loadHistory as no-op for backward compatibility
+function loadHistory() {}
+function toggleHistory() { toggleSimulator(); }
 </script>
 </body>
 </html>
@@ -5846,6 +5865,72 @@ def status():
         "cath_history_exists": os.path.exists(cath_path),
         "usuarios_contents": os.listdir(users_dir) if os.path.exists(users_dir) else [],
     })
+
+
+# ── Sales Simulator Endpoints ──────────────────────────────────────────────
+
+@app.route("/api/simulator/chat", methods=["POST"])
+def simulator_chat():
+    """Handle chat messages for the AI sales simulator."""
+    if not session.get("username"):
+        return jsonify({"error": "unauthorized"}), 401
+
+    data = request.get_json()
+    message = data.get("message", "")
+    difficulty = data.get("difficulty", "mediano")
+    history = data.get("history", [])
+
+    # Build system prompt based on difficulty
+    difficulty_prompts = {
+        "facil": "Eres un cliente interesado en comprar un lote/terreno. Eres receptivo, haces pocas objeciones (max 2) y avanzas rapido al cierre. Responde de forma breve y natural.",
+        "mediano": "Eres un cliente evaluando comprar un lote/terreno. Haces objeciones moderadas sobre precio y caracteristicas (3-5 objeciones). Necesitas que te convenzan con una buena propuesta de valor. Responde de forma breve.",
+        "dificil": "Eres un cliente esceptico evaluando un lote/terreno. Eres sensible al precio, comparas con la competencia, y pides datos especificos (5-8 objeciones). Responde de forma breve y directa.",
+        "muy_dificil": "Eres un cliente muy exigente evaluando un lote/terreno. Negocias agresivamente, pides descuentos, cuestionas el ROI, y rechazas al menos 2 propuestas (8-12 objeciones). Responde breve y cortante.",
+        "veterano": "Eres un comprador experto de bienes raices evaluando un lote. Usas objeciones complejas, citas normativas, haces preguntas tecnicas detalladas, y rechazas al menos 3 propuestas (10-15 objeciones). Responde breve, incisivo y desafiante."
+    }
+
+    system_prompt = difficulty_prompts.get(difficulty, difficulty_prompts["mediano"])
+    system_prompt += "\n\nREGLAS:\n- Responde SIEMPRE en espanol.\n- Maximo 60 palabras por respuesta.\n- Nunca rompas el personaje.\n- Si el vendedor logra convencerte genuinamente, acepta la compra.\n- Si detectas que el vendedor no maneja objeciones, muestra mas resistencia."
+
+    # Build messages for OpenAI
+    openai_messages = [{"role": "system", "content": system_prompt}]
+    for msg in history:
+        if msg.get("role") == "vendor":
+            openai_messages.append({"role": "user", "content": msg["text"]})
+        elif msg.get("role") == "client":
+            openai_messages.append({"role": "assistant", "content": msg["text"]})
+
+    if message and message != "[INICIO]":
+        openai_messages.append({"role": "user", "content": message})
+    elif message == "[INICIO]":
+        openai_messages.append({"role": "user", "content": "Hola, buenas tardes."})
+
+    try:
+        import openai
+        client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=openai_messages,
+            max_tokens=150,
+            temperature=0.8,
+        )
+        reply = response.choices[0].message.content.strip()
+        return jsonify({"response": reply, "ended": False})
+    except Exception as exc:
+        app.logger.error(f"Simulator error: {exc}")
+        return jsonify({"response": "Lo siento, no pude generar una respuesta. Verifica que OPENAI_API_KEY este configurada.", "ended": False})
+
+
+@app.route("/api/simulator/feedback", methods=["POST"])
+def simulator_feedback():
+    """Store simulator session feedback."""
+    if not session.get("username"):
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json()
+    feedback = data.get("feedback", "")
+    difficulty = data.get("difficulty", "")
+    app.logger.info(f"Simulator feedback from {session['username']}: difficulty={difficulty}, feedback={feedback[:100]}")
+    return jsonify({"success": True})
 
 
 @app.route("/debug/entries/<username>")
