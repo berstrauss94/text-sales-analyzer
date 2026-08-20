@@ -2218,6 +2218,7 @@ HTML = """
 const INDICADOR_CATEGORIAS = {{ indicador_categorias_json | safe }};
 let _lastCommercialData = null;
 window._currentEntryName = '';
+window._currentEntryId = '';
 window._lastAnalysisData = {};
 
 async function analyze() {
@@ -2273,7 +2274,7 @@ async function saveEntry() {
         const response = await fetch('/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, year: parseInt(year), month: parseInt(month), entry_name: entryName, target_user: targetUser, fecha: document.getElementById('selectFecha') ? document.getElementById('selectFecha').value : '' })
+            body: JSON.stringify({ text, year: parseInt(year), month: parseInt(month), entry_name: entryName, target_user: targetUser, fecha: document.getElementById('selectFecha') ? document.getElementById('selectFecha').value : '', existing_entry_id: window._currentEntryId || '' })
         });
         const data = await response.json();
         _lastCommercialData = data.commercial || null;
@@ -3617,7 +3618,7 @@ async function saveWithName() {
         const response = await fetch('/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, year, month, entry_name: name })
+            body: JSON.stringify({ text, year, month, entry_name: name, existing_entry_id: window._currentEntryId || '' })
         });
         const data = await response.json();
         if (!data.error) {
@@ -3698,9 +3699,11 @@ async function loadSavedTexts() {
 function onTextSelected(entryId) {
     if (!entryId) {
         document.getElementById('deleteTextBtn').style.display = 'none';
+        window._currentEntryId = '';
         return;
     }
     document.getElementById('deleteTextBtn').style.display = 'inline-block';
+    window._currentEntryId = entryId;  // Track loaded entry ID for UPSERT
     // Capture the full entry name from the selected option
     const select = document.getElementById('selectText');
     const selectedOpt = select.options[select.selectedIndex];
@@ -5500,6 +5503,7 @@ def analyze():
     month = data.get("month")
     entry_name = data.get("entry_name", "").strip()
     fecha_str = data.get("fecha", "").strip()  # YYYY-MM-DD from date input
+    existing_entry_id = data.get("existing_entry_id", "").strip()  # ID of entry being updated
     # Admin can save to another user's account
     target_user = data.get("target_user", "").strip() or session["username"]
     if target_user != session["username"] and not _is_admin():
@@ -5517,6 +5521,10 @@ def analyze():
 
     # Only save if entry_name is provided (mandatory) AND user is admin
     if entry_name and _should_save and _is_admin():
+        # If updating an existing entry, delete the old one first
+        if existing_entry_id:
+            from src.users.history_manager import delete_entry
+            delete_entry(target_user, existing_entry_id)
         add_entry(
             username=target_user,
             text=clean_text,
