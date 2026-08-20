@@ -5509,13 +5509,15 @@ def analyze():
     if target_user != session["username"] and not _is_admin():
         target_user = session["username"]  # Non-admins can only save to themselves
 
-    # If fecha is provided, override year/month from it
+    # If fecha is provided, override year/month/day from it
+    day = None
     if fecha_str and len(fecha_str) == 10:
         try:
             from datetime import datetime as _dt_parse
             parsed_fecha = _dt_parse.strptime(fecha_str, "%Y-%m-%d")
             year = parsed_fecha.year
             month = parsed_fecha.month
+            day = parsed_fecha.day
         except Exception:
             pass
 
@@ -5533,6 +5535,7 @@ def analyze():
             audio_filename=entry_name,
             year=year,
             month=month,
+            day=day,
             entry_name=entry_name,
         )
 

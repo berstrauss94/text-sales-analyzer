@@ -273,17 +273,19 @@ def add_entry(
     users_dir: str = USERS_DIR,
     year: int | None = None,
     month: int | None = None,
+    day: int | None = None,
     entry_name: str = "",
 ) -> dict:
     """
     Add an analysis entry to the user's history.
-    If year/month are provided, they override the entry's date for categorization.
+    If year/month/day are provided, they override the entry's date for categorization.
     Returns the entry dict that was saved.
     """
     now = datetime.now(timezone.utc)
     # If year/month provided, use that date for the entry timestamp
     if year and month:
-        cat_date = datetime(year, month, min(now.day, 28),
+        use_day = day if day else min(now.day, 28)
+        cat_date = datetime(year, month, use_day,
                            now.hour, now.minute, now.second, tzinfo=timezone.utc)
     else:
         cat_date = now
