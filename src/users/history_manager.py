@@ -181,15 +181,24 @@ def _history_file(username: str, users_dir: str = USERS_DIR) -> str:
 
 
 def _load_json(username: str, users_dir: str = USERS_DIR) -> dict:
+    # Try primary format: {username}_historial.json
     path = _history_file(username, users_dir)
-    if not os.path.exists(path):
-        return {}
-    with open(path, "r", encoding="utf-8") as f:
-        try:
-            return json.load(f)
-        except json.JSONDecodeError:
-            logger.warning(f"JSON history file for {username} is corrupted — returning empty history.")
-            return {}
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            try:
+                return json.load(f)
+            except json.JSONDecodeError:
+                logger.warning(f"JSON history file for {username} is corrupted — trying subdirectory format.")
+    # Try subdirectory format: {username}/history.json
+    safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in username)
+    subdir_path = os.path.join(users_dir, safe, "history.json")
+    if os.path.exists(subdir_path):
+        with open(subdir_path, "r", encoding="utf-8") as f:
+            try:
+                return json.load(f)
+            except json.JSONDecodeError:
+                logger.warning(f"JSON subdirectory history for {username} is corrupted.")
+    return {}
 
 
 # Per-user write locks to prevent concurrent writes from corrupting JSON files.

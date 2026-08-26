@@ -250,7 +250,35 @@ print("Info: Sync automático DESACTIVADO temporalmente.")
 # Auto-migrate JSON history files → PostgreSQL (runs once at startup)
 # ---------------------------------------------------------------------------
 try:
-    from src.users.history_manager import migrate_json_to_pg
+    from src.users.history_manager import migrate_json_to_pg, _is_pg_available, _get_pg_conn, _return_pg_conn
+    import os as _os_check
+
+    # Log database connectivity status at startup
+    _db_url = _os_check.environ.get("DATABASE_URL", "")
+    print(f"[DB STATUS] DATABASE_URL set: {bool(_db_url)}")
+    print(f"[DB STATUS] RAILWAY_ENVIRONMENT: {_os_check.environ.get('RAILWAY_ENVIRONMENT', 'NOT SET')}")
+
+    _pg_ok = _is_pg_available()
+    print(f"[DB STATUS] PostgreSQL available: {_pg_ok}")
+
+    if _pg_ok:
+        _diag_conn = _get_pg_conn()
+        if _diag_conn:
+            try:
+                with _diag_conn.cursor() as _cur:
+                    _cur.execute("SELECT COUNT(*) FROM analysis_history")
+                    _total = _cur.fetchone()[0]
+                    _cur.execute("SELECT username, COUNT(*) FROM analysis_history GROUP BY username")
+                    _by_user = dict(_cur.fetchall())
+                print(f"[DB STATUS] Total entries in DB: {_total}")
+                print(f"[DB STATUS] Entries by user: {_by_user}")
+            except Exception as _diag_exc:
+                print(f"[DB STATUS] Error querying DB: {_diag_exc}")
+            finally:
+                _return_pg_conn(_diag_conn)
+    else:
+        print("[DB STATUS] Using JSON fallback (PostgreSQL not available)")
+
     _migration = migrate_json_to_pg()
     if not _migration.get("skipped"):
         print(f"Migración JSON→PG: {_migration.get('migrated', 0)} entradas migradas, "
