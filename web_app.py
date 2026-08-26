@@ -4589,21 +4589,29 @@ const HIGHLIGHT_CATEGORIES = [
     { key: 'indicios_prospeccion', label: 'Prospeccion', color: '#5bd4f5' },
 ];
 
-// Build the category grid on load
-(function initCategoryGrid() {
-    const grid = document.getElementById('categoryGrid');
-    if (!grid) return;
-    grid.innerHTML = HIGHLIGHT_CATEGORIES.map(cat =>
-        '<div class="category-option" style="--cat-color:' + cat.color + ';" onclick="assignCategory(\'' + cat.key + '\')">' +
-            '<div class="cat-dot" style="background:' + cat.color + ';"></div>' +
-            '<span class="cat-label">' + cat.label + '</span>' +
-        '</div>'
-    ).join('');
-})();
+// Initialize highlight-define UI safely (errors here must NOT break other features)
+try {
+    // Build the category grid on load
+    (function initCategoryGrid() {
+        const grid = document.getElementById('categoryGrid');
+        if (!grid) return;
+        grid.innerHTML = HIGHLIGHT_CATEGORIES.map(cat =>
+            '<div class="category-option" style="--cat-color:' + cat.color + ';" onclick="assignCategory(\'' + cat.key + '\')">' +
+                '<div class="cat-dot" style="background:' + cat.color + ';"></div>' +
+                '<span class="cat-label">' + cat.label + '</span>' +
+            '</div>'
+        ).join('');
+    })();
 
-// Track text selection in textarea
-document.getElementById('textInput').addEventListener('mouseup', trackTextSelection);
-document.getElementById('textInput').addEventListener('keyup', trackTextSelection);
+    // Track text selection in textarea
+    const _hlTextInput = document.getElementById('textInput');
+    if (_hlTextInput) {
+        _hlTextInput.addEventListener('mouseup', trackTextSelection);
+        _hlTextInput.addEventListener('keyup', trackTextSelection);
+    }
+} catch(_hlInitErr) {
+    console.warn('Highlight-define init error (non-critical):', _hlInitErr);
+}
 
 function trackTextSelection() {
     const textarea = document.getElementById('textInput');
@@ -4693,16 +4701,20 @@ function clearManualHighlights() {
     closeHighlightOverlay();
 }
 
-// Close popover when clicking outside
-document.addEventListener('click', function(e) {
-    const popover = document.getElementById('categoryPopover');
-    const btn = document.getElementById('btnHighlightDefine');
-    if (popover && popover.classList.contains('active')) {
-        if (!popover.contains(e.target) && e.target !== btn) {
-            closeCategoryPopover();
+// Close popover when clicking outside (wrapped in try-catch for safety)
+try {
+    document.addEventListener('click', function(e) {
+        const popover = document.getElementById('categoryPopover');
+        const btn = document.getElementById('btnHighlightDefine');
+        if (popover && popover.classList.contains('active')) {
+            if (!popover.contains(e.target) && e.target !== btn) {
+                closeCategoryPopover();
+            }
         }
-    }
-});
+    });
+} catch(_hlClickErr) {
+    console.warn('Highlight-define click handler error:', _hlClickErr);
+}
 
 // ═══════════════════════════════════════════════════════════════════════
 // END RESALTAR Y DEFINIR
