@@ -151,8 +151,9 @@ def _ensure_pg_table(conn) -> None:
 
 def _is_pg_available() -> bool:
     global _use_pg
-    if _use_pg is not None:
-        return _use_pg
+    if _use_pg is True:
+        return True
+    # Always retry if previously failed — PG might have been temporarily unavailable
     conn = _get_pg_conn()
     if conn is None:
         _use_pg = False
