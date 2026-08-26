@@ -443,6 +443,137 @@ HTML = """
         .hl-indicios_prospeccion { background: rgba(91, 212, 245, 0.25); color: #5bd4f5; border-radius: 3px; padding: 0 2px; }
         .hl-intent { background: rgba(123, 91, 245, 0.3); color: #b38bff; border-radius: 3px; padding: 0 2px; }
 
+        /* Resaltar y Definir - highlight & define tool */
+        .highlight-define-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 8px;
+            position: relative;
+        }
+
+        .btn-highlight-define {
+            background: linear-gradient(135deg, #2a2d3a 0%, #1a1d27 100%);
+            border: 1px solid #3a3d4a;
+            color: #e0e0e0;
+            padding: 8px 16px;
+            border-radius: 7px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-highlight-define:hover {
+            border-color: #4a6cf7;
+            background: linear-gradient(135deg, #2a3050 0%, #1a2040 100%);
+            color: #fff;
+        }
+
+        .btn-highlight-define:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-highlight-define:disabled:hover {
+            border-color: #3a3d4a;
+            background: linear-gradient(135deg, #2a2d3a 0%, #1a1d27 100%);
+            color: #e0e0e0;
+        }
+
+        .highlight-selection-info {
+            font-size: 0.7rem;
+            color: #666;
+            font-style: italic;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .highlight-selection-info .selected-text {
+            color: #4a6cf7;
+            font-style: normal;
+            font-weight: 600;
+        }
+
+        /* Category popover */
+        .category-popover {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 0;
+            background: #1a1d27;
+            border: 1px solid #3a3d4a;
+            border-radius: 10px;
+            padding: 12px;
+            z-index: 100;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            min-width: 280px;
+        }
+
+        .category-popover.active {
+            display: block;
+        }
+
+        .category-popover-title {
+            font-size: 0.7rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .category-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 7px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.15s;
+            background: #0f1117;
+        }
+
+        .category-option:hover {
+            border-color: var(--cat-color);
+            background: #151820;
+            transform: scale(1.02);
+        }
+
+        .category-option .cat-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        .category-option .cat-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #ccc;
+        }
+
+        /* Manual highlights stored */
+        .hl-manual-palabras_positivas { background: rgba(91, 245, 163, 0.35); color: #5bf5a3; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
+        .hl-manual-respuestas_afirmativas { background: rgba(74, 108, 247, 0.35); color: #7b9cff; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
+        .hl-manual-indicios_cierre { background: rgba(245, 215, 91, 0.35); color: #f5d75b; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
+        .hl-manual-escasez_comercial { background: rgba(245, 163, 91, 0.35); color: #f5a35b; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
+        .hl-manual-pedidos_referidos { background: rgba(163, 91, 245, 0.35); color: #b38bff; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
+        .hl-manual-objeciones { background: rgba(245, 91, 91, 0.35); color: #f55b5b; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
+        .hl-manual-indicios_prospeccion { background: rgba(91, 212, 245, 0.35); color: #5bd4f5; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
+
         /* Date selectors */
         .date-selectors {
             display: flex;
@@ -2085,6 +2216,17 @@ HTML = """
             <div class="highlight-overlay" id="highlightOverlay" onclick="closeHighlightOverlay()"></div>
             <button class="highlight-close-btn" id="highlightCloseBtn" onclick="closeHighlightOverlay()" title="Cerrar resaltado">✕</button>
         </div>
+        <!-- Resaltar y Definir -->
+        <div class="highlight-define-row" id="highlightDefineRow">
+            <button class="btn-highlight-define" id="btnHighlightDefine" onclick="openCategoryPopover()" disabled>
+                &#9998; Resaltar y definir
+            </button>
+            <span class="highlight-selection-info" id="highlightSelectionInfo"></span>
+            <div class="category-popover" id="categoryPopover">
+                <div class="category-popover-title">Selecciona una categoria</div>
+                <div class="category-grid" id="categoryGrid"></div>
+            </div>
+        </div>
         <div class="btn-row">
             <button class="btn-primary" onclick="analyze()">&#128269; Analizar</button>
             <button class="btn-secondary" onclick="clearAll()">Limpiar</button>
@@ -2239,6 +2381,15 @@ async function analyze() {
         });
         const data = await response.json();
         _lastCommercialData = data.commercial || null;
+        // Merge manual highlights into commercial detalle
+        if (_lastCommercialData && window._manualHighlights.length > 0) {
+            if (!_lastCommercialData.detalle) _lastCommercialData.detalle = {};
+            window._manualHighlights.forEach(function(h) {
+                if (!_lastCommercialData.detalle[h.category]) _lastCommercialData.detalle[h.category] = {};
+                const key = h.text.toLowerCase();
+                _lastCommercialData.detalle[h.category][key] = (_lastCommercialData.detalle[h.category][key] || 0) + 1;
+            });
+        }
         // Update textarea with cleaned text (deduped)
         if (!data.error && data.input_text) {
             document.getElementById('textInput').value = data.input_text;
@@ -2278,6 +2429,15 @@ async function saveEntry() {
         });
         const data = await response.json();
         _lastCommercialData = data.commercial || null;
+        // Merge manual highlights into commercial detalle
+        if (_lastCommercialData && window._manualHighlights.length > 0) {
+            if (!_lastCommercialData.detalle) _lastCommercialData.detalle = {};
+            window._manualHighlights.forEach(function(h) {
+                if (!_lastCommercialData.detalle[h.category]) _lastCommercialData.detalle[h.category] = {};
+                const key = h.text.toLowerCase();
+                _lastCommercialData.detalle[h.category][key] = (_lastCommercialData.detalle[h.category][key] || 0) + 1;
+            });
+        }
         if (!data.error && data.input_text) {
             document.getElementById('textInput').value = data.input_text;
         }
@@ -2302,6 +2462,7 @@ function clearAll() {
     document.getElementById('textInput').value = '';
     document.getElementById('results').style.display = 'none';
     closeHighlightOverlay();
+    clearManualHighlights();
     _lastCommercialData = null;
 }
 
@@ -4409,6 +4570,143 @@ function closeHighlightOverlay() {
     overlay.classList.remove('active');
     closeBtn.classList.remove('active');
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// RESALTAR Y DEFINIR — Manual keyword labeling with color-coded categories
+// ═══════════════════════════════════════════════════════════════════════
+
+// In-memory store: [{text: "reserva", category: "indicios_cierre"}, ...]
+window._manualHighlights = [];
+window._selectedTextForHighlight = '';
+
+const HIGHLIGHT_CATEGORIES = [
+    { key: 'palabras_positivas', label: 'Positivas', color: '#5bf5a3' },
+    { key: 'respuestas_afirmativas', label: 'Afirmativas', color: '#7b9cff' },
+    { key: 'indicios_cierre', label: 'Cierre', color: '#f5d75b' },
+    { key: 'escasez_comercial', label: 'Escasez', color: '#f5a35b' },
+    { key: 'pedidos_referidos', label: 'Referidos', color: '#b38bff' },
+    { key: 'objeciones', label: 'Objeciones', color: '#f55b5b' },
+    { key: 'indicios_prospeccion', label: 'Prospeccion', color: '#5bd4f5' },
+];
+
+// Build the category grid on load
+(function initCategoryGrid() {
+    const grid = document.getElementById('categoryGrid');
+    if (!grid) return;
+    grid.innerHTML = HIGHLIGHT_CATEGORIES.map(cat =>
+        '<div class="category-option" style="--cat-color:' + cat.color + ';" onclick="assignCategory(\'' + cat.key + '\')">' +
+            '<div class="cat-dot" style="background:' + cat.color + ';"></div>' +
+            '<span class="cat-label">' + cat.label + '</span>' +
+        '</div>'
+    ).join('');
+})();
+
+// Track text selection in textarea
+document.getElementById('textInput').addEventListener('mouseup', trackTextSelection);
+document.getElementById('textInput').addEventListener('keyup', trackTextSelection);
+
+function trackTextSelection() {
+    const textarea = document.getElementById('textInput');
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = textarea.value.substring(start, end).trim();
+    const btn = document.getElementById('btnHighlightDefine');
+    const info = document.getElementById('highlightSelectionInfo');
+
+    if (selected.length > 0) {
+        window._selectedTextForHighlight = selected;
+        btn.disabled = false;
+        const display = selected.length > 40 ? selected.substring(0, 37) + '...' : selected;
+        info.innerHTML = 'Seleccion: <span class="selected-text">"' + escapeHtml(display) + '"</span>';
+    } else {
+        window._selectedTextForHighlight = '';
+        btn.disabled = true;
+        info.innerHTML = '';
+    }
+}
+
+function openCategoryPopover() {
+    if (!window._selectedTextForHighlight) return;
+    const popover = document.getElementById('categoryPopover');
+    popover.classList.toggle('active');
+}
+
+function closeCategoryPopover() {
+    const popover = document.getElementById('categoryPopover');
+    popover.classList.remove('active');
+}
+
+function assignCategory(categoryKey) {
+    const text = window._selectedTextForHighlight;
+    if (!text) return;
+
+    // Avoid duplicates
+    const exists = window._manualHighlights.find(
+        h => h.text.toLowerCase() === text.toLowerCase() && h.category === categoryKey
+    );
+    if (!exists) {
+        window._manualHighlights.push({ text: text, category: categoryKey });
+    }
+
+    // Close popover and reset
+    closeCategoryPopover();
+    window._selectedTextForHighlight = '';
+    document.getElementById('btnHighlightDefine').disabled = true;
+    document.getElementById('highlightSelectionInfo').innerHTML = '';
+
+    // Apply highlights visually
+    applyManualHighlights();
+}
+
+function applyManualHighlights() {
+    const textarea = document.getElementById('textInput');
+    const overlay = document.getElementById('highlightOverlay');
+    const closeBtn = document.getElementById('highlightCloseBtn');
+    const text = textarea.value;
+
+    if (!text || window._manualHighlights.length === 0) return;
+
+    // Build highlighted HTML combining all manual highlights
+    let result = escapeHtml(text);
+
+    // Sort highlights by length (longest first to avoid partial replacements)
+    const sorted = [...window._manualHighlights].sort((a, b) => b.text.length - a.text.length);
+
+    for (const h of sorted) {
+        const escapedWord = escapeHtml(h.text);
+        const escapedForRegex = escapedWord.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
+        const regex = new RegExp('(?<![a-zA-Z])(' + escapedForRegex + ')(?![a-zA-Z])', 'gi');
+        result = result.replace(regex, '<span class="hl-manual-' + h.category + '">$1</span>');
+    }
+
+    // Highlight roles
+    result = result.replace(/(Vendedor)/g, '<span style="color:#5bf5a3;font-weight:700;">$1</span>');
+    result = result.replace(/(Cliente(?:\\s*\\d*)?)/g, '<span style="color:#f5a35b;font-weight:700;">$1</span>');
+
+    overlay.innerHTML = result;
+    overlay.classList.add('active');
+    closeBtn.classList.add('active');
+}
+
+function clearManualHighlights() {
+    window._manualHighlights = [];
+    closeHighlightOverlay();
+}
+
+// Close popover when clicking outside
+document.addEventListener('click', function(e) {
+    const popover = document.getElementById('categoryPopover');
+    const btn = document.getElementById('btnHighlightDefine');
+    if (popover && popover.classList.contains('active')) {
+        if (!popover.contains(e.target) && e.target !== btn) {
+            closeCategoryPopover();
+        }
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// END RESALTAR Y DEFINIR
+// ═══════════════════════════════════════════════════════════════════════
 
 function toggleDetail(detailId, cardEl) {
     const panel = document.getElementById(detailId);
