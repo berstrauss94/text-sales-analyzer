@@ -4586,10 +4586,10 @@ function closeHighlightOverlay() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Stubs for highlight-define (real implementation in separate script below)
+// Stubs for highlight-define (overridden in DOMContentLoaded)
 function trackTextSelection() {}
-function openCategoryPopover() {}
-function closeCategoryPopover() {}
+function openCategoryPopover() { var p = document.getElementById('categoryPopover'); if (p && window._selectedTextForHighlight) p.classList.toggle('active'); }
+function closeCategoryPopover() { var p = document.getElementById('categoryPopover'); if (p) p.classList.remove('active'); }
 function assignCategory(k) {}
 function applyManualHighlights() {}
 function clearManualHighlights() { window._manualHighlights = []; }
@@ -4758,6 +4758,108 @@ document.addEventListener('DOMContentLoaded', () => {
         // Regular user: load their texts
         loadSavedTexts();
     }
+
+    // ── RESALTAR Y DEFINIR (inside DOMContentLoaded for safety) ──
+    try {
+        const hlCategories = [
+            { key: 'palabras_positivas', label: 'Positivas', color: '#5bf5a3' },
+            { key: 'respuestas_afirmativas', label: 'Afirmativas', color: '#7b9cff' },
+            { key: 'indicios_cierre', label: 'Cierre', color: '#f5d75b' },
+            { key: 'escasez_comercial', label: 'Escasez', color: '#f5a35b' },
+            { key: 'pedidos_referidos', label: 'Referidos', color: '#b38bff' },
+            { key: 'objeciones', label: 'Objeciones', color: '#f55b5b' },
+            { key: 'indicios_prospeccion', label: 'Prospeccion', color: '#5bd4f5' }
+        ];
+        const hlGrid = document.getElementById('categoryGrid');
+        const hlBtn = document.getElementById('btnHighlightDefine');
+        const hlInfo = document.getElementById('highlightSelectionInfo');
+        const hlPopover = document.getElementById('categoryPopover');
+        const hlWrapper = document.getElementById('textareaWrapper');
+        const hlOverlay = document.getElementById('highlightOverlay');
+        const hlTextarea = document.getElementById('textInput');
+
+        if (hlGrid && hlBtn && hlInfo && hlPopover && hlTextarea) {
+            // Build grid
+            hlGrid.innerHTML = hlCategories.map(c =>
+                '<div class="category-option" style="--cat-color:' + c.color + ';" data-cat="' + c.key + '">' +
+                '<div class="cat-dot" style="background:' + c.color + ';"></div>' +
+                '<span class="cat-label">' + c.label + '</span></div>'
+            ).join('');
+
+            // Selection detection
+            function hlGetSel() {
+                const s = window.getSelection();
+                if (s && s.toString().trim()) {
+                    let node = s.anchorNode;
+                    while (node) {
+                        if (node === hlWrapper) return s.toString().trim();
+                        node = node.parentElement;
+                    }
+                }
+                if (hlTextarea.selectionStart !== hlTextarea.selectionEnd) {
+                    return hlTextarea.value.substring(hlTextarea.selectionStart, hlTextarea.selectionEnd).trim();
+                }
+                return '';
+            }
+
+            function hlUpdate() {
+                const sel = hlGetSel();
+                if (sel) {
+                    window._selectedTextForHighlight = sel;
+                    hlBtn.disabled = false;
+                    const d = sel.length > 35 ? sel.substring(0, 32) + '...' : sel;
+                    hlInfo.textContent = 'Seleccion: "' + d + '"';
+                } else {
+                    window._selectedTextForHighlight = '';
+                    hlBtn.disabled = true;
+                    hlInfo.textContent = '';
+                }
+            }
+
+            hlTextarea.addEventListener('mouseup', hlUpdate);
+            if (hlOverlay) hlOverlay.addEventListener('mouseup', hlUpdate);
+            if (hlWrapper) hlWrapper.addEventListener('mouseup', hlUpdate);
+
+            hlBtn.onclick = function() {
+                if (window._selectedTextForHighlight) {
+                    hlPopover.classList.toggle('active');
+                }
+            };
+
+            hlGrid.addEventListener('click', function(e) {
+                const opt = e.target.closest('[data-cat]');
+                if (!opt) return;
+                const cat = opt.getAttribute('data-cat');
+                const txt = window._selectedTextForHighlight;
+                if (!txt || !cat) return;
+                window._manualHighlights.push({ text: txt, category: cat });
+                hlPopover.classList.remove('active');
+                window._selectedTextForHighlight = '';
+                hlBtn.disabled = true;
+                hlInfo.textContent = '';
+                // Apply visual highlight
+                const ov = document.getElementById('highlightOverlay');
+                const cb = document.getElementById('highlightCloseBtn');
+                const raw = hlTextarea.value;
+                if (!raw) return;
+                let html = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                window._manualHighlights.forEach(function(h) {
+                    const p = h.text.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
+                    try { html = html.replace(new RegExp('(' + p + ')', 'gi'), '<span class="hl-manual-' + h.category + '">$1</span>'); } catch(x) {}
+                });
+                ov.innerHTML = html;
+                ov.classList.add('active');
+                cb.classList.add('active');
+            });
+
+            // Close popover on outside click
+            document.addEventListener('mousedown', function(e) {
+                if (hlPopover.classList.contains('active') && !hlPopover.contains(e.target) && e.target !== hlBtn) {
+                    hlPopover.classList.remove('active');
+                }
+            });
+        }
+    } catch(hlErr) { console.warn('Resaltar y Definir error:', hlErr); }
 });
 
 // ── Informe de Seguimiento ────────────────────────────────────────────────
@@ -5176,177 +5278,6 @@ async function submitFeedback() {
 function loadHistory() {}
 function toggleHistory() { toggleSimulator(); }
 </script>
-
-<!-- RESALTAR Y DEFINIR — Script aislado (no afecta al script principal) -->
-<script>
-(function() {
-    'use strict';
-    // Safety wrapper: if anything fails here, the rest of the app is unaffected
-    try {
-        console.log('[Resaltar y Definir] Initializing...');
-        var HIGHLIGHT_CATEGORIES = [
-            { key: 'palabras_positivas', label: 'Positivas', color: '#5bf5a3' },
-            { key: 'respuestas_afirmativas', label: 'Afirmativas', color: '#7b9cff' },
-            { key: 'indicios_cierre', label: 'Cierre', color: '#f5d75b' },
-            { key: 'escasez_comercial', label: 'Escasez', color: '#f5a35b' },
-            { key: 'pedidos_referidos', label: 'Referidos', color: '#b38bff' },
-            { key: 'objeciones', label: 'Objeciones', color: '#f55b5b' },
-            { key: 'indicios_prospeccion', label: 'Prospeccion', color: '#5bd4f5' }
-        ];
-
-        // Build category grid
-        var grid = document.getElementById('categoryGrid');
-        if (grid) {
-            grid.innerHTML = HIGHLIGHT_CATEGORIES.map(function(cat) {
-                return '<div class="category-option" style="--cat-color:' + cat.color + ';" data-cat="' + cat.key + '">' +
-                    '<div class="cat-dot" style="background:' + cat.color + ';"></div>' +
-                    '<span class="cat-label">' + cat.label + '</span>' +
-                '</div>';
-            }).join('');
-        }
-
-        // Track text selection — works on BOTH textarea and overlay
-        var textInput = document.getElementById('textInput');
-        var overlay = document.getElementById('highlightOverlay');
-        var btn = document.getElementById('btnHighlightDefine');
-        var info = document.getElementById('highlightSelectionInfo');
-        var popover = document.getElementById('categoryPopover');
-        var wrapper = document.getElementById('textareaWrapper');
-
-        if (!textInput || !btn || !info || !popover) {
-            console.warn('[Resaltar y Definir] Missing elements:', {textInput: !!textInput, btn: !!btn, info: !!info, popover: !!popover});
-            return;
-        }
-        console.log('[Resaltar y Definir] All elements found, wiring up events...');
-
-        function getSelectedText() {
-            // First try: native DOM selection (works on overlay and any visible text)
-            var domSel = window.getSelection();
-            if (domSel && domSel.toString().trim().length > 0) {
-                // Only accept if selection is inside the textarea wrapper area
-                if (wrapper && domSel.anchorNode) {
-                    var container = domSel.anchorNode.parentElement;
-                    while (container) {
-                        if (container === wrapper) return domSel.toString().trim();
-                        container = container.parentElement;
-                    }
-                }
-            }
-            // Fallback: textarea selection (when overlay is not active)
-            if (textInput.selectionStart !== textInput.selectionEnd) {
-                return textInput.value.substring(textInput.selectionStart, textInput.selectionEnd).trim();
-            }
-            return '';
-        }
-
-        function updateSelectionUI() {
-            var sel = getSelectedText();
-            if (sel.length > 0) {
-                window._selectedTextForHighlight = sel;
-                btn.disabled = false;
-                var display = sel.length > 40 ? sel.substring(0, 37) + '...' : sel;
-                info.innerHTML = 'Seleccion: <span class="selected-text">&quot;' + display.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '&quot;</span>';
-            } else {
-                window._selectedTextForHighlight = '';
-                btn.disabled = true;
-                info.innerHTML = '';
-            }
-        }
-
-        // Listen on both textarea AND overlay AND document for mouseup
-        textInput.addEventListener('mouseup', updateSelectionUI);
-        textInput.addEventListener('keyup', updateSelectionUI);
-        if (overlay) overlay.addEventListener('mouseup', updateSelectionUI);
-        // Also listen on the wrapper to catch selections that span both
-        if (wrapper) wrapper.addEventListener('mouseup', updateSelectionUI);
-
-        // Override global stubs with real implementations
-        window.trackTextSelection = updateSelectionUI;
-
-        window.openCategoryPopover = function() {
-            if (!window._selectedTextForHighlight) return;
-            popover.classList.toggle('active');
-        };
-
-        window.closeCategoryPopover = function() {
-            popover.classList.remove('active');
-        };
-
-        window.assignCategory = function(categoryKey) {
-            var text = window._selectedTextForHighlight;
-            if (!text) return;
-            var exists = window._manualHighlights.some(function(h) {
-                return h.text.toLowerCase() === text.toLowerCase() && h.category === categoryKey;
-            });
-            if (!exists) {
-                window._manualHighlights.push({ text: text, category: categoryKey });
-            }
-            window.closeCategoryPopover();
-            window._selectedTextForHighlight = '';
-            btn.disabled = true;
-            info.innerHTML = '';
-            window.applyManualHighlights();
-        };
-
-        window.applyManualHighlights = function() {
-            var overlay = document.getElementById('highlightOverlay');
-            var closeBtn = document.getElementById('highlightCloseBtn');
-            var text = textInput.value;
-            if (!text || !window._manualHighlights || window._manualHighlights.length === 0) return;
-            var result = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            var sorted = window._manualHighlights.slice().sort(function(a, b) { return b.text.length - a.text.length; });
-            sorted.forEach(function(h) {
-                var escaped = h.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                var pattern = escaped.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
-                try {
-                    var re = new RegExp('(' + pattern + ')', 'gi');
-                    result = result.replace(re, '<span class="hl-manual-' + h.category + '">$1</span>');
-                } catch(e) { /* skip invalid regex */ }
-            });
-            result = result.replace(/(Vendedor)/g, '<span style="color:#5bf5a3;font-weight:700;">$1</span>');
-            result = result.replace(/(Cliente)/g, '<span style="color:#f5a35b;font-weight:700;">$1</span>');
-            overlay.innerHTML = result;
-            overlay.classList.add('active');
-            closeBtn.classList.add('active');
-        };
-
-        window.clearManualHighlights = function() {
-            window._manualHighlights = [];
-            if (typeof closeHighlightOverlay === 'function') closeHighlightOverlay();
-        };
-
-        // Delegated click on category options
-        if (grid) {
-            grid.addEventListener('click', function(e) {
-                var opt = e.target.closest('.category-option');
-                if (opt) {
-                    var cat = opt.getAttribute('data-cat');
-                    if (cat) window.assignCategory(cat);
-                }
-            });
-        }
-
-        // Close popover on outside click
-        document.addEventListener('click', function(e) {
-            if (popover.classList.contains('active')) {
-                if (!popover.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
-                    window.closeCategoryPopover();
-                }
-            }
-        });
-
-        // Wire up button
-        btn.onclick = function() { window.openCategoryPopover(); };
-        console.log('[Resaltar y Definir] Ready. Select text and click the button.');
-
-    } catch(err) {
-        if (window.console && console.warn) {
-            console.warn('[Resaltar y Definir] Init error (non-critical):', err);
-        }
-    }
-})();
-</script>
-
 </body>
 </html>
 """

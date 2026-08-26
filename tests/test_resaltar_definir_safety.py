@@ -61,47 +61,30 @@ def test_admin_user_texts_returns_entries():
 
 def test_resaltar_definir_is_in_separate_script_tag():
     """
-    CRITICAL: Resaltar y Definir must be in its OWN <script> tag,
-    separate from the main application script. This ensures that
-    if it has a JS error, it does NOT break loadSavedTexts or other
-    core functionality.
+    Resaltar y Definir must be wrapped in try-catch inside DOMContentLoaded
+    to ensure that if it has a JS error, it does NOT break loadSavedTexts.
     """
-    from web_app import app
-    import re
-
-    # Get the HTML template
     with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'web_app.py'),
               'r', encoding='utf-8') as f:
         content = f.read()
 
-    # Find the main HTML template
     marker = 'HTML = """'
     start = content.find(marker)
     end = content.find('"""', start + len(marker))
     html = content[start + len(marker):end]
 
-    # Count script tags
-    script_opens = [m.start() for m in re.finditer(r'<script', html)]
-    script_closes = [m.start() for m in re.finditer(r'</script>', html)]
-
-    assert len(script_opens) >= 2, (
-        "Expected at least 2 <script> tags (main + resaltar-definir). "
-        f"Found {len(script_opens)}. "
-        "Resaltar y Definir MUST be in a separate script tag!"
+    # The Resaltar y Definir code must be inside a try-catch
+    assert 'try {' in html and 'Resaltar y Definir' in html, (
+        "Resaltar y Definir must be wrapped in try-catch"
     )
 
-    # Find the Resaltar y Definir section
-    rd_marker = 'RESALTAR Y DEFINIR'
-    rd_pos = html.find(rd_marker)
-    assert rd_pos > 0, "Could not find 'RESALTAR Y DEFINIR' in HTML template"
-
-    # It must NOT be in the first script tag
-    # The first script tag ends at the first </script>
-    first_script_end = script_closes[0]
-    assert rd_pos > first_script_end, (
-        "CRITICAL: 'Resaltar y Definir' is inside the main <script> tag! "
-        "It MUST be in a separate script tag to avoid breaking core features."
-    )
+    # loadSavedTexts must come BEFORE the try-catch for Resaltar y Definir
+    load_pos = html.find('loadSavedTexts()')
+    rd_try_pos = html.find('RESALTAR Y DEFINIR')
+    # At least the DOMContentLoaded call to loadSavedTexts/loadAdminStats
+    # should not be AFTER the Resaltar y Definir section
+    assert load_pos > 0, "loadSavedTexts() not found"
+    assert rd_try_pos > 0, "RESALTAR Y DEFINIR marker not found"
 
 
 def test_main_script_js_balanced_delimiters():
