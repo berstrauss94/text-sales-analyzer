@@ -428,7 +428,9 @@ HTML = """
             white-space: pre-wrap;
             word-wrap: break-word;
             z-index: 10;
-            cursor: pointer;
+            cursor: text;
+            user-select: text;
+            -webkit-user-select: text;
             box-sizing: border-box;
         }
 
@@ -2241,7 +2243,7 @@ HTML = """
         <div class="textarea-wrapper" id="textareaWrapper">
             <textarea id="textInput"
                 placeholder="O escribe / pega aqui el texto que quieres analizar...&#10;&#10;Ejemplo: Ofrezco apartamento de 3 habitaciones en USD 180,000 negociable, zona norte, 95 m2."></textarea>
-            <div class="highlight-overlay" id="highlightOverlay" onclick="closeHighlightOverlay()"></div>
+            <div class="highlight-overlay" id="highlightOverlay"></div>
             <button class="highlight-close-btn" id="highlightCloseBtn" onclick="closeHighlightOverlay()" title="Cerrar resaltado">✕</button>
         </div>
         <!-- Resaltar y Definir -->
@@ -5203,11 +5205,13 @@ function toggleHistory() { toggleSimulator(); }
             }).join('');
         }
 
-        // Track text selection
+        // Track text selection — works on BOTH textarea and overlay
         var textInput = document.getElementById('textInput');
+        var overlay = document.getElementById('highlightOverlay');
         var btn = document.getElementById('btnHighlightDefine');
         var info = document.getElementById('highlightSelectionInfo');
         var popover = document.getElementById('categoryPopover');
+        var wrapper = document.getElementById('textareaWrapper');
 
         if (!textInput || !btn || !info || !popover) {
             console.warn('[Resaltar y Definir] Missing elements:', {textInput: !!textInput, btn: !!btn, info: !!info, popover: !!popover});
@@ -5215,19 +5219,33 @@ function toggleHistory() { toggleSimulator(); }
         }
         console.log('[Resaltar y Definir] All elements found, wiring up events...');
 
-        function getSelection() {
-            var start = textInput.selectionStart;
-            var end = textInput.selectionEnd;
-            return textInput.value.substring(start, end).trim();
+        function getSelectedText() {
+            // First try: native DOM selection (works on overlay and any visible text)
+            var domSel = window.getSelection();
+            if (domSel && domSel.toString().trim().length > 0) {
+                // Only accept if selection is inside the textarea wrapper area
+                if (wrapper && domSel.anchorNode) {
+                    var container = domSel.anchorNode.parentElement;
+                    while (container) {
+                        if (container === wrapper) return domSel.toString().trim();
+                        container = container.parentElement;
+                    }
+                }
+            }
+            // Fallback: textarea selection (when overlay is not active)
+            if (textInput.selectionStart !== textInput.selectionEnd) {
+                return textInput.value.substring(textInput.selectionStart, textInput.selectionEnd).trim();
+            }
+            return '';
         }
 
         function updateSelectionUI() {
-            var sel = getSelection();
+            var sel = getSelectedText();
             if (sel.length > 0) {
                 window._selectedTextForHighlight = sel;
                 btn.disabled = false;
                 var display = sel.length > 40 ? sel.substring(0, 37) + '...' : sel;
-                info.innerHTML = 'Seleccion: <span class="selected-text">&quot;' + display.replace(/</g, '&lt;') + '&quot;</span>';
+                info.innerHTML = 'Seleccion: <span class="selected-text">&quot;' + display.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '&quot;</span>';
             } else {
                 window._selectedTextForHighlight = '';
                 btn.disabled = true;
@@ -5235,8 +5253,12 @@ function toggleHistory() { toggleSimulator(); }
             }
         }
 
+        // Listen on both textarea AND overlay AND document for mouseup
         textInput.addEventListener('mouseup', updateSelectionUI);
         textInput.addEventListener('keyup', updateSelectionUI);
+        if (overlay) overlay.addEventListener('mouseup', updateSelectionUI);
+        // Also listen on the wrapper to catch selections that span both
+        if (wrapper) wrapper.addEventListener('mouseup', updateSelectionUI);
 
         // Override global stubs with real implementations
         window.trackTextSelection = updateSelectionUI;
