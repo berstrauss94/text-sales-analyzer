@@ -6423,6 +6423,25 @@ def admin_db_status():
     return jsonify(status)
 
 
+@app.route("/admin/test-texts/<username>")
+def admin_test_texts(username):
+    """Test endpoint - returns entries without any year/month filter (admin only)."""
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    entries = get_flat_entries(username, limit=10)
+    result = []
+    for e in entries[:10]:
+        result.append({
+            "id": e.get("id", ""),
+            "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
+            "year": e.get("year"),
+            "month": e.get("month"),
+            "timestamp": str(e.get("timestamp", ""))[:20],
+            "text_preview": (e.get("text", "") or "")[:40],
+        })
+    return jsonify({"total_in_db": len(entries), "sample": result})
+
+
 @app.route("/admin/user-texts/<username>")
 def admin_user_texts(username):
     """Return texts for a specific user filtered by year/month/fecha (admin only)."""
@@ -6461,6 +6480,14 @@ def admin_user_texts(username):
                 "timestamp": (str(e.get("timestamp", "")) or "")[:10],
                 "source": e.get("source", ""),
             })
+
+    # DEBUG: If no entries matched filters but entries exist, log it
+    if not filtered and entries:
+        import sys
+        print(f"[DEBUG user-texts] {username}: {len(entries)} entries in DB, 0 after filter (year={year}, month={month})", file=sys.stderr)
+        if entries:
+            sample = entries[0]
+            print(f"[DEBUG user-texts] Sample entry year={sample.get('year')}, month={sample.get('month')}, ts={str(sample.get('timestamp',''))[:20]}", file=sys.stderr)
 
     return jsonify({"entries": filtered})
 
