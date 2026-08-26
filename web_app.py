@@ -4816,9 +4816,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            hlTextarea.addEventListener('mouseup', hlUpdate);
-            if (hlOverlay) hlOverlay.addEventListener('mouseup', hlUpdate);
-            if (hlWrapper) hlWrapper.addEventListener('mouseup', hlUpdate);
+            hlTextarea.addEventListener('mouseup', function() { setTimeout(hlUpdate, 10); });
+            if (hlOverlay) hlOverlay.addEventListener('mouseup', function() { setTimeout(hlUpdate, 10); });
+            if (hlWrapper) hlWrapper.addEventListener('mouseup', function() { setTimeout(hlUpdate, 10); });
+            // Also listen for keyboard selection
+            hlTextarea.addEventListener('keyup', hlUpdate);
+            // selectionchange fires reliably on textareas in modern browsers
+            document.addEventListener('selectionchange', function() {
+                if (document.activeElement === hlTextarea) hlUpdate();
+            });
 
             hlBtn.onclick = function() {
                 if (window._selectedTextForHighlight) {
