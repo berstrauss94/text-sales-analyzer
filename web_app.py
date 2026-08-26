@@ -2362,6 +2362,8 @@ let _lastCommercialData = null;
 window._currentEntryName = '';
 window._currentEntryId = '';
 window._lastAnalysisData = {};
+window._manualHighlights = [];
+window._selectedTextForHighlight = '';
 
 async function analyze() {
     const text = document.getElementById('textInput').value.trim();
@@ -2382,7 +2384,7 @@ async function analyze() {
         const data = await response.json();
         _lastCommercialData = data.commercial || null;
         // Merge manual highlights into commercial detalle
-        if (_lastCommercialData && window._manualHighlights.length > 0) {
+        if (_lastCommercialData && window._manualHighlights && window._manualHighlights.length > 0) {
             if (!_lastCommercialData.detalle) _lastCommercialData.detalle = {};
             window._manualHighlights.forEach(function(h) {
                 if (!_lastCommercialData.detalle[h.category]) _lastCommercialData.detalle[h.category] = {};
@@ -2430,7 +2432,7 @@ async function saveEntry() {
         const data = await response.json();
         _lastCommercialData = data.commercial || null;
         // Merge manual highlights into commercial detalle
-        if (_lastCommercialData && window._manualHighlights.length > 0) {
+        if (_lastCommercialData && window._manualHighlights && window._manualHighlights.length > 0) {
             if (!_lastCommercialData.detalle) _lastCommercialData.detalle = {};
             window._manualHighlights.forEach(function(h) {
                 if (!_lastCommercialData.detalle[h.category]) _lastCommercialData.detalle[h.category] = {};
@@ -4575,9 +4577,7 @@ function closeHighlightOverlay() {
 // RESALTAR Y DEFINIR — Manual keyword labeling with color-coded categories
 // ═══════════════════════════════════════════════════════════════════════
 
-// In-memory store: [{text: "reserva", category: "indicios_cierre"}, ...]
-window._manualHighlights = [];
-window._selectedTextForHighlight = '';
+// Categories for manual labeling (mirrors the indicator system)
 
 const HIGHLIGHT_CATEGORIES = [
     { key: 'palabras_positivas', label: 'Positivas', color: '#5bf5a3' },
