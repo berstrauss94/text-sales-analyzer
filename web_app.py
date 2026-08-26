@@ -2411,15 +2411,6 @@ async function analyze() {
         });
         const data = await response.json();
         _lastCommercialData = data.commercial || null;
-        // Merge manual highlights into commercial detalle
-        if (_lastCommercialData && window._manualHighlights && window._manualHighlights.length > 0) {
-            if (!_lastCommercialData.detalle) _lastCommercialData.detalle = {};
-            window._manualHighlights.forEach(function(h) {
-                if (!_lastCommercialData.detalle[h.category]) _lastCommercialData.detalle[h.category] = {};
-                const key = h.text.toLowerCase();
-                _lastCommercialData.detalle[h.category][key] = (_lastCommercialData.detalle[h.category][key] || 0) + 1;
-            });
-        }
         // Update textarea with cleaned text (deduped)
         if (!data.error && data.input_text) {
             document.getElementById('textInput').value = data.input_text;
@@ -2459,15 +2450,6 @@ async function saveEntry() {
         });
         const data = await response.json();
         _lastCommercialData = data.commercial || null;
-        // Merge manual highlights into commercial detalle
-        if (_lastCommercialData && window._manualHighlights && window._manualHighlights.length > 0) {
-            if (!_lastCommercialData.detalle) _lastCommercialData.detalle = {};
-            window._manualHighlights.forEach(function(h) {
-                if (!_lastCommercialData.detalle[h.category]) _lastCommercialData.detalle[h.category] = {};
-                const key = h.text.toLowerCase();
-                _lastCommercialData.detalle[h.category][key] = (_lastCommercialData.detalle[h.category][key] || 0) + 1;
-            });
-        }
         if (!data.error && data.input_text) {
             document.getElementById('textInput').value = data.input_text;
         }
@@ -4602,147 +4584,15 @@ function closeHighlightOverlay() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// RESALTAR Y DEFINIR — Manual keyword labeling with color-coded categories
+// RESALTAR Y DEFINIR — TEMPORALMENTE DESACTIVADO
 // ═══════════════════════════════════════════════════════════════════════
 
-// Categories for manual labeling (mirrors the indicator system)
-
-const HIGHLIGHT_CATEGORIES = [
-    { key: 'palabras_positivas', label: 'Positivas', color: '#5bf5a3' },
-    { key: 'respuestas_afirmativas', label: 'Afirmativas', color: '#7b9cff' },
-    { key: 'indicios_cierre', label: 'Cierre', color: '#f5d75b' },
-    { key: 'escasez_comercial', label: 'Escasez', color: '#f5a35b' },
-    { key: 'pedidos_referidos', label: 'Referidos', color: '#b38bff' },
-    { key: 'objeciones', label: 'Objeciones', color: '#f55b5b' },
-    { key: 'indicios_prospeccion', label: 'Prospeccion', color: '#5bd4f5' },
-];
-
-// Initialize highlight-define UI safely (errors here must NOT break other features)
-try {
-    // Build the category grid on load
-    (function initCategoryGrid() {
-        const grid = document.getElementById('categoryGrid');
-        if (!grid) return;
-        grid.innerHTML = HIGHLIGHT_CATEGORIES.map(cat =>
-            '<div class="category-option" style="--cat-color:' + cat.color + ';" onclick="assignCategory(\'' + cat.key + '\')">' +
-                '<div class="cat-dot" style="background:' + cat.color + ';"></div>' +
-                '<span class="cat-label">' + cat.label + '</span>' +
-            '</div>'
-        ).join('');
-    })();
-
-    // Track text selection in textarea
-    const _hlTextInput = document.getElementById('textInput');
-    if (_hlTextInput) {
-        _hlTextInput.addEventListener('mouseup', trackTextSelection);
-        _hlTextInput.addEventListener('keyup', trackTextSelection);
-    }
-} catch(_hlInitErr) {
-    console.warn('Highlight-define init error (non-critical):', _hlInitErr);
-}
-
-function trackTextSelection() {
-    const textarea = document.getElementById('textInput');
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selected = textarea.value.substring(start, end).trim();
-    const btn = document.getElementById('btnHighlightDefine');
-    const info = document.getElementById('highlightSelectionInfo');
-
-    if (selected.length > 0) {
-        window._selectedTextForHighlight = selected;
-        btn.disabled = false;
-        const display = selected.length > 40 ? selected.substring(0, 37) + '...' : selected;
-        info.innerHTML = 'Seleccion: <span class="selected-text">"' + escapeHtml(display) + '"</span>';
-    } else {
-        window._selectedTextForHighlight = '';
-        btn.disabled = true;
-        info.innerHTML = '';
-    }
-}
-
-function openCategoryPopover() {
-    if (!window._selectedTextForHighlight) return;
-    const popover = document.getElementById('categoryPopover');
-    popover.classList.toggle('active');
-}
-
-function closeCategoryPopover() {
-    const popover = document.getElementById('categoryPopover');
-    popover.classList.remove('active');
-}
-
-function assignCategory(categoryKey) {
-    const text = window._selectedTextForHighlight;
-    if (!text) return;
-
-    // Avoid duplicates
-    const exists = window._manualHighlights.find(
-        h => h.text.toLowerCase() === text.toLowerCase() && h.category === categoryKey
-    );
-    if (!exists) {
-        window._manualHighlights.push({ text: text, category: categoryKey });
-    }
-
-    // Close popover and reset
-    closeCategoryPopover();
-    window._selectedTextForHighlight = '';
-    document.getElementById('btnHighlightDefine').disabled = true;
-    document.getElementById('highlightSelectionInfo').innerHTML = '';
-
-    // Apply highlights visually
-    applyManualHighlights();
-}
-
-function applyManualHighlights() {
-    const textarea = document.getElementById('textInput');
-    const overlay = document.getElementById('highlightOverlay');
-    const closeBtn = document.getElementById('highlightCloseBtn');
-    const text = textarea.value;
-
-    if (!text || window._manualHighlights.length === 0) return;
-
-    // Build highlighted HTML combining all manual highlights
-    let result = escapeHtml(text);
-
-    // Sort highlights by length (longest first to avoid partial replacements)
-    const sorted = [...window._manualHighlights].sort((a, b) => b.text.length - a.text.length);
-
-    for (const h of sorted) {
-        const escapedWord = escapeHtml(h.text);
-        const escapedForRegex = escapedWord.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
-        const regex = new RegExp('(?<![a-zA-Z])(' + escapedForRegex + ')(?![a-zA-Z])', 'gi');
-        result = result.replace(regex, '<span class="hl-manual-' + h.category + '">$1</span>');
-    }
-
-    // Highlight roles
-    result = result.replace(/(Vendedor)/g, '<span style="color:#5bf5a3;font-weight:700;">$1</span>');
-    result = result.replace(/(Cliente(?:\\s*\\d*)?)/g, '<span style="color:#f5a35b;font-weight:700;">$1</span>');
-
-    overlay.innerHTML = result;
-    overlay.classList.add('active');
-    closeBtn.classList.add('active');
-}
-
-function clearManualHighlights() {
-    window._manualHighlights = [];
-    closeHighlightOverlay();
-}
-
-// Close popover when clicking outside (wrapped in try-catch for safety)
-try {
-    document.addEventListener('click', function(e) {
-        const popover = document.getElementById('categoryPopover');
-        const btn = document.getElementById('btnHighlightDefine');
-        if (popover && popover.classList.contains('active')) {
-            if (!popover.contains(e.target) && e.target !== btn) {
-                closeCategoryPopover();
-            }
-        }
-    });
-} catch(_hlClickErr) {
-    console.warn('Highlight-define click handler error:', _hlClickErr);
-}
+function trackTextSelection() {}
+function openCategoryPopover() {}
+function closeCategoryPopover() {}
+function assignCategory(k) {}
+function applyManualHighlights() {}
+function clearManualHighlights() { window._manualHighlights = []; }
 
 // ═══════════════════════════════════════════════════════════════════════
 // END RESALTAR Y DEFINIR
