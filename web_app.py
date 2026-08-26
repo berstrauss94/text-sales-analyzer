@@ -5181,6 +5181,7 @@ function toggleHistory() { toggleSimulator(); }
     'use strict';
     // Safety wrapper: if anything fails here, the rest of the app is unaffected
     try {
+        console.log('[Resaltar y Definir] Initializing...');
         var HIGHLIGHT_CATEGORIES = [
             { key: 'palabras_positivas', label: 'Positivas', color: '#5bf5a3' },
             { key: 'respuestas_afirmativas', label: 'Afirmativas', color: '#7b9cff' },
@@ -5208,7 +5209,11 @@ function toggleHistory() { toggleSimulator(); }
         var info = document.getElementById('highlightSelectionInfo');
         var popover = document.getElementById('categoryPopover');
 
-        if (!textInput || !btn || !info || !popover) return; // Elements not found, skip
+        if (!textInput || !btn || !info || !popover) {
+            console.warn('[Resaltar y Definir] Missing elements:', {textInput: !!textInput, btn: !!btn, info: !!info, popover: !!popover});
+            return;
+        }
+        console.log('[Resaltar y Definir] All elements found, wiring up events...');
 
         function getSelection() {
             var start = textInput.selectionStart;
@@ -5310,6 +5315,7 @@ function toggleHistory() { toggleSimulator(); }
 
         // Wire up button
         btn.onclick = function() { window.openCategoryPopover(); };
+        console.log('[Resaltar y Definir] Ready. Select text and click the button.');
 
     } catch(err) {
         if (window.console && console.warn) {
