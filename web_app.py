@@ -4584,19 +4584,13 @@ function closeHighlightOverlay() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// RESALTAR Y DEFINIR — TEMPORALMENTE DESACTIVADO
-// ═══════════════════════════════════════════════════════════════════════
-
+// Stubs for highlight-define (real implementation in separate script below)
 function trackTextSelection() {}
 function openCategoryPopover() {}
 function closeCategoryPopover() {}
 function assignCategory(k) {}
 function applyManualHighlights() {}
 function clearManualHighlights() { window._manualHighlights = []; }
-
-// ═══════════════════════════════════════════════════════════════════════
-// END RESALTAR Y DEFINIR
-// ═══════════════════════════════════════════════════════════════════════
 
 function toggleDetail(detailId, cardEl) {
     const panel = document.getElementById(detailId);
@@ -5180,6 +5174,151 @@ async function submitFeedback() {
 function loadHistory() {}
 function toggleHistory() { toggleSimulator(); }
 </script>
+
+<!-- RESALTAR Y DEFINIR — Script aislado (no afecta al script principal) -->
+<script>
+(function() {
+    'use strict';
+    // Safety wrapper: if anything fails here, the rest of the app is unaffected
+    try {
+        var HIGHLIGHT_CATEGORIES = [
+            { key: 'palabras_positivas', label: 'Positivas', color: '#5bf5a3' },
+            { key: 'respuestas_afirmativas', label: 'Afirmativas', color: '#7b9cff' },
+            { key: 'indicios_cierre', label: 'Cierre', color: '#f5d75b' },
+            { key: 'escasez_comercial', label: 'Escasez', color: '#f5a35b' },
+            { key: 'pedidos_referidos', label: 'Referidos', color: '#b38bff' },
+            { key: 'objeciones', label: 'Objeciones', color: '#f55b5b' },
+            { key: 'indicios_prospeccion', label: 'Prospeccion', color: '#5bd4f5' }
+        ];
+
+        // Build category grid
+        var grid = document.getElementById('categoryGrid');
+        if (grid) {
+            grid.innerHTML = HIGHLIGHT_CATEGORIES.map(function(cat) {
+                return '<div class="category-option" style="--cat-color:' + cat.color + ';" data-cat="' + cat.key + '">' +
+                    '<div class="cat-dot" style="background:' + cat.color + ';"></div>' +
+                    '<span class="cat-label">' + cat.label + '</span>' +
+                '</div>';
+            }).join('');
+        }
+
+        // Track text selection
+        var textInput = document.getElementById('textInput');
+        var btn = document.getElementById('btnHighlightDefine');
+        var info = document.getElementById('highlightSelectionInfo');
+        var popover = document.getElementById('categoryPopover');
+
+        if (!textInput || !btn || !info || !popover) return; // Elements not found, skip
+
+        function getSelection() {
+            var start = textInput.selectionStart;
+            var end = textInput.selectionEnd;
+            return textInput.value.substring(start, end).trim();
+        }
+
+        function updateSelectionUI() {
+            var sel = getSelection();
+            if (sel.length > 0) {
+                window._selectedTextForHighlight = sel;
+                btn.disabled = false;
+                var display = sel.length > 40 ? sel.substring(0, 37) + '...' : sel;
+                info.innerHTML = 'Seleccion: <span class="selected-text">&quot;' + display.replace(/</g, '&lt;') + '&quot;</span>';
+            } else {
+                window._selectedTextForHighlight = '';
+                btn.disabled = true;
+                info.innerHTML = '';
+            }
+        }
+
+        textInput.addEventListener('mouseup', updateSelectionUI);
+        textInput.addEventListener('keyup', updateSelectionUI);
+
+        // Override global stubs with real implementations
+        window.trackTextSelection = updateSelectionUI;
+
+        window.openCategoryPopover = function() {
+            if (!window._selectedTextForHighlight) return;
+            popover.classList.toggle('active');
+        };
+
+        window.closeCategoryPopover = function() {
+            popover.classList.remove('active');
+        };
+
+        window.assignCategory = function(categoryKey) {
+            var text = window._selectedTextForHighlight;
+            if (!text) return;
+            var exists = window._manualHighlights.some(function(h) {
+                return h.text.toLowerCase() === text.toLowerCase() && h.category === categoryKey;
+            });
+            if (!exists) {
+                window._manualHighlights.push({ text: text, category: categoryKey });
+            }
+            window.closeCategoryPopover();
+            window._selectedTextForHighlight = '';
+            btn.disabled = true;
+            info.innerHTML = '';
+            window.applyManualHighlights();
+        };
+
+        window.applyManualHighlights = function() {
+            var overlay = document.getElementById('highlightOverlay');
+            var closeBtn = document.getElementById('highlightCloseBtn');
+            var text = textInput.value;
+            if (!text || !window._manualHighlights || window._manualHighlights.length === 0) return;
+            var result = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            var sorted = window._manualHighlights.slice().sort(function(a, b) { return b.text.length - a.text.length; });
+            sorted.forEach(function(h) {
+                var escaped = h.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                var pattern = escaped.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
+                try {
+                    var re = new RegExp('(' + pattern + ')', 'gi');
+                    result = result.replace(re, '<span class="hl-manual-' + h.category + '">$1</span>');
+                } catch(e) { /* skip invalid regex */ }
+            });
+            result = result.replace(/(Vendedor)/g, '<span style="color:#5bf5a3;font-weight:700;">$1</span>');
+            result = result.replace(/(Cliente)/g, '<span style="color:#f5a35b;font-weight:700;">$1</span>');
+            overlay.innerHTML = result;
+            overlay.classList.add('active');
+            closeBtn.classList.add('active');
+        };
+
+        window.clearManualHighlights = function() {
+            window._manualHighlights = [];
+            if (typeof closeHighlightOverlay === 'function') closeHighlightOverlay();
+        };
+
+        // Delegated click on category options
+        if (grid) {
+            grid.addEventListener('click', function(e) {
+                var opt = e.target.closest('.category-option');
+                if (opt) {
+                    var cat = opt.getAttribute('data-cat');
+                    if (cat) window.assignCategory(cat);
+                }
+            });
+        }
+
+        // Close popover on outside click
+        document.addEventListener('click', function(e) {
+            if (popover.classList.contains('active')) {
+                if (!popover.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
+                    window.closeCategoryPopover();
+                }
+            }
+        });
+
+        // Wire up button
+        btn.onclick = function() { window.openCategoryPopover(); };
+
+    } catch(err) {
+        if (window.console && console.warn) {
+            console.warn('[Resaltar y Definir] Init error (non-critical):', err);
+        }
+    }
+})();
+</script>
+
 </body>
 </html>
 """
