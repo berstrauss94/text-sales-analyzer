@@ -2248,7 +2248,7 @@ HTML = """
         </div>
         <!-- Resaltar y Definir -->
         <div class="highlight-define-row" id="highlightDefineRow">
-            <button class="btn-highlight-define" id="btnHighlightDefine" onclick="openCategoryPopover()" disabled>
+            <button class="btn-highlight-define" id="btnHighlightDefine" type="button">
                 &#9998; Resaltar y definir
             </button>
             <span class="highlight-selection-info" id="highlightSelectionInfo"></span>
@@ -4778,6 +4778,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const hlOverlay = document.getElementById('highlightOverlay');
         const hlTextarea = document.getElementById('textInput');
 
+        // Visible diagnostic: show init status in the info span
+        if (hlInfo) {
+            const missing = [];
+            if (!hlGrid) missing.push('grid');
+            if (!hlBtn) missing.push('btn');
+            if (!hlPopover) missing.push('popover');
+            if (!hlTextarea) missing.push('textarea');
+            if (missing.length > 0) {
+                hlInfo.textContent = '[RyD] Faltan elementos: ' + missing.join(', ');
+                hlInfo.style.color = '#f55b5b';
+            }
+        }
+
         if (hlGrid && hlBtn && hlInfo && hlPopover && hlTextarea) {
             // Build grid
             hlGrid.innerHTML = hlCategories.map(c =>
@@ -4826,10 +4839,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (document.activeElement === hlTextarea) hlUpdate();
             });
 
+            // Button is ALWAYS enabled — reads selection on click
+            hlBtn.disabled = false;
             hlBtn.onclick = function() {
-                if (window._selectedTextForHighlight) {
-                    hlPopover.classList.toggle('active');
+                // Re-read selection at click time
+                hlUpdate();
+                const sel = window._selectedTextForHighlight;
+                if (!sel) {
+                    hlInfo.textContent = 'Primero selecciona texto en el recuadro';
+                    hlInfo.style.color = '#f5a35b';
+                    return;
                 }
+                hlInfo.style.color = '';
+                hlPopover.classList.toggle('active');
             };
 
             hlGrid.addEventListener('click', function(e) {
