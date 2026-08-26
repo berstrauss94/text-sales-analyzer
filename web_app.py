@@ -6365,6 +6365,36 @@ def admin_users_list():
     return jsonify({"users": users})
 
 
+@app.route("/admin/db-status")
+def admin_db_status():
+    """Diagnostic endpoint to check database connectivity and entry counts."""
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users.history_manager import _is_pg_available, _get_pg_conn, _return_pg_conn
+    import os
+    status = {
+        "DATABASE_URL_set": bool(os.environ.get("DATABASE_URL")),
+        "pg_available": _is_pg_available(),
+        "RAILWAY_ENVIRONMENT": os.environ.get("RAILWAY_ENVIRONMENT", "NOT SET"),
+    }
+    conn = _get_pg_conn()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT username, COUNT(*) as cnt FROM analysis_history GROUP BY username ORDER BY cnt DESC LIMIT 20")
+                rows = cur.fetchall()
+                status["entries_by_user"] = {r[0]: r[1] for r in rows}
+                cur.execute("SELECT COUNT(*) FROM analysis_history")
+                status["total_entries"] = cur.fetchone()[0]
+            _return_pg_conn(conn)
+        except Exception as exc:
+            status["db_error"] = str(exc)
+            _return_pg_conn(conn, close=True)
+    else:
+        status["db_error"] = "Could not get connection from pool"
+    return jsonify(status)
+
+
 @app.route("/admin/user-texts/<username>")
 def admin_user_texts(username):
     """Return texts for a specific user filtered by year/month/fecha (admin only)."""
