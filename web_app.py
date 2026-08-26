@@ -503,16 +503,7 @@ HTML = """
             color: #fff;
         }
 
-        .btn-highlight-define:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-
-        .btn-highlight-define:disabled:hover {
-            border-color: #3a3d4a;
-            background: linear-gradient(135deg, #2a2d3a 0%, #1a1d27 100%);
-            color: #e0e0e0;
-        }
+        /* Button is always enabled now — no disabled styling */
 
         .highlight-selection-info {
             font-size: 0.7rem;
@@ -2249,7 +2240,7 @@ HTML = """
         <!-- Resaltar y Definir -->
         <div class="highlight-define-row" id="highlightDefineRow">
             <button class="btn-highlight-define" id="btnHighlightDefine" type="button">
-                &#9998; Resaltar y definir
+                &#9998; Resaltar y definir <span style="font-size:0.6rem;opacity:0.5;">v4</span>
             </button>
             <span class="highlight-selection-info" id="highlightSelectionInfo"></span>
             <div class="category-popover" id="categoryPopover">
