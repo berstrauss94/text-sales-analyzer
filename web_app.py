@@ -464,13 +464,13 @@ HTML = """
             color: #fff;
         }
 
-        .hl-palabras_positivas { background: rgba(91, 245, 163, 0.25); color: #5bf5a3; border-radius: 3px; padding: 0 2px; }
-        .hl-respuestas_afirmativas { background: rgba(74, 108, 247, 0.25); color: #7b9cff; border-radius: 3px; padding: 0 2px; }
-        .hl-indicios_cierre { background: rgba(245, 215, 91, 0.25); color: #f5d75b; border-radius: 3px; padding: 0 2px; }
-        .hl-escasez_comercial { background: rgba(245, 163, 91, 0.25); color: #f5a35b; border-radius: 3px; padding: 0 2px; }
+        .hl-palabras_positivas { background: rgba(255, 255, 0, 0.25); color: #FFFF00; border-radius: 3px; padding: 0 2px; }
+        .hl-respuestas_afirmativas { background: rgba(0, 128, 0, 0.30); color: #2ecc71; border-radius: 3px; padding: 0 2px; }
+        .hl-indicios_cierre { background: rgba(255, 165, 0, 0.25); color: #FFA500; border-radius: 3px; padding: 0 2px; }
+        .hl-escasez_comercial { background: rgba(255, 0, 255, 0.25); color: #FF00FF; border-radius: 3px; padding: 0 2px; }
         .hl-pedidos_referidos { background: rgba(163, 91, 245, 0.25); color: #b38bff; border-radius: 3px; padding: 0 2px; }
-        .hl-objeciones { background: rgba(245, 91, 91, 0.25); color: #f55b5b; border-radius: 3px; padding: 0 2px; }
-        .hl-indicios_prospeccion { background: rgba(91, 212, 245, 0.25); color: #5bd4f5; border-radius: 3px; padding: 0 2px; }
+        .hl-objeciones { background: rgba(255, 0, 0, 0.25); color: #FF4444; border-radius: 3px; padding: 0 2px; }
+        .hl-indicios_prospeccion { background: rgba(0, 191, 255, 0.25); color: #00BFFF; border-radius: 3px; padding: 0 2px; }
         .hl-intent { background: rgba(123, 91, 245, 0.3); color: #b38bff; border-radius: 3px; padding: 0 2px; }
 
         /* Resaltar y Definir - highlight & define tool */
@@ -587,13 +587,13 @@ HTML = """
         }
 
         /* Manual highlights stored */
-        .hl-manual-palabras_positivas { background: rgba(91, 245, 163, 0.35); color: #5bf5a3; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
-        .hl-manual-respuestas_afirmativas { background: rgba(74, 108, 247, 0.35); color: #7b9cff; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
-        .hl-manual-indicios_cierre { background: rgba(245, 215, 91, 0.35); color: #f5d75b; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
-        .hl-manual-escasez_comercial { background: rgba(245, 163, 91, 0.35); color: #f5a35b; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
+        .hl-manual-palabras_positivas { background: rgba(255, 255, 0, 0.35); color: #FFFF00; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
+        .hl-manual-respuestas_afirmativas { background: rgba(0, 128, 0, 0.40); color: #2ecc71; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
+        .hl-manual-indicios_cierre { background: rgba(255, 165, 0, 0.35); color: #FFA500; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
+        .hl-manual-escasez_comercial { background: rgba(255, 0, 255, 0.35); color: #FF00FF; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
         .hl-manual-pedidos_referidos { background: rgba(163, 91, 245, 0.35); color: #b38bff; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
-        .hl-manual-objeciones { background: rgba(245, 91, 91, 0.35); color: #f55b5b; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
-        .hl-manual-indicios_prospeccion { background: rgba(91, 212, 245, 0.35); color: #5bd4f5; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
+        .hl-manual-objeciones { background: rgba(255, 0, 0, 0.35); color: #FF4444; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
+        .hl-manual-indicios_prospeccion { background: rgba(0, 191, 255, 0.35); color: #00BFFF; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
 
         /* Date selectors */
         .date-selectors {
@@ -3182,13 +3182,13 @@ function renderCommercial(c) {
     const fillClass = pct > 70 ? 'prob-fill-hot' : pct > 40 ? 'prob-fill-warm' : 'prob-fill-cold';
 
     const indicators = [
-        { key: 'palabras_positivas',    label: 'Palabras Positivas',     value: c.palabras_positivas,    cls: c.palabras_positivas > 0 ? 'positive' : '', color: '#5bf5a3', desc: 'Mide expresiones de entusiasmo, aprobacion y satisfaccion del cliente. Un numero alto indica que el prospecto esta receptivo y con buena predisposicion hacia la propuesta.' },
-        { key: 'respuestas_afirmativas',label: 'Respuestas Afirmativas', value: c.respuestas_afirmativas, cls: c.respuestas_afirmativas > 0 ? 'positive' : '', color: '#7b9cff', desc: 'Cuenta confirmaciones directas, expresiones de acuerdo y disposicion a avanzar. Indica el nivel de aceptacion del cliente ante lo que se le propone.' },
-        { key: 'indicios_cierre',       label: 'Indicios de Cierre',     value: c.indicios_cierre,       cls: c.indicios_cierre > 0 ? 'positive' : '', color: '#f5d75b', desc: 'Detecta senales de que el cliente quiere concretar: reservar, firmar, avanzar. Es el indicador mas fuerte de que la venta esta proxima a cerrarse.' },
-        { key: 'escasez_comercial',     label: 'Escasez Comercial',      value: c.escasez_comercial,     cls: '', color: '#f5a35b', desc: 'Identifica menciones de disponibilidad limitada, urgencia temporal y exclusividad. Refleja el uso de tecnicas de escasez para motivar la decision de compra.' },
+        { key: 'palabras_positivas',    label: 'Palabras Positivas',     value: c.palabras_positivas,    cls: c.palabras_positivas > 0 ? 'positive' : '', color: '#FFFF00', desc: 'Mide expresiones de entusiasmo, aprobacion y satisfaccion del cliente. Un numero alto indica que el prospecto esta receptivo y con buena predisposicion hacia la propuesta.' },
+        { key: 'respuestas_afirmativas',label: 'Induccion al Si',        value: c.respuestas_afirmativas, cls: c.respuestas_afirmativas > 0 ? 'positive' : '', color: '#008000', desc: 'Cuenta confirmaciones directas, expresiones de acuerdo y disposicion a avanzar. Indica el nivel de aceptacion del cliente ante lo que se le propone.' },
+        { key: 'indicios_cierre',       label: 'Indicios de Cierre',     value: c.indicios_cierre,       cls: c.indicios_cierre > 0 ? 'positive' : '', color: '#FFA500', desc: 'Detecta senales de que el cliente quiere concretar: reservar, firmar, avanzar. Es el indicador mas fuerte de que la venta esta proxima a cerrarse.' },
+        { key: 'escasez_comercial',     label: 'Escasez Comercial',      value: c.escasez_comercial,     cls: '', color: '#FF00FF', desc: 'Identifica menciones de disponibilidad limitada, urgencia temporal y exclusividad. Refleja el uso de tecnicas de escasez para motivar la decision de compra.' },
         { key: 'pedidos_referidos',     label: 'Pedidos de Referidos',   value: c.pedidos_referidos,     cls: '', color: '#b38bff', desc: 'Detecta solicitudes de recomendaciones, menciones de contactos y red de referidos. Indica si se esta trabajando la expansion de la cartera de clientes.' },
-        { key: 'objeciones',            label: 'Objeciones',             value: c.objeciones,            cls: c.objeciones > 2 ? 'highlight' : '', color: '#f55b5b', desc: 'Cuenta objeciones de precio, indecision y postergacion del cliente. Un numero alto indica resistencia que debe ser abordada antes de intentar el cierre.' },
-        { key: 'indicios_prospeccion',  label: 'Prospeccion',            value: c.indicios_prospeccion,  cls: '', color: '#5bd4f5', desc: 'Mide frases de apertura, calificacion del prospecto y exploracion de necesidades. Indica si la conversacion esta en etapa inicial de descubrimiento del cliente.' },
+        { key: 'objeciones',            label: 'Objeciones',             value: c.objeciones,            cls: c.objeciones > 2 ? 'highlight' : '', color: '#FF0000', desc: 'Cuenta objeciones de precio, indecision y postergacion del cliente. Un numero alto indica resistencia que debe ser abordada antes de intentar el cierre.' },
+        { key: 'indicios_prospeccion',  label: 'Prospeccion',            value: c.indicios_prospeccion,  cls: '', color: '#00BFFF', desc: 'Mide frases de apertura, calificacion del prospecto y exploracion de necesidades. Indica si la conversacion esta en etapa inicial de descubrimiento del cliente.' },
     ];
 
     const indicatorsHtml = indicators.map((ind, idx) => {
@@ -3328,13 +3328,13 @@ function renderCommercial(c) {
 function renderTextProgressChart(c) {
     if (!c) return '';
     const indicators = [
-        { key: 'palabras_positivas', label: 'Positivas', color: '#5bf5a3' },
-        { key: 'respuestas_afirmativas', label: 'Afirmativas', color: '#7b9cff' },
-        { key: 'indicios_cierre', label: 'Cierre', color: '#f5d75b' },
-        { key: 'escasez_comercial', label: 'Escasez', color: '#f5a35b' },
+        { key: 'palabras_positivas', label: 'Positivas', color: '#FFFF00' },
+        { key: 'respuestas_afirmativas', label: 'Induccion al Si', color: '#008000' },
+        { key: 'indicios_cierre', label: 'Cierre', color: '#FFA500' },
+        { key: 'escasez_comercial', label: 'Escasez', color: '#FF00FF' },
         { key: 'pedidos_referidos', label: 'Referidos', color: '#b38bff' },
-        { key: 'objeciones', label: 'Objeciones', color: '#f55b5b' },
-        { key: 'indicios_prospeccion', label: 'Prospeccion', color: '#5bd4f5' },
+        { key: 'objeciones', label: 'Objeciones', color: '#FF0000' },
+        { key: 'indicios_prospeccion', label: 'Prospeccion', color: '#00BFFF' },
     ];
     const total = indicators.reduce((s, ind) => s + (c[ind.key] || 0), 0) || 1;
 
@@ -3404,7 +3404,7 @@ function renderTextReport(data) {
     }
 
     // Commercial indicators summary
-    const indLabels = { palabras_positivas: 'Positivas', respuestas_afirmativas: 'Afirmativas', indicios_cierre: 'Cierre', escasez_comercial: 'Escasez', pedidos_referidos: 'Referidos', objeciones: 'Objeciones', indicios_prospeccion: 'Prospeccion' };
+    const indLabels = { palabras_positivas: 'Positivas', respuestas_afirmativas: 'Induccion al Si', indicios_cierre: 'Cierre', escasez_comercial: 'Escasez', pedidos_referidos: 'Referidos', objeciones: 'Objeciones', indicios_prospeccion: 'Prospeccion' };
     const indSummary = Object.entries(indLabels).map(([k, label]) => label + ': ' + (c[k] || 0)).join(' | ');
 
     // Build report
@@ -4012,13 +4012,13 @@ async function loadAdminStats() {
         const totals = data.totals;
         const total = Object.values(totals).reduce((s, v) => s + v, 0) || 1;
         const indicators = [
-            { key: 'palabras_positivas', label: 'Positivas', color: '#5bf5a3' },
-            { key: 'respuestas_afirmativas', label: 'Afirmativas', color: '#7b9cff' },
-            { key: 'indicios_cierre', label: 'Cierre', color: '#f5d75b' },
-            { key: 'escasez_comercial', label: 'Escasez', color: '#f5a35b' },
+            { key: 'palabras_positivas', label: 'Positivas', color: '#FFFF00' },
+            { key: 'respuestas_afirmativas', label: 'Induccion al Si', color: '#008000' },
+            { key: 'indicios_cierre', label: 'Cierre', color: '#FFA500' },
+            { key: 'escasez_comercial', label: 'Escasez', color: '#FF00FF' },
             { key: 'pedidos_referidos', label: 'Referidos', color: '#b38bff' },
-            { key: 'objeciones', label: 'Objeciones', color: '#f55b5b' },
-            { key: 'indicios_prospeccion', label: 'Prospeccion', color: '#5bd4f5' },
+            { key: 'objeciones', label: 'Objeciones', color: '#FF0000' },
+            { key: 'indicios_prospeccion', label: 'Prospeccion', color: '#00BFFF' },
         ];
 
         // Build conic-gradient for 3D-style pie chart with percentage labels
@@ -4753,13 +4753,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── RESALTAR Y DEFINIR (inside DOMContentLoaded for safety) ──
     try {
         const hlCategories = [
-            { key: 'palabras_positivas', label: 'Positivas', color: '#5bf5a3' },
-            { key: 'respuestas_afirmativas', label: 'Afirmativas', color: '#7b9cff' },
-            { key: 'indicios_cierre', label: 'Cierre', color: '#f5d75b' },
-            { key: 'escasez_comercial', label: 'Escasez', color: '#f5a35b' },
+            { key: 'palabras_positivas', label: 'Positivas', color: '#FFFF00' },
+            { key: 'respuestas_afirmativas', label: 'Induccion al Si', color: '#008000' },
+            { key: 'indicios_cierre', label: 'Cierre', color: '#FFA500' },
+            { key: 'escasez_comercial', label: 'Escasez', color: '#FF00FF' },
             { key: 'pedidos_referidos', label: 'Referidos', color: '#b38bff' },
-            { key: 'objeciones', label: 'Objeciones', color: '#f55b5b' },
-            { key: 'indicios_prospeccion', label: 'Prospeccion', color: '#5bd4f5' }
+            { key: 'objeciones', label: 'Objeciones', color: '#FF0000' },
+            { key: 'indicios_prospeccion', label: 'Prospeccion', color: '#00BFFF' }
         ];
         const hlGrid = document.getElementById('categoryGrid');
         const hlBtn = document.getElementById('btnHighlightDefine');
