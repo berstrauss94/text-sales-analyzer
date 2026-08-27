@@ -31,7 +31,7 @@ def test_analyze_endpoint_works():
     client = app.test_client()
 
     with client.session_transaction() as sess:
-        sess['username'] = 'BaronVonBerna'
+        sess['username'] = 'Berna.Strauss'
 
     resp = client.post('/analyze', json={
         'text': 'Hola buenas tardes, me interesa el terreno de 300m2.',
@@ -50,7 +50,7 @@ def test_admin_user_texts_returns_entries():
     client = app.test_client()
 
     with client.session_transaction() as sess:
-        sess['username'] = 'BaronVonBerna'
+        sess['username'] = 'Berna.Strauss'
 
     # This should at minimum not crash (returns [] locally since no PG)
     resp = client.get('/admin/user-texts/ContrerasCath?year=2026&month=')

@@ -2,18 +2,18 @@
 Fecha de registro : 2026-05-02 14:00:00 UTC
 
 --- DATOS DE ACCESO ---
-Usuario           : BaronVonBerna
-Contrasena (hash) : 5db038e333773094db5380cc7198aa6f938eff224cd5f85aa2dc3dd5061a229e
+Usuario           : Berna.Strauss
+Contrasena (hash) : daed8b6e38f40d639f6e82351fe2afd094076a986a3fa2bc802f06a92f587fce
 
 --- DATOS PERSONALES ---
-Nombre            : BaronVonBerna
-Apellido          : 
+Nombre            : Berna
+Apellido          : Strauss
 Celular           : 
 Email             : 
 Direccion         : 
 
 --- DATOS PROFESIONALES ---
 Empresa           : 
-Cargo             : 
+Cargo             : Administrador
 
 ========================
