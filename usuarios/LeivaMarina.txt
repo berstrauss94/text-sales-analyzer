@@ -3,7 +3,7 @@ Fecha de registro : 2026-08-25 12:00:00 UTC
 
 --- DATOS DE ACCESO ---
 Usuario           : LeivaMarina
-Contrasena (hash) : 583c030b46e042634e44d90957b9062e32314ff69e1f254b586e7b7601246af6
+Contrasena (hash) : baf15a46958ebac5f80850f50b74c3c959543a5c1ae2d4373950d8dae0b835f1
 
 --- DATOS PERSONALES ---
 Nombre            : Marina Soledad
