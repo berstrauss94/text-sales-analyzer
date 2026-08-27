@@ -3,7 +3,7 @@ Fecha de registro : 2026-05-21 15:13:32 UTC
 
 --- DATOS DE ACCESO ---
 Usuario           : MartinianoSosa
-Contrasena (hash) : d1cd00831d9efed7e42c46a4c54ef1dfefb4bf46bb64dc249beb3719240bd78e
+Contrasena (hash) : 9a143881703fea1df44699c8e57ec5516f9be045e6a896aac64021aff0dfbc61
 
 --- DATOS PERSONALES ---
 Nombre            : Martiniano

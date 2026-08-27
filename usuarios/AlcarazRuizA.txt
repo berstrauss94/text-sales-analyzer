@@ -3,7 +3,7 @@ Fecha de registro : 2026-05-02 19:04:08 UTC
 
 --- DATOS DE ACCESO ---
 Usuario           : AlcarazRuizA
-Contrasena (hash) : 1b6fcae5d595874e2b7471ffa924f705fae76289abfa0ec858eb0f3859ad5725
+Contrasena (hash) : 3c8086be8662f6ca9b0e29eee0f5cd299bf69f1dd7adff604c193fae651f5fa7
 
 --- DATOS PERSONALES ---
 Nombre            : Adela

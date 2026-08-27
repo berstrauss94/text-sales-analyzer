@@ -3,7 +3,7 @@ Fecha de registro : 2026-05-02 19:04:08 UTC
 
 --- DATOS DE ACCESO ---
 Usuario           : RoaAngelesG
-Contrasena (hash) : 3074c554eca8fdb5a82e00782db8854cbd1bd3890f0db2ed893f12492fce5f39
+Contrasena (hash) : 7b6aae54bb3d277772dba7af6c7b0b9a89e09e28f4925596e77e83e5aa9c3ed4
 
 --- DATOS PERSONALES ---
 Nombre            : Angeles
