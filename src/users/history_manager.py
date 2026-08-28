@@ -332,6 +332,71 @@ def add_entry(
     return entry
 
 
+# ---------------------------------------------------------------------------
+# CANONICAL DATE RESOLUTION — single source of truth for every read/count path
+# ---------------------------------------------------------------------------
+# Every endpoint (saved-texts, admin/user-texts, admin/informe, admin/stats)
+# MUST derive an entry's (year, month, day) the SAME way, otherwise the list
+# count and the report count disagree. This function is that single rule.
+#
+# Priority for each field:
+#   1. Explicit day_label "DD/MM/YYYY" (what the admin actually assigned)
+#   2. Explicit year/month metadata on the entry
+#   3. Parsed from the timestamp
+# ---------------------------------------------------------------------------
+
+# High, effectively-uncapped limit used by ALL list/count endpoints so no entry
+# is ever silently truncated. A single seller realistically has < a few thousand.
+UNCAPPED_LIMIT = 100000
+
+
+def resolve_entry_date(entry: dict) -> tuple[int | None, int | None, int | None]:
+    """Return (year, month, day) for an entry using a single consistent rule."""
+    y = m = d = None
+
+    # 1. day_label "DD/MM/YYYY" — the user-assigned date, highest priority
+    label = (entry.get("day_label", "") or "").strip()
+    if label and "/" in label:
+        parts = label.split("/")
+        if len(parts) == 3:
+            try:
+                d = int(parts[0]); m = int(parts[1]); y = int(parts[2])
+                if 1 <= m <= 12 and 1 <= d <= 31 and y > 1900:
+                    return y, m, d
+                y = m = d = None
+            except (ValueError, TypeError):
+                y = m = d = None
+
+    # 2. explicit metadata
+    if entry.get("year"):
+        y = entry.get("year")
+    if entry.get("month"):
+        m = entry.get("month")
+
+    # 3. timestamp fallback for whatever is still missing
+    if (y is None or m is None or d is None) and entry.get("timestamp"):
+        ts_val = entry["timestamp"]
+        try:
+            if hasattr(ts_val, "year"):
+                y = y or ts_val.year
+                m = m or ts_val.month
+                d = d or getattr(ts_val, "day", None)
+            else:
+                ts = datetime.fromisoformat(str(ts_val).replace("Z", "+00:00"))
+                y = y or ts.year
+                m = m or ts.month
+                d = d or ts.day
+        except Exception:
+            pass
+
+    return y, m, d
+
+
+def get_all_entries(username: str, users_dir: str = USERS_DIR) -> list[dict]:
+    """Return ALL entries for a user (no truncation). Newest-first."""
+    return get_flat_entries(username, limit=UNCAPPED_LIMIT, users_dir=users_dir)
+
+
 def get_history(username: str, users_dir: str = USERS_DIR) -> dict:
     """Return the full history tree for a user (year→month→week→day→entries)."""
     if _is_pg_available():
@@ -341,10 +406,13 @@ def get_history(username: str, users_dir: str = USERS_DIR) -> dict:
 
 def get_flat_entries(
     username: str,
-    limit: int = 50,
+    limit: int = UNCAPPED_LIMIT,
     users_dir: str = USERS_DIR,
 ) -> list[dict]:
-    """Return the most recent `limit` entries as a flat list, newest-first."""
+    """Return the most recent `limit` entries as a flat list, newest-first.
+
+    Default is effectively uncapped so callers never silently truncate data.
+    """
     if _is_pg_available():
         return _pg_get_flat(username, limit)
     return _json_get_flat(username, limit, users_dir)
@@ -884,7 +952,6 @@ def _pg_get_entries_by_month(username: str, year: int | None, month: int | None)
                   AND EXTRACT(YEAR FROM timestamp) = %s
                   AND EXTRACT(MONTH FROM timestamp) = %s
                 ORDER BY timestamp DESC
-                LIMIT 100
             """, (username, year, month))
             rows = cur.fetchall()
         _return_pg_conn(conn)
@@ -1021,7 +1088,7 @@ def _json_get_entries_by_month(
                                 entries.append(entry)
 
     entries.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
-    return entries[:100]
+    return entries
 
 
 # ---------------------------------------------------------------------------

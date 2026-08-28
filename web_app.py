@@ -5840,10 +5840,9 @@ def analyze():
 
     # Only save if entry_name is provided (mandatory) AND user is admin
     if entry_name and _should_save and _is_admin():
-        # If updating an existing entry, delete the old one first
-        if existing_entry_id:
-            from src.users.history_manager import delete_entry
-            delete_entry(target_user, existing_entry_id)
+        # Save the NEW entry FIRST. Only after it is safely stored do we delete
+        # the old one. This prevents data loss if the save fails mid-way
+        # (previously it deleted first, so a failed add left NOTHING).
         add_entry(
             username=target_user,
             text=clean_text,
@@ -5855,6 +5854,10 @@ def analyze():
             day=day,
             entry_name=entry_name,
         )
+        # New entry stored OK — now remove the old version being replaced.
+        if existing_entry_id:
+            from src.users.history_manager import delete_entry
+            delete_entry(target_user, existing_entry_id)
 
     return jsonify({
         "error": False,
@@ -5877,76 +5880,24 @@ def saved_texts():
     fecha = request.args.get("fecha", "").strip()  # format: YYYY-MM-DD
 
     username = session["username"]
-    entries_found = []
 
-    # PRIMARY SOURCE: PostgreSQL (where audio uploads and analyses are saved)
-    try:
-        pg_entries = get_flat_entries(username, limit=1000)
-        for e in pg_entries:
-            e_year = e.get("year")
-            e_month = e.get("month")
+    from src.users.history_manager import get_all_entries, resolve_entry_date
+    entries = get_all_entries(username)
 
-            # Extract year/month from timestamp if not set explicitly
-            if e_year is None and e.get("timestamp"):
-                try:
-                    from datetime import datetime as _dt
-                    ts_str = str(e["timestamp"])
-                    if hasattr(e["timestamp"], "year"):
-                        e_year = e["timestamp"].year
-                        e_month = e["timestamp"].month
-                    elif "T" in ts_str or "-" in ts_str:
-                        ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
-                        e_year = ts.year
-                        e_month = ts.month
-                except Exception:
-                    pass
-
-            if (not year or e_year == year) and (not month or e_month is None or e_month == month):
-                entries_found.append(e)
-    except Exception as exc:
-        app.logger.warning(f"PG query failed for {username}: {exc}")
-
-    # FALLBACK: JSON file (for entries that were synced/imported)
-    if not entries_found:
-        import json as _json
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        users_dir = os.path.join(base_dir, "usuarios")
-
-        # Try subdirectory format
-        subdir_path = os.path.join(users_dir, username, "history.json")
-        if os.path.exists(subdir_path):
-            try:
-                with open(subdir_path, "r", encoding="utf-8") as f:
-                    history = _json.load(f)
-                year_key = str(year) if year else None
-                month_key = f"{month:02d}-" if month else None
-                if year_key and year_key in history:
-                    for mk, month_data in history[year_key].items():
-                        if month_key and not mk.startswith(month_key):
-                            continue
-                        if not isinstance(month_data, dict):
-                            continue
-                        for week_data in month_data.values():
-                            if not isinstance(week_data, dict):
-                                continue
-                            for day_data in week_data.values():
-                                if not isinstance(day_data, dict):
-                                    continue
-                                entries_found.extend(day_data.get("entries", []))
-            except Exception:
-                pass
-
-    # Format response
     result = []
-    for e in entries_found:
-        result.append({
-            "id": e.get("id", ""),
-            "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
-            "text": (e.get("text", "") or "")[:60],
-            "intent": e.get("intent", ""),
-            "timestamp": (str(e.get("timestamp", "")) or "")[:10],
-            "source": e.get("source", ""),
-        })
+    for e in entries:
+        e_year, e_month, _ = resolve_entry_date(e)
+        year_ok = (not year) or (e_year == year) or (e_year is None)
+        month_ok = (not month) or (e_month == month) or (e_month is None)
+        if year_ok and month_ok:
+            result.append({
+                "id": e.get("id", ""),
+                "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
+                "text": (e.get("text", "") or "")[:60],
+                "intent": e.get("intent", ""),
+                "timestamp": (str(e.get("timestamp", "")) or "")[:10],
+                "source": e.get("source", ""),
+            })
 
     return jsonify({"entries": result})
 
@@ -6668,30 +6619,16 @@ def admin_user_texts(username):
     month = request.args.get("month", type=int)
     fecha = request.args.get("fecha", "").strip()  # format: YYYY-MM-DD
 
-    entries = get_flat_entries(username, limit=1000)
+    from src.users.history_manager import get_all_entries, resolve_entry_date
+    entries = get_all_entries(username)
 
     filtered = []
     for e in entries:
-        e_year = e.get("year")
-        e_month = e.get("month")
-        if (e_year is None or not e_month) and e.get("timestamp"):
-            try:
-                from datetime import datetime as _dt
-                ts_str = str(e["timestamp"])
-                if hasattr(e["timestamp"], "year"):
-                    e_year = e_year or e["timestamp"].year
-                    e_month = e_month or e["timestamp"].month
-                elif "T" in ts_str or "-" in ts_str:
-                    ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
-                    e_year = e_year or ts.year
-                    e_month = e_month or ts.month
-            except Exception:
-                pass
-        # Include the entry if:
-        #  - no year filter, OR year matches, OR the entry's year could NOT be determined
-        #  - AND no month filter, OR month unknown, OR month matches
+        e_year, e_month, _ = resolve_entry_date(e)
+        # Include the entry if year/month match (unknown values pass through so
+        # nothing is ever silently dropped). Same rule used by every endpoint.
         year_ok = (not year) or (e_year == year) or (e_year is None)
-        month_ok = (not month) or (e_month is None) or (e_month == month)
+        month_ok = (not month) or (e_month == month) or (e_month is None)
         if year_ok and month_ok:
             filtered.append({
                 "id": e.get("id", ""),
@@ -6701,14 +6638,6 @@ def admin_user_texts(username):
                 "timestamp": (str(e.get("timestamp", "")) or "")[:10],
                 "source": e.get("source", ""),
             })
-
-    # DEBUG: If no entries matched filters but entries exist, log it
-    if not filtered and entries:
-        import sys
-        print(f"[DEBUG user-texts] {username}: {len(entries)} entries in DB, 0 after filter (year={year}, month={month})", file=sys.stderr)
-        if entries:
-            sample = entries[0]
-            print(f"[DEBUG user-texts] Sample entry year={sample.get('year')}, month={sample.get('month')}, ts={str(sample.get('timestamp',''))[:20]}", file=sys.stderr)
 
     return jsonify({"entries": filtered})
 
@@ -6722,18 +6651,19 @@ def admin_stats(username):
     period = request.args.get("period", "mensual")
     year = request.args.get("year", type=int) or 2026
 
+    from src.users.history_manager import get_all_entries, resolve_entry_date
     # If _all, aggregate across all users
     if username == "_all":
         all_users = user_manager.list_users()
         entries = []
         for u in all_users:
             try:
-                entries.extend(get_flat_entries(u, limit=500))
+                entries.extend(get_all_entries(u))
             except Exception:
                 pass
         display_name = "General (todos)"
     else:
-        entries = get_flat_entries(username, limit=500)
+        entries = get_all_entries(username)
         display_name = username
 
     # Determine which months to include based on period
@@ -6770,25 +6700,14 @@ def admin_stats(username):
     entry_count = 0
 
     for e in entries:
-        e_year = e.get("year")
-        e_month = e.get("month")
-        if e_year is None and e.get("timestamp"):
-            try:
-                ts_str = str(e["timestamp"])
-                if hasattr(e["timestamp"], "year"):
-                    e_year = e["timestamp"].year
-                    e_month = e["timestamp"].month
-                elif "T" in ts_str:
-                    ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
-                    e_year = ts.year
-                    e_month = ts.month
-            except Exception:
-                pass
+        e_year, e_month, _ = resolve_entry_date(e)
 
         if e_year == year and e_month in months_to_include:
+            # Count the entry regardless of whether it has commercial data,
+            # so entry_count matches the list/report counts.
+            entry_count += 1
             commercial = e.get("commercial") or {}
             if commercial:
-                entry_count += 1
                 for key in totals:
                     totals[key] += commercial.get(key, 0)
                 # Aggregate word-level detail
@@ -6922,33 +6841,17 @@ def admin_informe():
     matrix = {}
     weekly = {}
 
+    from src.users.history_manager import get_all_entries, resolve_entry_date
+
     for u in target_users:
-        entries = get_flat_entries(u, limit=1000)
+        entries = get_all_entries(u)
         matrix[u] = {m: 0 for m in range(1, 13)}
         weekly[u] = {m: {1: 0, 2: 0, 3: 0, 4: 0} for m in range(1, 13)}
         for e in entries:
-            e_year = e.get("year")
-            e_month = e.get("month")
-            e_day = None
-            # Always try to derive year/month/day from the timestamp when missing
-            if (e_year is None or not e_month) and e.get("timestamp"):
-                try:
-                    ts_str = str(e["timestamp"])
-                    if hasattr(e["timestamp"], "year"):
-                        e_year = e_year or e["timestamp"].year
-                        e_month = e_month or e["timestamp"].month
-                        e_day = e["timestamp"].day if hasattr(e["timestamp"], "day") else None
-                    elif "T" in ts_str or "-" in ts_str:
-                        ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
-                        e_year = e_year or ts.year
-                        e_month = e_month or ts.month
-                        e_day = ts.day
-                except Exception:
-                    pass
+            e_year, e_month, e_day = resolve_entry_date(e)
             # Count the entry if it belongs to the requested year.
             # If month is still unknown but the year matches, assign it to month 1
-            # so it is NOT silently dropped (this was causing count mismatches
-            # between the saved-texts list and the annual report).
+            # so it is NOT silently dropped (keeps list count == report count).
             if e_year == year:
                 if not e_month or not (1 <= e_month <= 12):
                     e_month = 1  # fallback bucket so the entry is still counted
