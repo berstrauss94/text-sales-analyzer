@@ -77,6 +77,22 @@ def test_no_dead_if_false_blocks():
     assert "if (false)" not in src, "Hay bloques 'if (false)' muertos en el template"
 
 
+# ── Incidente 5: e.target.closest sin proteger (TypeError en cada mouse move) ─
+def test_no_unguarded_target_closest():
+    """
+    Prohibe 'e.target.closest(' directo en handlers: si el target es un nodo de
+    texto o el document, .closest no existe y lanza TypeError que rompe la UI
+    (impedia que el informe se re-renderizara). Debe usarse el helper _closest.
+    """
+    src = _read(WEB_APP)
+    # Ignorar la linea del comentario que documenta el error
+    offenders = [ln for ln in src.splitlines()
+                 if "e.target.closest(" in ln and "//" not in ln.split("e.target.closest(")[0]]
+    assert not offenders, (
+        "Hay 'e.target.closest(' sin proteger (usar _closest): " + str(offenders[:3])
+    )
+
+
 # ── Incidente 4: ON CONFLICT DO NOTHING debe estar acompanado de id unico ──
 def test_pg_add_entry_relies_on_unique_id():
     """

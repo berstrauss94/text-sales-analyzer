@@ -4931,9 +4931,19 @@ function toggleMissingPanel(panelId) {
     }
 }
 
+// Safe closest(): returns null when the event target is not an Element
+// (e.g. a text node or the document). Prevents "e.target.closest is not a
+// function" errors that were crashing delegated handlers on every mouse move.
+function _closest(e, selector) {
+    let t = e && e.target;
+    if (t && t.nodeType === 3) t = t.parentElement;  // text node -> parent element
+    if (!t || typeof t.closest !== 'function') return null;
+    return t.closest(selector);
+}
+
 // Delegated click handler for pie charts (avoids inline onclick quote issues)
 document.addEventListener('click', function(e) {
-    const pie = e.target.closest('.pie-chart-click');
+    const pie = _closest(e, '.pie-chart-click');
     if (pie) {
         e.stopPropagation();
         const panelId = pie.getAttribute('data-missing');
@@ -4941,7 +4951,7 @@ document.addEventListener('click', function(e) {
         return;
     }
     // Delegated click for phrase chips — highlight word in text
-    const chip = e.target.closest('.phrase-chip');
+    const chip = _closest(e, '.phrase-chip');
     if (chip) {
         e.stopPropagation();
         const word = chip.getAttribute('data-word');
@@ -4950,7 +4960,7 @@ document.addEventListener('click', function(e) {
         return;
     }
     // Delegated click for source toggles — show/hide text fragment
-    const srcTog = e.target.closest('.source-toggle');
+    const srcTog = _closest(e, '.source-toggle');
     if (srcTog) {
         const targetId = srcTog.getAttribute('data-target');
         if (targetId) {
@@ -4963,7 +4973,7 @@ document.addEventListener('click', function(e) {
         }
     }
     // Delegated click for inline source toggles (violet arrows)
-    const inlineTog = e.target.closest('.src-toggle-inline');
+    const inlineTog = _closest(e, '.src-toggle-inline');
     if (inlineTog) {
         const section = inlineTog.getAttribute('data-section');
         const fragEl = inlineTog.nextElementSibling;
@@ -4984,7 +4994,7 @@ document.addEventListener('click', function(e) {
 
 // Hover tooltip for pie charts (desktop: mouseenter/mouseleave)
 document.addEventListener('mouseenter', function(e) {
-    const pie = e.target.closest('.pie-chart-click');
+    const pie = _closest(e, '.pie-chart-click');
     if (pie) {
         const tooltipId = pie.getAttribute('data-tooltip');
         if (tooltipId) {
@@ -4995,7 +5005,7 @@ document.addEventListener('mouseenter', function(e) {
 }, true);
 
 document.addEventListener('mouseleave', function(e) {
-    const pie = e.target.closest('.pie-chart-click');
+    const pie = _closest(e, '.pie-chart-click');
     if (pie) {
         const tooltipId = pie.getAttribute('data-tooltip');
         if (tooltipId) {
@@ -5008,7 +5018,7 @@ document.addEventListener('mouseleave', function(e) {
 // Long-press tooltip for pie charts (mobile: touchstart/touchend)
 let _pieTooltipTimer = null;
 document.addEventListener('touchstart', function(e) {
-    const pie = e.target.closest('.pie-chart-click');
+    const pie = _closest(e, '.pie-chart-click');
     if (pie) {
         const tooltipId = pie.getAttribute('data-tooltip');
         if (tooltipId) {
@@ -5175,7 +5185,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             hlGrid.addEventListener('click', function(e) {
-                const opt = e.target.closest('[data-cat]');
+                const opt = _closest(e, '[data-cat]');
                 if (!opt) return;
                 const cat = opt.getAttribute('data-cat');
                 const txt = window._selectedTextForHighlight;
