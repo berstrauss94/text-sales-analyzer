@@ -4733,20 +4733,45 @@ function imprimirTextoResaltado() {
     const w = window.open('', '_blank');
     if (!w) return;
     w.document.write('<html><head><title>Texto Resaltado</title><style>');
+    // CRITICAL: force browsers to actually PRINT the background colors even when
+    // the user has "Background graphics" turned off. Without this the highlights
+    // are invisible on paper/PDF.
+    w.document.write('* { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }');
     w.document.write('@page { size: A4; margin: 2cm; }');
-    w.document.write('body { font-family: "Segoe UI", sans-serif; line-height: 1.7; font-size: 12px; color: #111; white-space: pre-wrap; word-wrap: break-word; }');
-    w.document.write('h1 { font-size: 16px; font-weight: 600; margin-bottom: 12px; }');
-    // Highlight classes with printable colors (backgrounds tuned for white paper)
-    w.document.write('.hl-palabras_positivas{background:#fff9b0;padding:0 2px;border-radius:3px;}');
-    w.document.write('.hl-respuestas_afirmativas{background:#b6f0c4;padding:0 2px;border-radius:3px;}');
-    w.document.write('.hl-indicios_cierre{background:#ffd9a0;padding:0 2px;border-radius:3px;}');
-    w.document.write('.hl-escasez_comercial{background:#f6c0f6;padding:0 2px;border-radius:3px;}');
-    w.document.write('.hl-pedidos_referidos{background:#dcc9fb;padding:0 2px;border-radius:3px;}');
-    w.document.write('.hl-objeciones{background:#f8bcbc;padding:0 2px;border-radius:3px;}');
-    w.document.write('.hl-indicios_prospeccion{background:#b8e6fb;padding:0 2px;border-radius:3px;}');
+    w.document.write('body { font-family: "Segoe UI", sans-serif; line-height: 1.8; font-size: 12px; color: #111; white-space: pre-wrap; word-wrap: break-word; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }');
+    w.document.write('h1 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }');
+    w.document.write('.sub { font-size: 11px; color: #666; margin-bottom: 12px; }');
+    w.document.write('.legend { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 16px; padding:10px; border:1px solid #ccc; border-radius:6px; }');
+    w.document.write('.legend span { font-size:10px; padding:2px 8px; border-radius:3px; }');
+    // Highlight classes with printable colors (backgrounds tuned for white paper).
+    // Each rule forces the background to print via print-color-adjust:exact.
+    const hlCss = 'padding:0 2px;border-radius:3px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;';
+    w.document.write('.hl-palabras_positivas{background:#fff17a !important;' + hlCss + '}');
+    w.document.write('.hl-respuestas_afirmativas{background:#8ce6a6 !important;' + hlCss + '}');
+    w.document.write('.hl-indicios_cierre{background:#ffc266 !important;' + hlCss + '}');
+    w.document.write('.hl-escasez_comercial{background:#f39cf3 !important;' + hlCss + '}');
+    w.document.write('.hl-pedidos_referidos{background:#c7aef9 !important;' + hlCss + '}');
+    w.document.write('.hl-objeciones{background:#f79a9a !important;' + hlCss + '}');
+    w.document.write('.hl-indicios_prospeccion{background:#93d9f7 !important;' + hlCss + '}');
     w.document.write('</style></head><body>');
     w.document.write('<h1>Texto Resaltado — Analisis de Indicadores</h1>');
-    w.document.write('<div>' + styledHtml + '</div>');
+    const nowStr = new Date().toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' });
+    w.document.write('<div class="sub">Mi Primer Casa S.A. — ' + nowStr + '</div>');
+    // Color legend so whoever works on paper knows what each color means
+    w.document.write('<div class="legend">');
+    w.document.write('<span class="hl-palabras_positivas">Positivas</span>');
+    w.document.write('<span class="hl-respuestas_afirmativas">Induccion al Si</span>');
+    w.document.write('<span class="hl-indicios_cierre">Cierre</span>');
+    w.document.write('<span class="hl-escasez_comercial">Escasez</span>');
+    w.document.write('<span class="hl-pedidos_referidos">Referidos</span>');
+    w.document.write('<span class="hl-objeciones">Objeciones</span>');
+    w.document.write('<span class="hl-indicios_prospeccion">Prospeccion</span>');
+    w.document.write('</div>');
+    // Darken the role colors (Vendedor/Cliente) so they are readable on white paper.
+    let printHtml = styledHtml
+        .replace(/color:#5bf5a3;font-weight:700;/g, 'color:#1a7a3a;font-weight:700;')
+        .replace(/color:#f5a35b;font-weight:700;/g, 'color:#b05a10;font-weight:700;');
+    w.document.write('<div>' + printHtml + '</div>');
     w.document.write('</body></html>');
     w.document.close();
     setTimeout(function() { w.print(); }, 300);
