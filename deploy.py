@@ -92,6 +92,15 @@ def main() -> None:
         sys.exit(1)
     ok("Sintaxis correcta")
 
+    # Step 1b: JavaScript validity gate (blocks deploy if embedded JS is broken)
+    step("1b. Validando JavaScript embebido...")
+    code, out = run("python -m pytest tests/test_js_validity.py -q", capture=True)
+    if code != 0:
+        fail("JavaScript embebido INVALIDO — deploy bloqueado:")
+        print(out)
+        sys.exit(1)
+    ok("JavaScript valido")
+
     # Step 2: Run tests
     step("2. Ejecutando tests...")
     code, out = run("python -m pytest tests/ -q", capture=True)
