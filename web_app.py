@@ -5168,20 +5168,20 @@ async function loadInforme() {
                 lineValues.push(dayTotal);
             }
         } else if (data.filter_month > 0) {
-            // WEEKLY trend for the month
-            lineTitle = 'Tendencia semanal — ' + months[data.filter_month];
-            const weekLabels = ['S1', 'S2', 'S3', 'S4'];
-            const weekTotals = [0, 0, 0, 0];
-            const wusers = (data.filter_seller && data.filter_seller !== '_all')
-                ? [data.filter_seller] : Object.keys(data.weekly || {});
-            wusers.forEach(u => {
-                const wd = (data.weekly[u] || {})[data.filter_month];
-                if (wd) {
-                    for (let wi = 1; wi <= 4; wi++) weekTotals[wi - 1] += (wd[wi] || 0);
-                }
-            });
-            lineLabels = weekLabels;
-            lineValues = weekTotals;
+            // DAILY trend for the WHOLE month (more informative than 4 weeks)
+            lineTitle = 'Tendencia diaria — ' + months[data.filter_month] + ' ' + year;
+            const dusers = (data.filter_seller && data.filter_seller !== '_all')
+                ? [data.filter_seller] : Object.keys(data.daily || {});
+            const daysInMonth = new Date(parseInt(year), parseInt(data.filter_month), 0).getDate();
+            for (let d = 1; d <= daysInMonth; d++) {
+                let dayTotal = 0;
+                dusers.forEach(u => {
+                    const dd = data.daily[u] || {};
+                    dayTotal += (dd[d] || dd[String(d)] || 0);
+                });
+                lineLabels.push(String(d));
+                lineValues.push(dayTotal);
+            }
         } else {
             // MONTHLY trend for the year
             lineTitle = 'Tendencia mensual — ' + year;
@@ -7173,8 +7173,9 @@ def admin_informe():
                     continue
                 matrix[u][e_month] = matrix[u].get(e_month, 0) + 1
                 weekly[u][e_month][w] = weekly[u][e_month].get(w, 0) + 1
-                # Daily breakdown: only meaningful when a specific month+week are chosen
-                if filter_month > 0 and filter_week > 0 and e_day:
+                # Daily breakdown: populated whenever a month is selected (with or
+                # without a week filter) so the line chart can show a per-day trend.
+                if filter_month > 0 and e_day:
                     daily[u][e_day] = daily[u].get(e_day, 0) + 1
 
     # Totals per month

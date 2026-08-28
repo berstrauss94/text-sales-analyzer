@@ -298,7 +298,12 @@ def add_entry(
     # PostgreSQL silently discard entries (ON CONFLICT DO NOTHING) — some saved
     # texts never appeared in the list. See _build_entry (id uses %f).
     if year and month:
-        use_day = day if day else min(now.day, 28)
+        # Use the explicit day when provided. Otherwise fall back to today's day,
+        # clamped only to the real number of days in the target month (not a
+        # hard 28) so the day is as accurate as possible.
+        import calendar as _calendar
+        _days_in_month = _calendar.monthrange(year, month)[1]
+        use_day = day if day else min(now.day, _days_in_month)
         cat_date = datetime(year, month, use_day,
                            now.hour, now.minute, now.second, now.microsecond,
                            tzinfo=timezone.utc)
