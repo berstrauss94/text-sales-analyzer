@@ -5881,7 +5881,7 @@ def saved_texts():
 
     # PRIMARY SOURCE: PostgreSQL (where audio uploads and analyses are saved)
     try:
-        pg_entries = get_flat_entries(username, limit=200)
+        pg_entries = get_flat_entries(username, limit=1000)
         for e in pg_entries:
             e_year = e.get("year")
             e_month = e.get("month")
@@ -6616,6 +6616,48 @@ def admin_diagnose_count(username):
     })
 
 
+@app.route("/admin/dump-entries/<username>")
+def admin_dump_entries(username):
+    """Dump ALL entries with their date fields for full diagnosis (admin only)."""
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from datetime import datetime as _dt
+    entries = get_flat_entries(username, limit=1000)
+    # Count by year and by (year,month)
+    by_year = {}
+    by_year_month = {}
+    dump = []
+    for e in entries:
+        e_year = e.get("year")
+        e_month = e.get("month")
+        ts_str = str(e.get("timestamp", ""))
+        if (e_year is None or not e_month) and ts_str:
+            try:
+                ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
+                e_year = e_year or ts.year
+                e_month = e_month or ts.month
+            except Exception:
+                pass
+        yk = str(e_year)
+        ymk = f"{e_year}-{e_month:02d}" if (e_year and e_month) else f"{e_year}-??"
+        by_year[yk] = by_year.get(yk, 0) + 1
+        by_year_month[ymk] = by_year_month.get(ymk, 0) + 1
+        dump.append({
+            "name": (e.get("entry_name", "") or e.get("audio_filename", ""))[:25],
+            "year": e_year,
+            "month": e_month,
+            "ts": ts_str[:19],
+            "day_label": e.get("day_label", ""),
+        })
+    return jsonify({
+        "username": username,
+        "total": len(entries),
+        "by_year": by_year,
+        "by_year_month": by_year_month,
+        "entries": dump,
+    })
+
+
 @app.route("/admin/user-texts/<username>")
 def admin_user_texts(username):
     """Return texts for a specific user filtered by year/month/fecha (admin only)."""
@@ -6626,26 +6668,31 @@ def admin_user_texts(username):
     month = request.args.get("month", type=int)
     fecha = request.args.get("fecha", "").strip()  # format: YYYY-MM-DD
 
-    entries = get_flat_entries(username, limit=200)
+    entries = get_flat_entries(username, limit=1000)
 
     filtered = []
     for e in entries:
         e_year = e.get("year")
         e_month = e.get("month")
-        if e_year is None and e.get("timestamp"):
+        if (e_year is None or not e_month) and e.get("timestamp"):
             try:
                 from datetime import datetime as _dt
                 ts_str = str(e["timestamp"])
                 if hasattr(e["timestamp"], "year"):
-                    e_year = e["timestamp"].year
-                    e_month = e["timestamp"].month
+                    e_year = e_year or e["timestamp"].year
+                    e_month = e_month or e["timestamp"].month
                 elif "T" in ts_str or "-" in ts_str:
                     ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
-                    e_year = ts.year
-                    e_month = ts.month
+                    e_year = e_year or ts.year
+                    e_month = e_month or ts.month
             except Exception:
                 pass
-        if (not year or e_year == year) and (not month or e_month is None or e_month == month):
+        # Include the entry if:
+        #  - no year filter, OR year matches, OR the entry's year could NOT be determined
+        #  - AND no month filter, OR month unknown, OR month matches
+        year_ok = (not year) or (e_year == year) or (e_year is None)
+        month_ok = (not month) or (e_month is None) or (e_month == month)
+        if year_ok and month_ok:
             filtered.append({
                 "id": e.get("id", ""),
                 "entry_name": e.get("entry_name", "") or e.get("audio_filename", ""),
