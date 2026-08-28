@@ -360,6 +360,76 @@ def get_entries_by_month(
     return _json_get_entries_by_month(username, year, month, users_dir)
 
 
+def update_entry_text(username: str, entry_id: str, new_text_short: str,
+                      new_text_full: str, users_dir: str = USERS_DIR) -> bool:
+    """Update the text_short and text_full of an existing entry (preserves id/timestamp)."""
+    if _is_pg_available():
+        return _pg_update_entry_text(username, entry_id, new_text_short, new_text_full)
+    return _json_update_entry_text(username, entry_id, new_text_short, new_text_full, users_dir)
+
+
+def _pg_update_entry_text(username: str, entry_id: str, new_short: str, new_full: str) -> bool:
+    conn = _get_pg_conn()
+    if conn is None:
+        return False
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE analysis_history SET text_short = %s, text_full = %s "
+                "WHERE username = %s AND id = %s",
+                (new_short, new_full, username, entry_id)
+            )
+            conn.commit()
+            return cur.rowcount > 0
+    except Exception as exc:
+        logger.error(f"PG update text error: {exc}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        _return_pg_conn(conn, close=True)
+        conn = None  # prevent double-release in finally
+        return False
+    finally:
+        if conn is not None:
+            _return_pg_conn(conn)
+
+
+def _json_update_entry_text(username: str, entry_id: str, new_short: str, new_full: str, users_dir: str) -> bool:
+    history = _load_json(username, users_dir)
+    if not history:
+        return False
+    updated = False
+    for year_data in history.values():
+        if not isinstance(year_data, dict):
+            continue
+        for month_data in year_data.values():
+            if not isinstance(month_data, dict):
+                continue
+            for week_data in month_data.values():
+                if not isinstance(week_data, dict):
+                    continue
+                for day_data in week_data.values():
+                    if not isinstance(day_data, dict):
+                        continue
+                    for entry in day_data.get("entries", []):
+                        if entry.get("id") == entry_id:
+                            entry["text"] = new_short
+                            entry["text_full"] = new_full
+                            updated = True
+    if updated:
+        path = _history_file(username, users_dir)
+        # For subdirectory format, also handle that path
+        if not os.path.exists(path):
+            safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in username)
+            subdir = os.path.join(users_dir, safe, "history.json")
+            if os.path.exists(subdir):
+                path = subdir
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+    return updated
+
+
 def delete_entry(username: str, entry_id: str, users_dir: str = USERS_DIR) -> bool:
     """Delete an entry by ID from the user's history. Returns True if deleted."""
     if _is_pg_available():
