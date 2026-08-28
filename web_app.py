@@ -610,9 +610,11 @@ HTML = """
         /* Date selectors */
         .date-selectors {
             display: flex;
+            flex-wrap: wrap;
             gap: 12px;
             margin-bottom: 10px;
         }
+        .date-select-group { min-width: 0; }
         .date-select-group {
             display: flex;
             flex-direction: column;
@@ -2063,40 +2065,66 @@ HTML = """
         .history-entry-detail.open { display: block; }
 
         /* ═══════════════════════════════════════════════════════════════
-           RESPONSIVE: Tablet (≤768px) y Móvil (≤480px)
+           RESPONSIVE LAYOUT ENGINE
+           Breakpoints: mobile-S ≤400 · mobile ≤480 · tablet ≤768 ·
+                        laptop ≤1200 · desktop (default) · TV ≥1600
+           Fluid scaling via clamp() + auto-wrapping grids.
            ═══════════════════════════════════════════════════════════════ */
+
+        /* Fluid base: container width and body font scale with the viewport */
+        .container {
+            width: 100%;
+            max-width: 900px;
+            padding-left: clamp(8px, 2vw, 20px);
+            padding-right: clamp(8px, 2vw, 20px);
+        }
+
+        /* Date selectors: fluid columns that wrap automatically on any screen */
+        .date-selectors { row-gap: 10px; }
+        .date-select-group select,
+        #selectFecha { width: 100%; }
+
+        /* ── TABLET (≤768px) ── */
         @media (max-width: 768px) {
             .container { padding: 10px; max-width: 100%; }
             .top-bar { flex-direction: column; gap: 8px; align-items: stretch; }
             .btn-row { flex-wrap: wrap; gap: 6px; }
-            .btn-row button, .btn-row input { font-size: 0.75rem; }
+            .btn-row button, .btn-row input { font-size: 0.8rem; }
             textarea { font-size: 0.85rem; min-height: 150px; }
             .result-grid { grid-template-columns: 1fr; gap: 10px; }
             .indicators-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
             .commercial-section { padding: 12px; }
-            .date-select-group select { font-size: 0.8rem; min-width: 80px; }
+            /* Date selectors: 2 per row on tablet */
+            .date-selectors { gap: 10px; }
+            .date-select-group { flex: 1 1 calc(50% - 10px); min-width: 120px; }
+            .date-select-group select, #selectFecha { font-size: 0.82rem; min-width: 0; }
             .date-select-group label { font-size: 0.7rem; }
             .save-name-input { font-size: 0.8rem; }
             .card { padding: 12px; }
             .card-title { font-size: 0.7rem; }
         }
 
+        /* ── MOBILE (≤480px) ── */
         @media (max-width: 480px) {
             body { font-size: 13px; }
-            .container { padding: 6px; }
+            .container { padding: 8px; }
             .top-bar { padding: 8px; }
-            h1 { font-size: 1.1rem; }
-            textarea { font-size: 0.8rem; min-height: 120px; }
+            h1 { font-size: 1.15rem; }
+            .subtitle { font-size: 0.8rem; }
+            textarea { font-size: 0.85rem; min-height: 260px; }
             .btn-row { flex-direction: column; }
             .btn-row button { width: 100%; padding: 10px; }
+            .btn-row input { width: 100%; margin-left: 0 !important; }
             .result-grid { grid-template-columns: 1fr; }
             .indicators-grid { grid-template-columns: repeat(2, 1fr); gap: 4px; }
             .indicator-item { padding: 6px 4px; }
             .indicator-label { font-size: 0.6rem; }
             .indicator-value { font-size: 1rem; }
             .commercial-title { font-size: 0.85rem; }
-            .date-select-group { min-width: 0; }
-            .date-select-group select { width: 100%; font-size: 0.78rem; }
+            /* Date selectors: each on its own full-width row so nothing is clipped */
+            .date-selectors { gap: 8px; }
+            .date-select-group { flex: 1 1 100%; min-width: 0; width: 100%; }
+            .date-select-group select, #selectFecha { width: 100%; font-size: 0.85rem; min-width: 0; box-sizing: border-box; }
             .card { padding: 10px; border-radius: 8px; }
             .card-title { font-size: 0.68rem; }
             .badge { font-size: 0.75rem; padding: 3px 8px; }
@@ -2105,10 +2133,41 @@ HTML = """
             .save-relocate-selects { flex-direction: column; gap: 6px; }
             .save-relocate-selects select { width: 100%; }
             .save-relocate-selects button { width: 100%; }
+            .highlight-define-row { flex-wrap: wrap; }
         }
 
-        /* Utility: prevent horizontal scroll on mobile */
-        html, body { overflow-x: hidden; }
+        /* ── MOBILE-S (≤400px) — very small phones ── */
+        @media (max-width: 400px) {
+            body { font-size: 12px; }
+            h1 { font-size: 1.05rem; }
+            .indicators-grid { grid-template-columns: repeat(2, 1fr); }
+            .btn-highlight-define { font-size: 0.72rem; padding: 7px 10px; }
+        }
+
+        /* ── LAPTOP (≤1200px) — keep comfortable width ── */
+        @media (min-width: 769px) and (max-width: 1200px) {
+            .container { max-width: 92%; }
+        }
+
+        /* ── TV / LARGE DISPLAYS (≥1600px) — scale everything up ── */
+        @media (min-width: 1600px) {
+            .container { max-width: 1300px; }
+            body { font-size: 17px; }
+            h1 { font-size: 2.1rem; }
+            .subtitle { font-size: 1.05rem; }
+            textarea { font-size: 1.05rem; }
+            .card-title { font-size: 0.9rem; }
+            .indicator-value { font-size: 1.6rem; }
+        }
+        @media (min-width: 2200px) {
+            .container { max-width: 1700px; }
+            body { font-size: 20px; }
+            h1 { font-size: 2.6rem; }
+        }
+
+        /* Utility: prevent horizontal scroll on any device */
+        html, body { overflow-x: hidden; max-width: 100%; }
+        *, *::before, *::after { box-sizing: border-box; }
 
         /* ── Sales Simulator Styles ── */
         .sim-diff-btn {
@@ -2191,7 +2250,7 @@ HTML = """
             {% if username in ['admin', 'Vanesa.Admin', 'Berna.Strauss', 'FedericoCeballos', 'MartinianoSosa'] %}
             <div class="date-select-group">
                 <label for="selectUser">👤 Usuario</label>
-                <select id="selectUser" onchange="loadSavedTexts(); loadAdminStats();" style="min-width:150px;">
+                <select id="selectUser" onchange="loadSavedTexts(); loadAdminStats();" style="min-width:120px;">
                     <option value="">-- Todos --</option>
                     {% for u in all_users %}
                     <option value="{{ u }}">{{ u }}</option>
@@ -2230,7 +2289,7 @@ HTML = """
             </div>
             <div class="date-select-group">
                 <label for="selectFecha">Fecha</label>
-                <input type="date" id="selectFecha" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:7px 10px;font-size:0.82rem;cursor:pointer;outline:none;min-width:130px;">
+                <input type="date" id="selectFecha" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:7px 10px;font-size:0.82rem;cursor:pointer;outline:none;min-width:120px;max-width:100%;box-sizing:border-box;">
             </div>
             <div class="date-select-group">
                 <label for="selectText">Textos <span id="savedTextsCount" style="color:#555;"></span></label>
