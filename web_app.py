@@ -303,8 +303,22 @@ except Exception as _mig_exc:
 # Runs in the background so it never delays app startup. Best-effort.
 # ---------------------------------------------------------------------------
 try:
-    from src.users.backup_manager import ensure_backup_tables, take_backup, get_backup_status
+    from src.users.backup_manager import ensure_backup_tables, take_backup, get_backup_status, auto_fix
     ensure_backup_tables()
+    # AUTO FIX at boot: reconcile the live table against the union of ALL
+    # backups, entry-by-entry, and re-insert any missing texts automatically.
+    # Only adds, never deletes — so it can only recover, never lose data.
+    try:
+        _fix = auto_fix()
+        if _fix.get("ok") and _fix.get("restored", 0) > 0:
+            print(f"[AUTO-FIX] Recuperados {_fix['restored']} textos faltantes al arrancar "
+                  f"(de {_fix.get('missing_count')} detectados).")
+        elif _fix.get("ok"):
+            print(f"[AUTO-FIX] Sin textos faltantes. Vivos={_fix.get('live_count')}, "
+                  f"backup-union={_fix.get('backup_union_count')}.")
+    except Exception as _fx_exc:
+        print(f"[AUTO-FIX] omitido (no critico): {_fx_exc}")
+
     _bstat = get_backup_status()
     # Only take a boot backup if there is NO significant loss detected. If a loss
     # IS detected, we must NOT overwrite the good backup with a diminished one.
@@ -5617,21 +5631,40 @@ function showBackupAlert(s) {
 }
 
 async function restoreBackupNow() {
-    if (!confirm('Se restauraran los textos faltantes desde el ultimo backup. Continuar?')) return;
+    if (!confirm('Auto Fix comparara todos los backups y restaurara UNO POR UNO los textos que falten. Solo agrega, nunca borra. Continuar?')) return;
     const banner = document.getElementById('backupAlertBanner');
-    if (banner) banner.innerHTML = '<span style="padding:4px;">Restaurando textos, aguarde...</span>';
+    if (banner) banner.innerHTML = '<span style="padding:4px;">Auto Fix en curso: comparando backups y restaurando textos faltantes...</span>';
     try {
-        const resp = await fetch('/admin/restore-backup', { method: 'POST' });
+        // Auto Fix: entry-by-entry reconciliation across ALL backups (most precise)
+        const resp = await fetch('/admin/auto-fix', { method: 'POST' });
         const r = await resp.json();
         if (r.ok) {
-            if (banner) banner.innerHTML = '<span style="color:#5bf5a3;padding:4px;">&#10003; Restaurados ' + r.restored + ' textos. Recargando...</span>';
-            setTimeout(function() { location.reload(); }, 1500);
+            if (r.restored > 0) {
+                if (banner) banner.innerHTML = '<span style="color:#5bf5a3;padding:4px;">&#10003; Auto Fix: restaurados ' + r.restored + ' de ' + r.missing_count + ' textos faltantes. Recargando...</span>';
+                setTimeout(function() { location.reload(); }, 1800);
+            } else {
+                if (banner) banner.innerHTML = '<span style="color:#5bf5a3;padding:4px;">&#10003; Auto Fix: no faltaba ningun texto recuperable. Todo en orden.</span>';
+                setTimeout(function() { const b = document.getElementById('backupAlertBanner'); if (b) b.remove(); document.body.style.paddingTop = '0'; }, 2500);
+            }
         } else {
-            if (banner) banner.innerHTML = '<span style="color:#f88;padding:4px;">Error al restaurar: ' + (r.reason || 'desconocido') + '</span>';
+            if (banner) banner.innerHTML = '<span style="color:#f88;padding:4px;">Error en Auto Fix: ' + (r.reason || 'desconocido') + '</span>';
         }
     } catch (e) {
         if (banner) banner.innerHTML = '<span style="color:#f88;padding:4px;">Error de conexion al restaurar.</span>';
     }
+}
+
+// Manual Auto Fix trigger (can be called from console or a button): previews first
+async function runAutoFix() {
+    try {
+        const prev = await (await fetch('/admin/auto-fix?dry_run=1')).json();
+        if (!prev.ok) { alert('Auto Fix no disponible: ' + (prev.reason || '')); return; }
+        if (prev.missing_count === 0) { alert('Auto Fix: no faltan textos. Todo en orden (' + prev.live_count + ' textos).'); return; }
+        if (!confirm('Auto Fix detecto ' + prev.missing_count + ' textos faltantes. Restaurarlos ahora?')) return;
+        const r = await (await fetch('/admin/auto-fix', { method: 'POST' })).json();
+        alert('Auto Fix: restaurados ' + r.restored + ' textos. La pagina se recargara.');
+        location.reload();
+    } catch (e) { alert('Error en Auto Fix: ' + e.message); }
 }
 
 // Load informe on page load if admin
@@ -6829,6 +6862,29 @@ def admin_restore_backup():
         return jsonify({"error": "unauthorized"}), 403
     from src.users.backup_manager import restore_latest_backup
     return jsonify(restore_latest_backup())
+
+
+@app.route("/admin/auto-fix", methods=["POST", "GET"])
+def admin_auto_fix():
+    """
+    Auto Fix: compare the live table entry-by-entry against the UNION of all
+    backups and re-insert exactly the missing entries, one by one. Only adds.
+    Pass ?dry_run=1 to preview what would be restored without writing. Admin only.
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users.backup_manager import auto_fix
+    dry = request.args.get("dry_run", "0") == "1"
+    return jsonify(auto_fix(dry_run=dry))
+
+
+@app.route("/admin/compare-backups")
+def admin_compare_backups():
+    """Compare consecutive backups to see exactly when entries were lost (admin only)."""
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users.backup_manager import compare_backups
+    return jsonify(compare_backups())
 
 
 @app.route("/admin/dedup-all-texts")
