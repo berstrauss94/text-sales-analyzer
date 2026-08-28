@@ -5720,9 +5720,15 @@ function showBackupAlert(s) {
         '<span style="color:#ddd;">Actual: ' + (s.current_total||0) + ' · Ultimo backup: ' + (s.last_backup_total||0) +
         ' (faltan ~' + (lost > 0 ? lost : 0) + ')' + drops + '</span>' +
         '<button onclick="restoreBackupNow()" style="margin-left:auto;background:#2a8a4a;border:none;color:#fff;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer;">Restaurar textos</button>' +
-        '<button onclick="document.getElementById(\'backupAlertBanner\').remove()" style="background:transparent;border:1px solid #f55b5b;color:#f88;padding:8px 12px;border-radius:6px;cursor:pointer;">Ignorar</button>';
+        '<button onclick="dismissBackupAlert()" style="background:transparent;border:1px solid #f55b5b;color:#f88;padding:8px 12px;border-radius:6px;cursor:pointer;">Ignorar</button>';
     document.body.appendChild(banner);
     document.body.style.paddingTop = '56px';
+}
+
+function dismissBackupAlert() {
+    const b = document.getElementById('backupAlertBanner');
+    if (b) b.remove();
+    document.body.style.paddingTop = '0';
 }
 
 async function restoreBackupNow() {

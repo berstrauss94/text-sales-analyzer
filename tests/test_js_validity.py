@@ -23,14 +23,31 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_APP = os.path.join(BASE_DIR, "web_app.py")
 
 
+def _rendered_html_templates() -> list[str]:
+    """
+    Import web_app and return the ACTUAL rendered HTML strings (HTML, LOGIN_HTML),
+    i.e. exactly what the browser receives after Python has processed all string
+    escapes (\\', etc.). This is the only reliable way to catch JS syntax errors
+    caused by escape sequences that only manifest after Python renders the string.
+    """
+    import importlib
+    web_app = importlib.import_module("web_app")
+    templates = []
+    for name in ("HTML", "LOGIN_HTML"):
+        val = getattr(web_app, name, None)
+        if isinstance(val, str) and val.strip():
+            templates.append(val)
+    return templates
+
+
 def _read_web_app() -> str:
     with open(WEB_APP, "r", encoding="utf-8") as f:
         return f.read()
 
 
 def _extract_scripts(content: str) -> list[str]:
-    """Return the JS body of every <script>...</script> inside the Python string
-    templates, with Jinja2 tags neutralized so it is plain JS."""
+    """Return the JS body of every <script>...</script> found in the given
+    already-rendered HTML text, with Jinja2 tags neutralized so it is plain JS."""
     scripts = []
     for m in re.finditer(r"<script>(.*?)</script>", content, re.DOTALL):
         js = m.group(1)
@@ -52,7 +69,17 @@ def _balanced(js: str) -> tuple[bool, str]:
     return True, ""
 
 
-_SCRIPTS = _extract_scripts(_read_web_app())
+# Validate the RENDERED templates (what the browser actually gets), which
+# reflects Python's string-escape processing. Falls back to raw file scan if the
+# import fails for any reason.
+try:
+    _SCRIPTS = []
+    for _tpl in _rendered_html_templates():
+        _SCRIPTS.extend(_extract_scripts(_tpl))
+    if not _SCRIPTS:
+        _SCRIPTS = _extract_scripts(_read_web_app())
+except Exception:
+    _SCRIPTS = _extract_scripts(_read_web_app())
 
 
 def test_at_least_one_script_found():
