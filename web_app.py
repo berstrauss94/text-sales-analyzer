@@ -453,26 +453,34 @@ HTML = """
         .highlight-close-btn {
             display: none;
             position: absolute;
-            top: 6px;
-            right: 8px;
+            top: 8px;
+            right: 12px;
             background: #1a1d27;
-            border: 1px solid #3a3d4a;
-            color: #aaa;
+            border: 1px solid #4a6cf7;
+            color: #fff;
             border-radius: 50%;
-            width: 22px;
-            height: 22px;
-            font-size: 0.7rem;
+            width: 32px;
+            height: 32px;
+            min-width: 32px;
+            min-height: 32px;
+            flex: 0 0 32px;
+            padding: 0;
+            font-size: 0.95rem;
             cursor: pointer;
-            z-index: 11;
+            z-index: 20;
             line-height: 1;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            box-sizing: border-box;
         }
 
         .highlight-close-btn.active {
-            display: block;
+            display: flex;
         }
 
         .highlight-close-btn:hover {
-            background: #2a2d3a;
+            background: #4a6cf7;
             color: #fff;
         }
 
@@ -4667,9 +4675,23 @@ function escapeHtml(str) {
 function closeHighlightOverlay() {
     const overlay = document.getElementById('highlightOverlay');
     const closeBtn = document.getElementById('highlightCloseBtn');
-    overlay.classList.remove('active');
-    closeBtn.classList.remove('active');
+    if (overlay) overlay.classList.remove('active');
+    if (closeBtn) closeBtn.classList.remove('active');
+    // Reset the "Resaltar palabras" toggle so its state stays consistent
+    window._resaltarActivo = false;
+    const rp = document.getElementById('btnResaltarPalabras');
+    const pr = document.getElementById('btnImprimirResaltado');
+    if (rp) { rp.style.background = 'linear-gradient(135deg,#2a2d3a,#1a1d27)'; rp.style.color = '#e0e0e0'; }
+    if (pr) pr.style.display = 'none';
 }
+
+// Close the highlight overlay with the Escape key (accessibility / easy exit)
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const ov = document.getElementById('highlightOverlay');
+        if (ov && ov.classList.contains('active')) closeHighlightOverlay();
+    }
+});
 
 // ── RESALTAR PALABRAS (toggle all detected keywords with category colors) ──
 window._resaltarActivo = false;
