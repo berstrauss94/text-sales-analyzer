@@ -6402,6 +6402,44 @@ def admin_db_status():
     return jsonify(status)
 
 
+@app.route("/admin/dedup-all-texts")
+def admin_dedup_all_texts():
+    """Re-apply deduplication to ALL saved texts across ALL users (admin only)."""
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+
+    from src.users.history_manager import update_entry_text
+
+    all_users = user_manager.list_users()
+    summary = {"users_scanned": 0, "entries_scanned": 0, "entries_cleaned": 0, "details": []}
+
+    for u in all_users:
+        summary["users_scanned"] += 1
+        try:
+            entries = get_flat_entries(u, limit=1000)
+        except Exception:
+            continue
+        user_cleaned = 0
+        for e in entries:
+            summary["entries_scanned"] += 1
+            eid = e.get("id")
+            if not eid:
+                continue
+            orig_short = e.get("text", "") or ""
+            orig_full = e.get("text_full", "") or orig_short
+            new_short = _dedup_transcription(orig_short)
+            new_full = _dedup_transcription(orig_full)
+            # Only update if something actually changed
+            if new_short != orig_short or new_full != orig_full:
+                if update_entry_text(u, eid, new_short, new_full):
+                    user_cleaned += 1
+                    summary["entries_cleaned"] += 1
+        if user_cleaned > 0:
+            summary["details"].append({"username": u, "cleaned": user_cleaned})
+
+    return jsonify(summary)
+
+
 @app.route("/admin/test-texts/<username>")
 def admin_test_texts(username):
     """Test endpoint - returns entries without any year/month filter (admin only)."""
