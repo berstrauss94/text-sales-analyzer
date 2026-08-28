@@ -298,6 +298,26 @@ try:
 except Exception as _mig_exc:
     print(f"Warning: migración JSON→PG falló: {_mig_exc}")
 
+# ---------------------------------------------------------------------------
+# Data-protection: ensure backup tables exist and take a boot-time snapshot.
+# Runs in the background so it never delays app startup. Best-effort.
+# ---------------------------------------------------------------------------
+try:
+    from src.users.backup_manager import ensure_backup_tables, take_backup, get_backup_status
+    ensure_backup_tables()
+    _bstat = get_backup_status()
+    # Only take a boot backup if there is NO significant loss detected. If a loss
+    # IS detected, we must NOT overwrite the good backup with a diminished one.
+    if not _bstat.get("alert"):
+        take_backup(reason="startup")
+        print(f"[BACKUP] Snapshot inicial OK. Entradas: {_bstat.get('current_total', '?')}")
+    else:
+        print(f"[BACKUP] ALERTA: posible perdida de datos detectada al arrancar. "
+              f"Actual={_bstat.get('current_total')} vs backup={_bstat.get('last_backup_total')}. "
+              f"NO se sobrescribio el backup. Revisar /admin/backup-status")
+except Exception as _bk_exc:
+    print(f"Warning: inicializacion de backups fallo (no critico): {_bk_exc}")
+
 # Solo iniciar el scheduler si las credenciales están configuradas
 # DESACTIVADO TEMPORALMENTE — sync automático apagado
 _mpc_configured = False  # Forzar desactivado
@@ -5027,6 +5047,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('selectUser')) {
         // Admin: users already in HTML via Jinja2, just load stats
         loadAdminStats();
+        // Data-protection: check for possible data loss and warn the admin
+        checkBackupStatus();
     } else {
         // Regular user: load their texts
         loadSavedTexts();
@@ -5554,6 +5576,62 @@ function printInforme() {
     printWindow.document.write('</body></html>');
     printWindow.document.close();
     setTimeout(function() { printWindow.print(); }, 300);
+}
+
+// ── DATA-LOSS ALERT ──────────────────────────────────────────────────────
+// Checks the backup status and, if a significant loss of saved texts is
+// detected vs the last backup, shows a fixed banner at the top with a
+// "Restaurar" button so the admin fixes it BEFORE continuing.
+async function checkBackupStatus() {
+    try {
+        const resp = await fetch('/admin/backup-status?_t=' + Date.now(), { cache: 'no-store' });
+        if (!resp.ok) return;
+        const s = await resp.json();
+        if (s && s.alert) {
+            showBackupAlert(s);
+        }
+    } catch (e) { /* silent — never break the page */ }
+}
+
+function showBackupAlert(s) {
+    if (document.getElementById('backupAlertBanner')) return;
+    const lost = (s.last_backup_total || 0) - (s.current_total || 0);
+    const banner = document.createElement('div');
+    banner.id = 'backupAlertBanner';
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#3a0d0d;border-bottom:2px solid #f55b5b;color:#fff;padding:12px 16px;font-size:0.85rem;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 4px 16px rgba(0,0,0,0.6);';
+    let drops = '';
+    if (s.per_user_drops && s.per_user_drops.length) {
+        drops = ' — ' + s.per_user_drops.slice(0, 5).map(function(d) {
+            return d.username + ' (' + d.before + '→' + d.now + ')';
+        }).join(', ');
+    }
+    banner.innerHTML =
+        '<span style="font-size:1.1rem;">&#9888;</span>' +
+        '<strong style="color:#f88;">Posible perdida de textos detectada.</strong>' +
+        '<span style="color:#ddd;">Actual: ' + (s.current_total||0) + ' · Ultimo backup: ' + (s.last_backup_total||0) +
+        ' (faltan ~' + (lost > 0 ? lost : 0) + ')' + drops + '</span>' +
+        '<button onclick="restoreBackupNow()" style="margin-left:auto;background:#2a8a4a;border:none;color:#fff;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer;">Restaurar textos</button>' +
+        '<button onclick="document.getElementById(\'backupAlertBanner\').remove()" style="background:transparent;border:1px solid #f55b5b;color:#f88;padding:8px 12px;border-radius:6px;cursor:pointer;">Ignorar</button>';
+    document.body.appendChild(banner);
+    document.body.style.paddingTop = '56px';
+}
+
+async function restoreBackupNow() {
+    if (!confirm('Se restauraran los textos faltantes desde el ultimo backup. Continuar?')) return;
+    const banner = document.getElementById('backupAlertBanner');
+    if (banner) banner.innerHTML = '<span style="padding:4px;">Restaurando textos, aguarde...</span>';
+    try {
+        const resp = await fetch('/admin/restore-backup', { method: 'POST' });
+        const r = await resp.json();
+        if (r.ok) {
+            if (banner) banner.innerHTML = '<span style="color:#5bf5a3;padding:4px;">&#10003; Restaurados ' + r.restored + ' textos. Recargando...</span>';
+            setTimeout(function() { location.reload(); }, 1500);
+        } else {
+            if (banner) banner.innerHTML = '<span style="color:#f88;padding:4px;">Error al restaurar: ' + (r.reason || 'desconocido') + '</span>';
+        }
+    } catch (e) {
+        if (banner) banner.innerHTML = '<span style="color:#f88;padding:4px;">Error de conexion al restaurar.</span>';
+    }
 }
 
 // Load informe on page load if admin
@@ -6724,6 +6802,33 @@ def admin_db_status():
     else:
         status["db_error"] = "Could not get connection from pool"
     return jsonify(status)
+
+
+@app.route("/admin/backup-status")
+def admin_backup_status():
+    """Report whether a data-loss is detected vs the last backup (admin only)."""
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users.backup_manager import get_backup_status
+    return jsonify(get_backup_status())
+
+
+@app.route("/admin/backup-now", methods=["POST", "GET"])
+def admin_backup_now():
+    """Force an immediate full backup (admin only)."""
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users.backup_manager import take_backup
+    return jsonify(take_backup(reason="manual"))
+
+
+@app.route("/admin/restore-backup", methods=["POST"])
+def admin_restore_backup():
+    """Restore all entries from the most recent backup (admin only)."""
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users.backup_manager import restore_latest_backup
+    return jsonify(restore_latest_backup())
 
 
 @app.route("/admin/dedup-all-texts")
