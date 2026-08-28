@@ -5535,17 +5535,6 @@ async function loadInforme() {
         synthesisHtml += '</p>';
 
         // Retained legacy variable to avoid breaking downstream references
-        synthesisHtml += '';
-        if (false) { synthesisHtml += 'Como puede observarse en el consolidado final correspondiente al mes de <strong style="color:#e0e0e0;">' + cmName + '</strong>, el volumen total de audios cargados al sistema por parte de los vendedores ';
-        if (cmTotal >= meta * activeUsers * 0.7) {
-            synthesisHtml += 'muestra un cumplimiento <strong style="color:#5bf5a3;">satisfactorio</strong> frente a las metas institucionales.';
-        } else if (cmTotal >= meta * activeUsers * 0.3) {
-            synthesisHtml += 'muestra un cumplimiento <strong style="color:#f5d75b;">parcial</strong> frente a las metas institucionales.';
-        } else {
-            synthesisHtml += 'muestra un cumplimiento <strong style="color:#f55b5b;">Insuficiente</strong> frente a las metas institucionales.';
-        }
-        }  // end legacy if(false) block
-
         // Section heading: 4. Desempeno individual
         synthesisHtml += '<div style="font-size:0.72rem;color:#7b9cff;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">4. Desempeno individual</div>';
         // Paragraph 5: Top performer detail
