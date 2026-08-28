@@ -110,6 +110,18 @@ def _dedup_transcription(text: str) -> str:
         if result == prev:
             break
 
+    # Pass 4b: Remove consecutive repeated phrases of ANY length (4 to 10 words)
+    # Handles: "a ver si lo corto, a ver si lo corto, ..." → "a ver si lo corto"
+    # Iterates from longest to shortest so long phrases collapse first.
+    for phrase_len in range(10, 3, -1):
+        word = r'\w+'
+        phrase_pattern = r'\b(' + word + r'(?:\s+' + word + r'){' + str(phrase_len - 1) + r'})([,;.\s]+\1)+\b'
+        for _ in range(3):
+            prev = result
+            result = re.sub(phrase_pattern, r'\1', result, flags=re.IGNORECASE)
+            if result == prev:
+                break
+
     # Pass 5: Remove repeated short sentences/phrases separated by punctuation
     # Handles: "Si, si. Si, si. Si, si." → "Si, si."
     for _ in range(3):
