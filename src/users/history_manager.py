@@ -292,15 +292,24 @@ def add_entry(
     Returns the entry dict that was saved.
     """
     now = datetime.now(timezone.utc)
-    # If year/month provided, use that date for the entry timestamp
+    # If year/month provided, use that date for the entry timestamp.
+    # IMPORTANT: keep microseconds from `now` so the generated id stays unique.
+    # Previously microseconds were dropped, causing id collisions that made
+    # PostgreSQL silently discard entries (ON CONFLICT DO NOTHING) — some saved
+    # texts never appeared in the list. See _build_entry (id uses %f).
     if year and month:
         use_day = day if day else min(now.day, 28)
         cat_date = datetime(year, month, use_day,
-                           now.hour, now.minute, now.second, tzinfo=timezone.utc)
+                           now.hour, now.minute, now.second, now.microsecond,
+                           tzinfo=timezone.utc)
     else:
         cat_date = now
 
     entry = _build_entry(username, text, analysis, source, audio_filename, cat_date)
+    # Guarantee a unique id even if two saves land on the same microsecond:
+    # append a short random suffix. The id is only used as a DB key, not shown.
+    import secrets as _secrets
+    entry["id"] = entry["id"] + _secrets.token_hex(3)
     # Add year/month/name metadata to entry
     if year:
         entry["year"] = year
