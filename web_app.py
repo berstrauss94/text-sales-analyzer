@@ -6902,6 +6902,73 @@ def admin_users_list():
     return jsonify({"users": users})
 
 
+@app.route("/admin/full-diag")
+def admin_full_diag():
+    """
+    One-shot live diagnostic: DB connectivity, total counts, per-user counts,
+    what the saved-texts pipeline returns for a given user, and backup status.
+    Open: /admin/full-diag?user=FernandezCeci
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    import os as _os
+    from src.users.history_manager import (_is_pg_available, _get_pg_conn,
+                                            _return_pg_conn, get_all_entries,
+                                            resolve_entry_date)
+    out = {
+        "DATABASE_URL_set": bool(_os.environ.get("DATABASE_URL")),
+        "RAILWAY_ENVIRONMENT": _os.environ.get("RAILWAY_ENVIRONMENT", "NOT SET"),
+        "pg_available": _is_pg_available(),
+    }
+    # Raw DB counts
+    conn = _get_pg_conn()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM analysis_history")
+                out["db_total_entries"] = cur.fetchone()[0]
+                cur.execute("SELECT username, COUNT(*) FROM analysis_history GROUP BY username ORDER BY 2 DESC")
+                out["db_per_user"] = {r[0]: r[1] for r in cur.fetchall()}
+            _return_pg_conn(conn)
+        except Exception as exc:
+            out["db_error"] = str(exc)
+            _return_pg_conn(conn, close=True)
+    else:
+        out["db_error"] = "no PG connection"
+
+    # What the read pipeline returns for the requested user
+    user = request.args.get("user", "").strip()
+    if user:
+        try:
+            entries = get_all_entries(user)
+            out["pipeline_user"] = user
+            out["pipeline_total_read"] = len(entries)
+            months = {}
+            for e in entries:
+                y, m, d = resolve_entry_date(e)
+                key = f"{y}-{m:02d}" if (y and m) else f"{y}-??"
+                months[key] = months.get(key, 0) + 1
+            out["pipeline_by_year_month"] = months
+            out["pipeline_sample"] = [
+                {"id": (e.get("id") or "")[:16],
+                 "name": (e.get("entry_name") or e.get("audio_filename") or "")[:30],
+                 "day_label": e.get("day_label", ""),
+                 "ts": str(e.get("timestamp", ""))[:19]}
+                for e in entries[:5]
+            ]
+        except Exception as exc:
+            out["pipeline_error"] = str(exc)
+
+    # Backup status
+    try:
+        from src.users.backup_manager import get_backup_status
+        out["backup"] = get_backup_status()
+    except Exception as exc:
+        out["backup_error"] = str(exc)
+
+    return jsonify(out)
+
+
 @app.route("/admin/db-status")
 def admin_db_status():
     """Diagnostic endpoint to check database connectivity and entry counts."""
