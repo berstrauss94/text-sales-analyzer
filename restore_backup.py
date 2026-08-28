@@ -1,24 +1,27 @@
 # -*- coding: utf-8 -*-
 """
-restore_backup.py - Restaurar el sistema al estado estable del 25/08/2026.
+restore_backup.py - Restaurar el CODIGO al ultimo estado estable conocido.
 
-Este script restaura el código al punto de backup donde:
-- La carga de textos funciona correctamente
-- Usuario LeivaMarina está creado (grupo Aguilas)
-- "Resaltar y Definir" está desactivado (no rompe nada)
-- PostgreSQL conecta correctamente con retry
-- Diagnostico DB disponible en /admin/db-status
+Punto de restauracion actual: backup-estable-2026-08-28
+Ese backup incluye:
+- Carga de textos funcionando (SyntaxError del banner de backup resuelto)
+- Backups automaticos de DATOS activos (cada 10 guardados / 5 min) + Auto-Fix
+- Deteccion de perdida con alerta admin y restauracion entrada por entrada
+- Informe con filtros de periodo (Enero a la fecha, mes, semanas)
+- Layout responsive (movil/tablet/PC/TV)
+- Gate de validez de JavaScript + 4 regression guards (102 tests)
 
 Uso:
     python restore_backup.py
 
 Esto hace:
     1. Checkout a master
-    2. Reset al tag backup-estable-2026-08-25
+    2. Reset al tag BACKUP_TAG
     3. Force push a GitHub
-    4. Railway redespliega automáticamente
+    4. Railway redespliega automaticamente
 
-ADVERTENCIA: Esto descarta TODOS los cambios posteriores al backup.
+ADVERTENCIA: Esto descarta TODOS los cambios de codigo posteriores al backup.
+Los DATOS (textos en PostgreSQL) NO se tocan — eso lo maneja el Auto-Fix.
 """
 from __future__ import annotations
 import subprocess
@@ -31,13 +34,17 @@ def run(cmd: str) -> tuple[int, str]:
     return result.returncode, output
 
 
+# Punto de restauracion actual. Actualizar cuando se cree un nuevo backup estable.
+BACKUP_TAG = "backup-estable-2026-08-28"
+
+
 def main():
     print("=" * 60)
-    print("  RESTAURACION DE BACKUP - 25/08/2026")
+    print("  RESTAURACION DE BACKUP")
     print("=" * 60)
     print()
-    print("  Este script restaurara el sistema al estado estable.")
-    print("  Tag: backup-estable-2026-08-25")
+    print("  Este script restaurara el CODIGO al estado estable.")
+    print(f"  Tag: {BACKUP_TAG}")
     print()
 
     confirm = input("  Continuar? (si/no): ").strip().lower()
@@ -54,7 +61,7 @@ def main():
     print("     OK")
 
     print("  2. Reseteando al backup...")
-    code, out = run("git reset --hard backup-estable-2026-08-25")
+    code, out = run(f"git reset --hard {BACKUP_TAG}")
     if code != 0:
         print(f"     Error: {out}")
         sys.exit(1)
@@ -69,7 +76,7 @@ def main():
 
     print("  4. Volviendo a develop...")
     run("git checkout develop")
-    run("git reset --hard backup-estable-2026-08-25")
+    run(f"git reset --hard {BACKUP_TAG}")
 
     print()
     print("=" * 60)
