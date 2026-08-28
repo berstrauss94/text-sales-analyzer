@@ -5069,7 +5069,7 @@ async function loadInforme() {
     container.innerHTML = '<div style="color:#555;">Cargando informe...</div>';
 
     try {
-        const resp = await fetch('/admin/informe?year=' + year + '&month=' + month + '&week=' + week + '&seller=' + seller);
+        const resp = await fetch('/admin/informe?year=' + year + '&month=' + month + '&week=' + week + '&seller=' + seller + '&_t=' + Date.now(), { cache: 'no-store' });
         if (!resp.ok) { container.innerHTML = '<div style="color:#f55b5b;">Error ' + resp.status + '</div>'; return; }
         const data = await resp.json();
         if (data.error) { container.innerHTML = '<div style="color:#f55b5b;">' + data.error + '</div>'; return; }
@@ -5155,7 +5155,7 @@ async function loadInforme() {
             const wk = data.filter_week;
             const startDay = (wk - 1) * 7 + 1;
             const endDay = (wk === 4) ? 31 : wk * 7;  // week 4 covers 22-31
-            lineTitle = 'Tendencia diaria — ' + months[data.filter_month] + ' · Semana ' + wk + ' (' + startDay + '-' + endDay + ')';
+            lineTitle = 'Tendencia diaria — ' + months[data.filter_month] + ' · Dias ' + startDay + ' al ' + endDay;
             const dusers = (data.filter_seller && data.filter_seller !== '_all')
                 ? [data.filter_seller] : Object.keys(data.daily || {});
             for (let d = startDay; d <= endDay; d++) {
@@ -6018,7 +6018,13 @@ def logout():
 def index():
     if not session.get("username"):
         return redirect(url_for("login_page"))
-    return render_template_string(HTML, username=session["username"], indicador_categorias_json=_INDICADOR_CATEGORIAS_JSON, all_users=[u for u in user_manager.list_users() if u not in ('admin', 'Vanesa_Admin', 'FedericoCeballos', 'MartinianoSosa', 'GarciaTania', 'Berna.Strauss')])
+    html = render_template_string(HTML, username=session["username"], indicador_categorias_json=_INDICADOR_CATEGORIAS_JSON, all_users=[u for u in user_manager.list_users() if u not in ('admin', 'Vanesa_Admin', 'FedericoCeballos', 'MartinianoSosa', 'GarciaTania', 'Berna.Strauss')])
+    # Prevent the browser from serving a stale cached page after each deploy.
+    resp = app.make_response(html)
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 @app.route("/analyze", methods=["POST"])
