@@ -6440,6 +6440,89 @@ def admin_dedup_all_texts():
     return jsonify(summary)
 
 
+@app.route("/admin/fix-dates/<username>")
+def admin_fix_dates(username):
+    """
+    Fix entries whose timestamp month/day does not match their day_label
+    (the DD/MM/YYYY the user actually assigned). Uses day_label as source of truth.
+    Only touches month and day — year is kept from day_label too. Admin only.
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+
+    from src.users.history_manager import fix_entry_date
+    from datetime import datetime as _dt, timezone as _tz
+
+    dry_run = request.args.get("dry_run", "0") == "1"
+    entries = get_flat_entries(username, limit=1000)
+
+    fixed = []
+    skipped_no_label = 0
+    already_ok = 0
+
+    for e in entries:
+        eid = e.get("id")
+        day_label = (e.get("day_label", "") or "").strip()
+        ts_str = str(e.get("timestamp", ""))
+
+        # day_label expected format: DD/MM/YYYY
+        if not day_label or "/" not in day_label:
+            skipped_no_label += 1
+            continue
+        try:
+            parts = day_label.split("/")
+            if len(parts) != 3:
+                skipped_no_label += 1
+                continue
+            d, m, y = int(parts[0]), int(parts[1]), int(parts[2])
+        except Exception:
+            skipped_no_label += 1
+            continue
+
+        # Parse current timestamp to compare and preserve time-of-day
+        try:
+            cur_ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
+        except Exception:
+            cur_ts = _dt.now(_tz.utc)
+
+        # If the timestamp already matches the day_label date, skip
+        if cur_ts.year == y and cur_ts.month == m and cur_ts.day == d:
+            already_ok += 1
+            continue
+
+        # Build corrected timestamp: date from day_label, time from original ts
+        try:
+            new_ts = _dt(y, m, d, cur_ts.hour, cur_ts.minute, cur_ts.second,
+                         cur_ts.microsecond, tzinfo=_tz.utc)
+        except Exception:
+            skipped_no_label += 1
+            continue
+
+        entry_info = {
+            "id": eid,
+            "entry_name": (e.get("entry_name", "") or e.get("audio_filename", ""))[:30],
+            "old_ts": ts_str[:19],
+            "day_label": day_label,
+            "new_ts": new_ts.isoformat()[:19],
+        }
+
+        if not dry_run:
+            if fix_entry_date(username, eid, new_ts):
+                fixed.append(entry_info)
+        else:
+            fixed.append(entry_info)
+
+    return jsonify({
+        "username": username,
+        "dry_run": dry_run,
+        "total_entries": len(entries),
+        "fixed_count": len(fixed),
+        "already_correct": already_ok,
+        "skipped_no_label": skipped_no_label,
+        "fixed": fixed,
+    })
+
+
 @app.route("/admin/test-texts/<username>")
 def admin_test_texts(username):
     """Test endpoint - returns entries without any year/month filter (admin only)."""
