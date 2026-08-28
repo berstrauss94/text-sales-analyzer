@@ -5622,21 +5622,6 @@ async function loadInforme() {
         card2Html += 'Los hallazgos aqui desarrollados deberan interpretarse como un insumo de apoyo para la toma de decisiones, la optimizacion de procesos de atencion y ventas, y la consolidacion de estandares de calidad en las interacciones evaluadas. La auditoria de grabaciones constituye una herramienta de retroalimentacion sistematica orientada al fortalecimiento de habilidades comunicacionales y comerciales.';
         card2Html += '</p>';
 
-        // Weekly breakdown if filter active
-        if (data.filter_month > 0 && data.weekly) {
-            card2Html += '<div style="margin-top:10px;padding:10px;background:#0d1018;border-radius:6px;border:1px solid #1a1d2e;">';
-            card2Html += '<div style="font-size:0.7rem;color:#888;font-weight:600;margin-bottom:6px;">Desglose semanal - ' + months[data.filter_month] + ':</div>';
-            const weekNames = ['', 'S1 (1-7)', 'S2 (8-14)', 'S3 (15-21)', 'S4 (22-31)'];
-            Object.keys(data.weekly).forEach(u => {
-                const wdata = data.weekly[u][data.filter_month];
-                if (wdata) {
-                    const wvals = weekNames.slice(1).map((wn, wi) => wn + ': ' + (wdata[wi+1] || 0)).join(' | ');
-                    card2Html += '<div style="font-size:0.68rem;color:#aaa;padding:2px 0;">' + u + ': ' + wvals + '</div>';
-                }
-            });
-            card2Html += '</div>';
-        }
-
         card2Html += '</div>';
 
         container.innerHTML = tableHtml + totalsHtml + lineHtml + pieHtml + complianceHtml + synthesisHtml + card2Html;
