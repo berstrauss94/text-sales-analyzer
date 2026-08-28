@@ -6760,6 +6760,41 @@ def admin_test_texts(username):
     return jsonify({"total_in_db": len(entries), "sample": result})
 
 
+@app.route("/admin/diagnose-days/<username>")
+def admin_diagnose_days(username):
+    """Show the resolved (year,month,day) of each entry for a given month (admin only).
+    Helps diagnose why the daily line chart misses some days."""
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users.history_manager import get_all_entries, resolve_entry_date
+    year = request.args.get("year", type=int) or 2026
+    month = request.args.get("month", type=int) or 0
+
+    entries = get_all_entries(username)
+    rows = []
+    day_counts = {}
+    for e in entries:
+        ey, em, ed = resolve_entry_date(e)
+        if ey == year and (month == 0 or em == month):
+            day_counts[ed] = day_counts.get(ed, 0) + 1
+            rows.append({
+                "name": (e.get("entry_name", "") or e.get("audio_filename", ""))[:30],
+                "resolved_day": ed,
+                "resolved_month": em,
+                "day_label": e.get("day_label", ""),
+                "timestamp": str(e.get("timestamp", ""))[:19],
+                "meta_year": e.get("year"),
+                "meta_month": e.get("month"),
+            })
+    rows.sort(key=lambda r: (r["resolved_day"] or 0))
+    return jsonify({
+        "username": username, "year": year, "month": month,
+        "total_in_month": len(rows),
+        "day_counts": {str(k): v for k, v in sorted(day_counts.items(), key=lambda x: (x[0] or 0))},
+        "entries": rows,
+    })
+
+
 @app.route("/admin/diagnose-count/<username>")
 def admin_diagnose_count(username):
     """Diagnose why list count differs from informe count (admin only)."""
