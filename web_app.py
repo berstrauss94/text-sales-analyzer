@@ -2279,7 +2279,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning</p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.6rem;opacity:0.5;">v5</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -3977,11 +3977,11 @@ async function loadSavedTexts() {
     }
 
     let url = adminUser
-        ? `/admin/user-texts/${adminUser}?year=${year}&month=${month}`
-        : `/saved-texts?year=${year}&month=${month}`;
+        ? `/admin/user-texts/${adminUser}?year=${year}&month=${month}&_t=${Date.now()}`
+        : `/saved-texts?year=${year}&month=${month}&_t=${Date.now()}`;
 
     try {
-        const response = await fetch(url);
+        const response = await fetch(url, { cache: 'no-store' });
         const data = await response.json();
         const select = document.getElementById('selectText');
         const count = document.getElementById('savedTextsCount');
