@@ -6459,6 +6459,80 @@ def admin_test_texts(username):
     return jsonify({"total_in_db": len(entries), "sample": result})
 
 
+@app.route("/admin/diagnose-count/<username>")
+def admin_diagnose_count(username):
+    """Diagnose why list count differs from informe count (admin only)."""
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from datetime import datetime as _dt
+    year = request.args.get("year", type=int) or 2026
+
+    entries = get_flat_entries(username, limit=1000)
+
+    total = len(entries)
+    con_year_valido = 0
+    con_month_valido = 0
+    sin_year = 0
+    sin_month = 0
+    year_distinto = 0
+    problematicas = []
+
+    for e in entries:
+        e_year = e.get("year")
+        e_month = e.get("month")
+        # Replicar extraccion desde timestamp
+        if e_year is None and e.get("timestamp"):
+            try:
+                ts_str = str(e["timestamp"])
+                if hasattr(e["timestamp"], "year"):
+                    e_year = e["timestamp"].year
+                    e_month = e["timestamp"].month
+                elif "T" in ts_str or "-" in ts_str:
+                    ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
+                    e_year = ts.year
+                    e_month = ts.month
+            except Exception:
+                pass
+
+        if e_year is None:
+            sin_year += 1
+        elif e_year != year:
+            year_distinto += 1
+        else:
+            con_year_valido += 1
+
+        if not e_month or not (1 <= (e_month or 0) <= 12):
+            sin_month += 1
+        else:
+            con_month_valido += 1
+
+        # Entradas que aparecen en lista pero NO en informe
+        # Lista: (not year or e_year == year) and (not month or e_month is None or e_month == month)
+        # Informe: e_year == year and e_month and 1<=e_month<=12
+        en_lista = (e_year == year)  # con year=2026, month=todos
+        en_informe = (e_year == year and e_month and 1 <= (e_month or 0) <= 12)
+        if en_lista and not en_informe:
+            problematicas.append({
+                "id": e.get("id", ""),
+                "entry_name": (e.get("entry_name", "") or e.get("audio_filename", ""))[:30],
+                "year": e_year,
+                "month": e_month,
+                "timestamp": str(e.get("timestamp", ""))[:20],
+            })
+
+    return jsonify({
+        "username": username,
+        "total_entries": total,
+        "con_year_valido": con_year_valido,
+        "year_distinto": year_distinto,
+        "sin_year": sin_year,
+        "con_month_valido": con_month_valido,
+        "sin_month_valido": sin_month,
+        "en_lista_pero_no_en_informe": len(problematicas),
+        "problematicas": problematicas,
+    })
+
+
 @app.route("/admin/user-texts/<username>")
 def admin_user_texts(username):
     """Return texts for a specific user filtered by year/month/fecha (admin only)."""
@@ -6719,28 +6793,35 @@ def admin_informe():
     weekly = {}
 
     for u in target_users:
-        entries = get_flat_entries(u, limit=500)
+        entries = get_flat_entries(u, limit=1000)
         matrix[u] = {m: 0 for m in range(1, 13)}
         weekly[u] = {m: {1: 0, 2: 0, 3: 0, 4: 0} for m in range(1, 13)}
         for e in entries:
             e_year = e.get("year")
             e_month = e.get("month")
             e_day = None
-            if e_year is None and e.get("timestamp"):
+            # Always try to derive year/month/day from the timestamp when missing
+            if (e_year is None or not e_month) and e.get("timestamp"):
                 try:
                     ts_str = str(e["timestamp"])
                     if hasattr(e["timestamp"], "year"):
-                        e_year = e["timestamp"].year
-                        e_month = e["timestamp"].month
+                        e_year = e_year or e["timestamp"].year
+                        e_month = e_month or e["timestamp"].month
                         e_day = e["timestamp"].day if hasattr(e["timestamp"], "day") else None
                     elif "T" in ts_str or "-" in ts_str:
                         ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
-                        e_year = ts.year
-                        e_month = ts.month
+                        e_year = e_year or ts.year
+                        e_month = e_month or ts.month
                         e_day = ts.day
                 except Exception:
                     pass
-            if e_year == year and e_month and 1 <= e_month <= 12:
+            # Count the entry if it belongs to the requested year.
+            # If month is still unknown but the year matches, assign it to month 1
+            # so it is NOT silently dropped (this was causing count mismatches
+            # between the saved-texts list and the annual report).
+            if e_year == year:
+                if not e_month or not (1 <= e_month <= 12):
+                    e_month = 1  # fallback bucket so the entry is still counted
                 # Week filter
                 if e_day:
                     w = min(4, (e_day - 1) // 7 + 1)
