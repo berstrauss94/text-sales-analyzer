@@ -2419,20 +2419,31 @@ HTML = """
     <!-- ── INFORME DE SEGUIMIENTO ── -->
     <div class="input-section" id="informePanel" style="margin-top:20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-            <div style="font-size:0.85rem;font-weight:600;color:#5bf5a3;">&#128202; Informe de Seguimiento Anual</div>
+            <div style="font-size:0.85rem;font-weight:600;color:#5bf5a3;">&#128202; Informe de Seguimiento</div>
             <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                <select id="informePreset" onchange="applyInformePreset()" style="background:#101c2a;color:#5bd4f5;border:1px solid #2a3a4a;border-radius:6px;padding:6px 10px;font-size:0.78rem;font-weight:600;">
+                    <option value="anual" selected>Enero a la fecha</option>
+                    <option value="mes_actual">Mes en curso</option>
+                    <option value="s1">Mes en curso · Semana 1</option>
+                    <option value="s2">Mes en curso · Semana 2</option>
+                    <option value="s3">Mes en curso · Semana 3</option>
+                    <option value="s4">Mes en curso · Semana 4</option>
+                    <option value="s12">Mes en curso · Primeras 2 semanas</option>
+                    <option value="s123">Mes en curso · Primeras 3 semanas</option>
+                    <option value="custom">Personalizado</option>
+                </select>
                 <select id="informeYear" onchange="loadInforme()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.78rem;">
                     <option value="2026" selected>2026</option>
                     <option value="2025">2025</option>
                 </select>
-                <select id="informeMonth" onchange="loadInforme()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.78rem;">
+                <select id="informeMonth" onchange="_informeManualChange()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.78rem;">
                     <option value="0">Todos los meses</option>
                     <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
                     <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
                     <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
                     <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
                 </select>
-                <select id="informeWeek" onchange="loadInforme()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.78rem;">
+                <select id="informeWeek" onchange="_informeManualChange()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.78rem;">
                     <option value="0">Todas las semanas</option>
                     <option value="1">Semana 1 (1-7)</option>
                     <option value="2">Semana 2 (8-14)</option>
@@ -5201,6 +5212,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── Informe de Seguimiento ────────────────────────────────────────────────
 
+// Apply a quick period preset that adjusts the month/week selectors, then reload.
+function applyInformePreset() {
+    const preset = document.getElementById('informePreset');
+    if (!preset) return;
+    const v = preset.value;
+    const monthSel = document.getElementById('informeMonth');
+    const weekSel = document.getElementById('informeWeek');
+    const now = new Date();
+    const curMonth = now.getMonth() + 1;  // 1-12
+    window._informeWeekUpto = 0;  // reset cumulative-week filter
+
+    if (v === 'anual') {
+        // Enero a la fecha: all months, all weeks
+        if (monthSel) monthSel.value = '0';
+        if (weekSel) weekSel.value = '0';
+    } else if (v === 'mes_actual') {
+        if (monthSel) monthSel.value = String(curMonth);
+        if (weekSel) weekSel.value = '0';
+    } else if (v === 's1' || v === 's2' || v === 's3' || v === 's4') {
+        if (monthSel) monthSel.value = String(curMonth);
+        if (weekSel) weekSel.value = v.substring(1);  // exact week
+    } else if (v === 's12') {
+        if (monthSel) monthSel.value = String(curMonth);
+        if (weekSel) weekSel.value = '0';
+        window._informeWeekUpto = 2;  // weeks 1..2
+    } else if (v === 's123') {
+        if (monthSel) monthSel.value = String(curMonth);
+        if (weekSel) weekSel.value = '0';
+        window._informeWeekUpto = 3;  // weeks 1..3
+    } else if (v === 'custom') {
+        // leave selectors as they are; user drives them manually
+    }
+    loadInforme();
+}
+
+// If the user changes month/week manually, switch the preset to "Personalizado"
+function _informeManualChange() {
+    const preset = document.getElementById('informePreset');
+    if (preset) preset.value = 'custom';
+    window._informeWeekUpto = 0;
+    loadInforme();
+}
+
 async function loadInforme() {
     const year = document.getElementById('informeYear') ? document.getElementById('informeYear').value : '2026';
     const month = document.getElementById('informeMonth') ? document.getElementById('informeMonth').value : '0';
@@ -5211,7 +5265,8 @@ async function loadInforme() {
     container.innerHTML = '<div style="color:#555;">Cargando informe...</div>';
 
     try {
-        const resp = await fetch('/admin/informe?year=' + year + '&month=' + month + '&week=' + week + '&seller=' + seller + '&_t=' + Date.now(), { cache: 'no-store' });
+        const weekUpto = window._informeWeekUpto || 0;
+        const resp = await fetch('/admin/informe?year=' + year + '&month=' + month + '&week=' + week + '&week_upto=' + weekUpto + '&seller=' + seller + '&_t=' + Date.now(), { cache: 'no-store' });
         if (!resp.ok) { container.innerHTML = '<div style="color:#f55b5b;">Error ' + resp.status + '</div>'; return; }
         const data = await resp.json();
         if (data.error) { container.innerHTML = '<div style="color:#f55b5b;">' + data.error + '</div>'; return; }
@@ -5396,6 +5451,27 @@ async function loadInforme() {
         const cmName = months[cm] || 'mes actual';
         const cmTotal = data.totals_per_month[cm] || 0;
         const activeUsers = users.length;
+
+        // Build a readable label of the ACTIVE period so the whole report reflects
+        // exactly what is being filtered (professional presentation requirement).
+        const monthFullNames = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        let periodLabel;
+        const _fm = data.filter_month || 0;
+        const _fw = data.filter_week || 0;
+        const _wu = data.week_upto || 0;
+        const _weekRanges = { 1: '1 al 7', 2: '8 al 14', 3: '15 al 21', 4: '22 al 31' };
+        if (_fm === 0) {
+            periodLabel = 'Enero a la fecha · ' + year;
+        } else if (_fw > 0) {
+            periodLabel = monthFullNames[_fm] + ' ' + year + ' · Semana ' + _fw + ' (dias ' + (_weekRanges[_fw] || '') + ')';
+        } else if (_wu > 0) {
+            periodLabel = monthFullNames[_fm] + ' ' + year + ' · Primeras ' + _wu + ' semanas (dias 1 al ' + (_wu * 7) + ')';
+        } else {
+            periodLabel = monthFullNames[_fm] + ' ' + year + ' · mes completo';
+        }
+        const sellerLabel = (data.filter_seller && data.filter_seller !== '_all')
+            ? data.filter_seller : 'todo el equipo';
         const cumpleCount = data.cumplen.length;
         const noCumpleCount = data.no_cumplen.length;
         const cumplePct = activeUsers > 0 ? Math.round((cumpleCount / activeUsers) * 100) : 0;
@@ -5413,29 +5489,32 @@ async function loadInforme() {
         const lowPerformers = users.filter(u => (data.matrix[u][cm] || 0) < meta && (data.matrix[u][cm] || 0) > 0);
         const zeroPerformers = users.filter(u => (data.matrix[u][cm] || 0) === 0);
 
-        let synthesisHtml = '<div style="margin-top:14px;padding:18px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;border-left:3px solid #4a6cf7;">';
-        synthesisHtml += '<div style="font-size:0.78rem;color:#e0e0e0;font-weight:600;margin-bottom:6px;">Mi Primer Casa S.A.</div>';
-        synthesisHtml += '<div style="font-size:0.68rem;color:#888;margin-bottom:14px;">Informe de Auditoria de Grabacion y Transcripciones - ' + cmName + ' ' + year + '</div>';
+        const _todayStr = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
+        let synthesisHtml = '<div style="margin-top:14px;padding:22px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;border-left:3px solid #4a6cf7;">';
+        synthesisHtml += '<div style="font-size:0.95rem;color:#fff;font-weight:700;letter-spacing:0.02em;margin-bottom:4px;">Mi Primer Casa S.A.</div>';
+        synthesisHtml += '<div style="font-size:0.72rem;color:#aaa;margin-bottom:2px;">Informe de Auditoria de Grabaciones y Transcripciones Comerciales</div>';
+        synthesisHtml += '<div style="font-size:0.7rem;color:#5bd4f5;margin-bottom:2px;font-weight:600;">Periodo analizado: ' + periodLabel + '</div>';
+        synthesisHtml += '<div style="font-size:0.66rem;color:#777;margin-bottom:2px;">Alcance: ' + sellerLabel + ' &nbsp;·&nbsp; Vendedores con actividad: ' + activeUsers + ' &nbsp;·&nbsp; Registros en el periodo: ' + data.total_general + '</div>';
+        synthesisHtml += '<div style="font-size:0.64rem;color:#666;margin-bottom:14px;">Emitido el ' + _todayStr + ' &nbsp;·&nbsp; Auditor responsable: Bernardo Strauss</div>';
         synthesisHtml += '<hr style="border:none;border-top:1px solid #2a2d3a;margin-bottom:14px;">';
 
-        // Paragraph 1: Introduction
+        // Section heading: 1. Objeto del informe
+        synthesisHtml += '<div style="font-size:0.72rem;color:#7b9cff;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">1. Objeto del informe</div>';
         synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.8;margin-bottom:12px;text-align:justify;">';
-        synthesisHtml += 'El presente informe tiene como finalidad documentar el proceso de seguimiento, evaluacion y analisis de las grabaciones de audio proporcionadas voluntariamente por los clientes al sistema de autoevaluacion. A traves de esta auditoria se busca determinar el nivel de calidad de las interacciones comerciales, comunicacionales y operativas registradas en dichos audios, permitiendo identificar fortalezas, oportunidades de mejora y patrones de desempeno relevantes para el desarrollo profesional de los Vendedores.';
+        synthesisHtml += 'El presente documento tiene por finalidad documentar de manera formal el proceso de seguimiento, evaluacion y analisis de las grabaciones de audio y transcripciones comerciales incorporadas al sistema de autoevaluacion durante el periodo <strong style="color:#e0e0e0;">' + periodLabel + '</strong>. A traves de esta auditoria se procura determinar el nivel de calidad de las interacciones comerciales, comunicacionales y operativas registradas, identificando fortalezas consolidadas, oportunidades concretas de mejora y patrones de desempeno relevantes para el desarrollo profesional de los vendedores. El informe se circunscribe estrictamente al alcance seleccionado (' + sellerLabel + '), de modo que las cifras, graficos y conclusiones aqui expuestos corresponden unica y exclusivamente al recorte temporal y de personal definido en los filtros activos.';
         synthesisHtml += '</p>';
 
-        // Paragraph 2: Methodology
+        // Section heading: 2. Metodologia
+        synthesisHtml += '<div style="font-size:0.72rem;color:#7b9cff;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">2. Metodologia de evaluacion</div>';
         synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.8;margin-bottom:12px;text-align:justify;">';
-        synthesisHtml += 'El sistema realiza un analisis integral de cada grabacion considerando las respuestas emitidas, la estructura de la conversacion, la capacidad de deteccion de necesidades, el manejo de objeciones, la claridad del mensaje, el nivel de escucha activa, el grado de vinculacion con el interlocutor y otros indicadores previamente definidos dentro de los criterios de evaluacion establecidos.';
+        synthesisHtml += 'El sistema realiza un analisis integral de cada grabacion considerando las respuestas emitidas, la estructura de la conversacion, la capacidad de deteccion de necesidades, el manejo de objeciones, la claridad del mensaje, el nivel de escucha activa, el grado de vinculacion con el interlocutor y demas indicadores previamente definidos dentro de los criterios de evaluacion establecidos. Cada registro es procesado de forma independiente y sus metricas se consolidan luego a nivel individual y grupal, garantizando trazabilidad y comparabilidad entre periodos.';
         synthesisHtml += '</p>';
 
-        // Paragraph 3: Purpose
-        synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.8;margin-bottom:12px;text-align:justify;">';
-        synthesisHtml += 'Asimismo, el presente documento expone los resultados obtenidos a partir de la informacion procesada, proporcionando observaciones objetivas, metricas de desempeno y conclusiones fundamentadas que permitan al usuario comprender su situacion actual, medir su evolucion a lo largo del tiempo y disenar estrategias concretas de mejora continua.';
-        synthesisHtml += '</p>';
-
+        // Section heading: 3. Analisis de resultados
+        synthesisHtml += '<div style="font-size:0.72rem;color:#7b9cff;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">3. Analisis de resultados del periodo</div>';
         // Paragraph 4: Data-driven analysis
         synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.8;margin-bottom:12px;text-align:justify;">';
-        synthesisHtml += 'Como puede observarse en el consolidado final correspondiente al mes de <strong style="color:#e0e0e0;">' + cmName + '</strong>, el volumen total de audios cargados al sistema por parte de los vendedores ';
+        synthesisHtml += 'En el periodo analizado (<strong style="color:#e0e0e0;">' + periodLabel + '</strong>) se contabilizaron <strong style="color:#5bd4f5;">' + data.total_general + '</strong> registros correspondientes a ' + activeUsers + ' vendedor(es) con actividad. El volumen consolidado de audios y transcripciones cargados al sistema ';
         if (cmTotal >= meta * activeUsers * 0.7) {
             synthesisHtml += 'muestra un cumplimiento <strong style="color:#5bf5a3;">satisfactorio</strong> frente a las metas institucionales.';
         } else if (cmTotal >= meta * activeUsers * 0.3) {
@@ -5445,12 +5524,30 @@ async function loadInforme() {
         }
         synthesisHtml += ' Considerando que la metrica minima exigida para el cierre mensual es de <strong style="color:#5bf5a3;">' + meta + '</strong> audios por vendedor, ';
         if (cumpleCount > 0) {
-            synthesisHtml += 'se constata que solo el <strong style="color:#5bf5a3;">' + cumplePct + '%</strong> (' + cumpleCount + ' de ' + activeUsers + ') del equipo auditado logro alcanzar y superar el objetivo establecido.';
+            synthesisHtml += 'se constata que el <strong style="color:#5bf5a3;">' + cumplePct + '%</strong> (' + cumpleCount + ' de ' + activeUsers + ') del equipo auditado logro alcanzar y superar el objetivo establecido.';
         } else {
-            synthesisHtml += 'se constata que <strong style="color:#f55b5b;">ningun vendedor</strong> del equipo auditado logro alcanzar el objetivo establecido.';
+            synthesisHtml += 'se constata que <strong style="color:#f55b5b;">ningun vendedor</strong> del equipo auditado logro alcanzar el objetivo establecido dentro del recorte seleccionado.';
         }
         synthesisHtml += '</p>';
 
+        synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.8;margin-bottom:12px;text-align:justify;">';
+        synthesisHtml += 'Complementariamente, este documento expone los resultados obtenidos a partir de la informacion procesada, proporcionando observaciones objetivas, metricas de desempeno y conclusiones fundamentadas que permiten comprender la situacion actual del equipo, medir su evolucion a lo largo del tiempo y disenar estrategias concretas de mejora continua. La lectura combinada de la tabla mensual, el grafico de tendencia y la distribucion porcentual habilita una interpretacion tanto cuantitativa como cualitativa del desempeno.';
+        synthesisHtml += '</p>';
+
+        // Retained legacy variable to avoid breaking downstream references
+        synthesisHtml += '';
+        if (false) { synthesisHtml += 'Como puede observarse en el consolidado final correspondiente al mes de <strong style="color:#e0e0e0;">' + cmName + '</strong>, el volumen total de audios cargados al sistema por parte de los vendedores ';
+        if (cmTotal >= meta * activeUsers * 0.7) {
+            synthesisHtml += 'muestra un cumplimiento <strong style="color:#5bf5a3;">satisfactorio</strong> frente a las metas institucionales.';
+        } else if (cmTotal >= meta * activeUsers * 0.3) {
+            synthesisHtml += 'muestra un cumplimiento <strong style="color:#f5d75b;">parcial</strong> frente a las metas institucionales.';
+        } else {
+            synthesisHtml += 'muestra un cumplimiento <strong style="color:#f55b5b;">Insuficiente</strong> frente a las metas institucionales.';
+        }
+        }  // end legacy if(false) block
+
+        // Section heading: 4. Desempeno individual
+        synthesisHtml += '<div style="font-size:0.72rem;color:#7b9cff;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">4. Desempeno individual</div>';
         // Paragraph 5: Top performer detail
         if (topUser && topCount > 0) {
             synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.8;margin-bottom:12px;text-align:justify;">';
@@ -5477,9 +5574,18 @@ async function loadInforme() {
             synthesisHtml += '</p>';
         }
 
+        // Section heading: 5. Conclusiones
+        synthesisHtml += '<div style="font-size:0.72rem;color:#7b9cff;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">5. Conclusiones del periodo</div>';
         // Paragraph 7: Conclusion
         synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.8;margin-bottom:12px;text-align:justify;">';
-        synthesisHtml += 'Esta situacion evidencia una brecha profunda respecto a los indicadores de seguimiento definidos por la organizacion. La falta de registros por parte de la mayoria del personal impacta de forma directa y negativa en los procesos de evaluacion de calidad, limitando la disponibilidad de informacion para la mejora continua.';
+        synthesisHtml += 'Del analisis del periodo <strong style="color:#e0e0e0;">' + periodLabel + '</strong> se desprende que ';
+        if (cumplePct >= 70) {
+            synthesisHtml += 'el equipo mantiene un ritmo de carga acorde a los objetivos institucionales, lo que permite sostener una evaluacion de calidad continua y confiable. ';
+        } else if (cumplePct >= 30) {
+            synthesisHtml += 'el equipo presenta un cumplimiento heterogeneo: mientras algunos vendedores sostienen el ritmo esperado, otros requieren acompanamiento para alcanzar la meta. ';
+        } else {
+            synthesisHtml += 'existe una brecha significativa respecto a los indicadores de seguimiento definidos por la organizacion. La falta de registros por parte de la mayoria del personal impacta de forma directa en los procesos de evaluacion de calidad, limitando la disponibilidad de informacion para la mejora continua. ';
+        }
         synthesisHtml += '</p>';
 
         // Evaluation box
@@ -7393,7 +7499,8 @@ def admin_informe():
     year = request.args.get("year", type=int) or 2026
     meta_mensual = request.args.get("meta", type=int) or 30
     filter_month = request.args.get("month", type=int) or 0  # 0 = all months
-    filter_week = request.args.get("week", type=int) or 0    # 0 = all weeks
+    filter_week = request.args.get("week", type=int) or 0    # 0 = all weeks (exact week)
+    week_upto = request.args.get("week_upto", type=int) or 0  # >0 = weeks 1..N inclusive
     filter_seller = request.args.get("seller", "") or "_all"
 
     from src.users.history_manager import get_flat_entries
@@ -7432,8 +7539,10 @@ def admin_informe():
                     w = min(4, (e_day - 1) // 7 + 1)
                 else:
                     w = 1  # default to week 1 if no day info
-                # Apply week filter
+                # Apply week filter: exact week, or "up to week N" (cumulative)
                 if filter_week > 0 and w != filter_week:
+                    continue
+                if week_upto > 0 and w > week_upto:
                     continue
                 # Apply month filter
                 if filter_month > 0 and e_month != filter_month:
@@ -7472,6 +7581,7 @@ def admin_informe():
         "total_general": sum(totals_per_month.values()),
         "filter_month": filter_month,
         "filter_week": filter_week,
+        "week_upto": week_upto,
         "filter_seller": filter_seller,
     })
 
