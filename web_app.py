@@ -2466,6 +2466,13 @@ async function saveEntry() {
         document.getElementById('entryNameInput').value = '';
         // Refresh saved texts count
         loadSavedTexts();
+        // Real-time sync: refresh the Annual Panel and admin stats after saving
+        if (typeof loadInforme === 'function' && document.getElementById('informePanel')) {
+            loadInforme();
+        }
+        if (typeof loadAdminStats === 'function' && document.getElementById('adminStatsPanel')) {
+            loadAdminStats();
+        }
     } catch (e) {
         document.getElementById('results').innerHTML =
             '<div class="error-card">Error de conexion: ' + e.message + '</div>';
@@ -2480,6 +2487,7 @@ function clearAll() {
     document.getElementById('results').style.display = 'none';
     closeHighlightOverlay();
     clearManualHighlights();
+    window._resaltarActivo = false;
     _lastCommercialData = null;
 }
 
@@ -3374,6 +3382,21 @@ function renderTextProgressChart(c) {
         return '<div style="display:flex;align-items:center;gap:5px;font-size:0.65rem;"><div style="width:8px;height:8px;border-radius:2px;background:' + ind.color + ';"></div><span style="color:#aaa;">' + ind.label + ': ' + val + ' (' + pct + '%)</span></div>';
     }).join('');
 
+    // Action buttons row: toggle highlight all + print highlighted transcript
+    const btnRow =
+        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid #1e2130;">' +
+            '<button id="btnResaltarPalabras" type="button" onclick="toggleResaltarPalabras()" ' +
+                'style="background:linear-gradient(135deg,#2a2d3a,#1a1d27);border:1px solid #3a3d4a;color:#e0e0e0;' +
+                'padding:8px 16px;border-radius:7px;font-size:0.8rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">' +
+                '&#127752; Resaltar palabras' +
+            '</button>' +
+            '<button id="btnImprimirResaltado" type="button" onclick="imprimirTextoResaltado()" ' +
+                'style="display:none;background:linear-gradient(135deg,#1a3a2a,#0d2a1a);border:1px solid #2a5a3a;color:#5bf5a3;' +
+                'padding:8px 16px;border-radius:7px;font-size:0.8rem;font-weight:600;cursor:pointer;align-items:center;gap:6px;">' +
+                '&#128424; Imprimir texto resaltado' +
+            '</button>' +
+        '</div>';
+
     return '<div style="margin-top:16px;padding:14px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">' +
         '<div style="font-size:0.75rem;color:#888;font-weight:600;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em;">Distribucion de Indicadores — Este Texto</div>' +
         '<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center;">' +
@@ -3383,6 +3406,7 @@ function renderTextProgressChart(c) {
             '</div>' +
             '<div style="display:flex;flex-direction:column;gap:4px;">' + legend + '</div>' +
         '</div>' +
+        btnRow +
     '</div>';
 }
 
@@ -4588,6 +4612,146 @@ function closeHighlightOverlay() {
     closeBtn.classList.remove('active');
 }
 
+// ── RESALTAR PALABRAS (toggle all detected keywords with category colors) ──
+window._resaltarActivo = false;
+
+// Build HTML highlighting ALL detected keywords across ALL categories at once,
+// each with its own category color class (hl-<indicatorKey>).
+function buildAllHighlightedText(text) {
+    function normalize(str) {
+        return str.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase();
+    }
+    const normalizedText = normalize(text);
+
+    // Collect matches from every category present in _lastCommercialData.detalle
+    const detalle = (_lastCommercialData && _lastCommercialData.detalle) || {};
+    let matches = [];  // {start, end, key}
+    Object.keys(detalle).forEach(function(key) {
+        const words = Object.keys(detalle[key] || {});
+        for (const word of words) {
+            if (key === 'respuestas_afirmativas' && word === 'si') {
+                const patterns = [
+                    /(?:^|[.!?\\n]\\s*)si(?:\\s*[,.]|\\s*$)/gim,
+                    /(?:^|[.!?\\n]\\s*)si,\\s/gim,
+                    /(?:^|[.!?\\n]\\s*)si[.!]/gim,
+                ];
+                for (const pat of patterns) {
+                    let mm;
+                    while ((mm = pat.exec(normalizedText)) !== null) {
+                        const siIdx = mm[0].toLowerCase().indexOf('si');
+                        const start = mm.index + siIdx;
+                        matches.push({ start: start, end: start + 2, key: key });
+                    }
+                }
+                continue;
+            }
+            const nw = normalize(word);
+            const esc = nw.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
+            let regex;
+            if (nw.split(' ').length > 3) {
+                regex = new RegExp(esc, 'gi');
+            } else {
+                regex = new RegExp('(?<![a-z])' + esc + '(?![a-z])', 'gi');
+            }
+            let m;
+            while ((m = regex.exec(normalizedText)) !== null) {
+                matches.push({ start: m.index, end: m.index + m[0].length, key: key });
+            }
+        }
+    });
+
+    if (matches.length === 0) return null;
+
+    // Sort by start; drop overlaps (keep the first / longest-anchored match)
+    matches.sort((a, b) => a.start - b.start || b.end - a.end);
+    const merged = [];
+    let lastEnd = -1;
+    for (const m of matches) {
+        if (m.start >= lastEnd) {
+            merged.push(m);
+            lastEnd = m.end;
+        }
+    }
+
+    let result = '';
+    let lastIdx = 0;
+    for (const m of merged) {
+        result += escapeHtml(text.substring(lastIdx, m.start));
+        result += '<span class="hl-' + m.key + '">' + escapeHtml(text.substring(m.start, m.end)) + '</span>';
+        lastIdx = m.end;
+    }
+    result += escapeHtml(text.substring(lastIdx));
+
+    // Role highlighting
+    result = result.replace(/(Vendedor)/g, '<span style="color:#5bf5a3;font-weight:700;">$1</span>');
+    result = result.replace(/(Cliente(?:\\s*\\d*)?)/g, '<span style="color:#f5a35b;font-weight:700;">$1</span>');
+    return result;
+}
+
+function toggleResaltarPalabras() {
+    const btn = document.getElementById('btnResaltarPalabras');
+    const printBtn = document.getElementById('btnImprimirResaltado');
+    const overlay = document.getElementById('highlightOverlay');
+    const closeBtn = document.getElementById('highlightCloseBtn');
+    const textarea = document.getElementById('textInput');
+    const wrapper = document.getElementById('textareaWrapper');
+    if (!overlay || !textarea) return;
+
+    if (window._resaltarActivo) {
+        // Turn OFF
+        closeHighlightOverlay();
+        window._resaltarActivo = false;
+        if (btn) { btn.style.background = 'linear-gradient(135deg,#2a2d3a,#1a1d27)'; btn.style.color = '#e0e0e0'; }
+        if (printBtn) printBtn.style.display = 'none';
+        return;
+    }
+
+    // Turn ON
+    const text = textarea.value;
+    if (!text) return;
+    const html = buildAllHighlightedText(text);
+    if (!html) {
+        // Nothing detected — brief feedback
+        if (btn) { btn.textContent = 'Sin palabras detectadas'; setTimeout(function(){ btn.innerHTML = '\\u{1F308} Resaltar palabras'; }, 1500); }
+        return;
+    }
+    overlay.innerHTML = html;
+    overlay.classList.add('active');
+    if (closeBtn) closeBtn.classList.add('active');
+    window._resaltarActivo = true;
+    if (btn) { btn.style.background = 'linear-gradient(135deg,#4a6cf7,#3a5ae0)'; btn.style.color = '#fff'; }
+    if (printBtn) printBtn.style.display = 'inline-flex';
+
+    // Scroll/focus the transcript box
+    if (wrapper) wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function imprimirTextoResaltado() {
+    const overlay = document.getElementById('highlightOverlay');
+    if (!overlay || !overlay.innerHTML) return;
+    const styledHtml = overlay.innerHTML;
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write('<html><head><title>Texto Resaltado</title><style>');
+    w.document.write('@page { size: A4; margin: 2cm; }');
+    w.document.write('body { font-family: "Segoe UI", sans-serif; line-height: 1.7; font-size: 12px; color: #111; white-space: pre-wrap; word-wrap: break-word; }');
+    w.document.write('h1 { font-size: 16px; font-weight: 600; margin-bottom: 12px; }');
+    // Highlight classes with printable colors (backgrounds tuned for white paper)
+    w.document.write('.hl-palabras_positivas{background:#fff9b0;padding:0 2px;border-radius:3px;}');
+    w.document.write('.hl-respuestas_afirmativas{background:#b6f0c4;padding:0 2px;border-radius:3px;}');
+    w.document.write('.hl-indicios_cierre{background:#ffd9a0;padding:0 2px;border-radius:3px;}');
+    w.document.write('.hl-escasez_comercial{background:#f6c0f6;padding:0 2px;border-radius:3px;}');
+    w.document.write('.hl-pedidos_referidos{background:#dcc9fb;padding:0 2px;border-radius:3px;}');
+    w.document.write('.hl-objeciones{background:#f8bcbc;padding:0 2px;border-radius:3px;}');
+    w.document.write('.hl-indicios_prospeccion{background:#b8e6fb;padding:0 2px;border-radius:3px;}');
+    w.document.write('</style></head><body>');
+    w.document.write('<h1>Texto Resaltado — Analisis de Indicadores</h1>');
+    w.document.write('<div>' + styledHtml + '</div>');
+    w.document.write('</body></html>');
+    w.document.close();
+    setTimeout(function() { w.print(); }, 300);
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // Stubs for highlight-define (overridden in DOMContentLoaded)
 function trackTextSelection() {}
@@ -4977,6 +5141,81 @@ async function loadInforme() {
         pieHtml += '<div style="width:60px;height:60px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;"><span style="font-size:0.6rem;color:#aaa;">' + data.total_general + '</span></div></div>';
         pieHtml += '<div style="display:flex;flex-direction:column;gap:3px;">' + pieLegend + '</div></div>';
 
+        // ── LINE CHART (trend) — rendered ABOVE the pie chart ──
+        // If a month filter is active, show the weekly trend (S1-S4) for that month.
+        // Otherwise show the monthly trend (Jan-Dec). Reflects the active seller filter.
+        let lineLabels = [];
+        let lineValues = [];
+        let lineTitle = '';
+        if (data.filter_month > 0) {
+            lineTitle = 'Tendencia semanal — ' + months[data.filter_month];
+            const weekLabels = ['S1', 'S2', 'S3', 'S4'];
+            const weekTotals = [0, 0, 0, 0];
+            const wusers = (data.filter_seller && data.filter_seller !== '_all')
+                ? [data.filter_seller] : Object.keys(data.weekly || {});
+            wusers.forEach(u => {
+                const wd = (data.weekly[u] || {})[data.filter_month];
+                if (wd) {
+                    for (let wi = 1; wi <= 4; wi++) weekTotals[wi - 1] += (wd[wi] || 0);
+                }
+            });
+            lineLabels = weekLabels;
+            lineValues = weekTotals;
+        } else {
+            lineTitle = 'Tendencia mensual — ' + year;
+            for (let m = 1; m <= 12; m++) {
+                lineLabels.push(months[m]);
+                lineValues.push(data.totals_per_month[m] || 0);
+            }
+        }
+
+        // Build an SVG line chart
+        const lcW = 640, lcH = 180, lcPadL = 34, lcPadR = 14, lcPadT = 16, lcPadB = 26;
+        const plotW = lcW - lcPadL - lcPadR;
+        const plotH = lcH - lcPadT - lcPadB;
+        const maxV = Math.max(1, ...lineValues);
+        const n = lineValues.length;
+        const stepX = n > 1 ? plotW / (n - 1) : plotW;
+        let points = [];
+        for (let i = 0; i < n; i++) {
+            const x = lcPadL + (n > 1 ? i * stepX : plotW / 2);
+            const y = lcPadT + plotH - (lineValues[i] / maxV) * plotH;
+            points.push([x, y]);
+        }
+        // Grid lines (4 horizontal)
+        let gridSvg = '';
+        for (let g = 0; g <= 4; g++) {
+            const gy = lcPadT + (plotH / 4) * g;
+            const gv = Math.round(maxV - (maxV / 4) * g);
+            gridSvg += '<line x1="' + lcPadL + '" y1="' + gy + '" x2="' + (lcW - lcPadR) + '" y2="' + gy + '" stroke="#1e2130" stroke-width="1"/>';
+            gridSvg += '<text x="' + (lcPadL - 6) + '" y="' + (gy + 3) + '" text-anchor="end" font-size="9" fill="#666">' + gv + '</text>';
+        }
+        // Polyline path + area
+        const linePath = points.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+        let areaPath = '';
+        if (n > 0) {
+            areaPath = 'M' + points[0][0].toFixed(1) + ',' + (lcPadT + plotH);
+            points.forEach(p => { areaPath += ' L' + p[0].toFixed(1) + ',' + p[1].toFixed(1); });
+            areaPath += ' L' + points[n - 1][0].toFixed(1) + ',' + (lcPadT + plotH) + ' Z';
+        }
+        // Dots + x labels + value labels
+        let dotsSvg = '', xlabelsSvg = '', vlabelsSvg = '';
+        points.forEach((p, i) => {
+            dotsSvg += '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3.5" fill="#4a6cf7" stroke="#0a0c14" stroke-width="1.5"/>';
+            xlabelsSvg += '<text x="' + p[0].toFixed(1) + '" y="' + (lcH - 8) + '" text-anchor="middle" font-size="9" fill="#888">' + lineLabels[i] + '</text>';
+            if (lineValues[i] > 0) {
+                vlabelsSvg += '<text x="' + p[0].toFixed(1) + '" y="' + (p[1] - 7).toFixed(1) + '" text-anchor="middle" font-size="9" fill="#e0e0e0" font-weight="600">' + lineValues[i] + '</text>';
+            }
+        });
+        let lineHtml = '<div style="margin-top:14px;padding:12px 10px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
+        lineHtml += '<div style="font-size:0.72rem;color:#888;font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em;">' + lineTitle + (data.filter_seller && data.filter_seller !== '_all' ? ' · ' + data.filter_seller : '') + '</div>';
+        lineHtml += '<div style="width:100%;overflow-x:auto;"><svg viewBox="0 0 ' + lcW + ' ' + lcH + '" style="width:100%;min-width:420px;height:auto;display:block;">';
+        lineHtml += gridSvg;
+        if (areaPath) lineHtml += '<path d="' + areaPath + '" fill="rgba(74,108,247,0.12)"/>';
+        lineHtml += '<path d="' + linePath + '" fill="none" stroke="#4a6cf7" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+        lineHtml += dotsSvg + vlabelsSvg + xlabelsSvg;
+        lineHtml += '</svg></div></div>';
+
         // Compliance summary
         let complianceHtml = '<div style="margin-top:12px;padding:10px;background:#0a0c14;border:1px solid #1e2130;border-radius:8px;font-size:0.72rem;">';
         complianceHtml += '<div style="color:#888;margin-bottom:6px;">Meta mensual: <strong style="color:#5bf5a3;">' + meta + ' audios/vendedor</strong></div>';
@@ -5141,7 +5380,7 @@ async function loadInforme() {
 
         card2Html += '</div>';
 
-        container.innerHTML = tableHtml + totalsHtml + pieHtml + complianceHtml + synthesisHtml + card2Html;
+        container.innerHTML = tableHtml + totalsHtml + lineHtml + pieHtml + complianceHtml + synthesisHtml + card2Html;
     } catch (e) {
         container.innerHTML = '<div style="color:#f55b5b;">Error: ' + e.message + '</div>';
     }
