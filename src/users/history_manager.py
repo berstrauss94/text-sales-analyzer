@@ -334,6 +334,13 @@ def add_entry(
         logger.error(f"ERROR guardando entrada para {username}: {exc}")
         raise
 
+    # Best-effort automatic backup after a successful save. Never blocks the save.
+    try:
+        from src.users.backup_manager import maybe_auto_backup
+        maybe_auto_backup()
+    except Exception:
+        pass
+
     return entry
 
 
