@@ -5142,12 +5142,33 @@ async function loadInforme() {
         pieHtml += '<div style="display:flex;flex-direction:column;gap:3px;">' + pieLegend + '</div></div>';
 
         // ── LINE CHART (trend) — rendered ABOVE the pie chart ──
-        // If a month filter is active, show the weekly trend (S1-S4) for that month.
-        // Otherwise show the monthly trend (Jan-Dec). Reflects the active seller filter.
+        // Levels of detail, responding to the active filters:
+        //   • Month + Week selected  -> DAILY trend for the days of that week
+        //   • Month selected (no week)-> WEEKLY trend (S1-S4) of that month
+        //   • No month                -> MONTHLY trend (Jan-Dec)
+        // Always reflects the active seller filter.
         let lineLabels = [];
         let lineValues = [];
         let lineTitle = '';
-        if (data.filter_month > 0) {
+        if (data.filter_month > 0 && data.filter_week > 0) {
+            // DAILY breakdown for the selected week
+            const wk = data.filter_week;
+            const startDay = (wk - 1) * 7 + 1;
+            const endDay = (wk === 4) ? 31 : wk * 7;  // week 4 covers 22-31
+            lineTitle = 'Tendencia diaria — ' + months[data.filter_month] + ' · Semana ' + wk + ' (' + startDay + '-' + endDay + ')';
+            const dusers = (data.filter_seller && data.filter_seller !== '_all')
+                ? [data.filter_seller] : Object.keys(data.daily || {});
+            for (let d = startDay; d <= endDay; d++) {
+                let dayTotal = 0;
+                dusers.forEach(u => {
+                    const dd = data.daily[u] || {};
+                    dayTotal += (dd[d] || dd[String(d)] || 0);
+                });
+                lineLabels.push(String(d));
+                lineValues.push(dayTotal);
+            }
+        } else if (data.filter_month > 0) {
+            // WEEKLY trend for the month
             lineTitle = 'Tendencia semanal — ' + months[data.filter_month];
             const weekLabels = ['S1', 'S2', 'S3', 'S4'];
             const weekTotals = [0, 0, 0, 0];
@@ -5162,6 +5183,7 @@ async function loadInforme() {
             lineLabels = weekLabels;
             lineValues = weekTotals;
         } else {
+            // MONTHLY trend for the year
             lineTitle = 'Tendencia mensual — ' + year;
             for (let m = 1; m <= 12; m++) {
                 lineLabels.push(months[m]);
@@ -7077,8 +7099,10 @@ def admin_informe():
 
     # Build matrix: {username: {month: count}}
     # Also build weekly breakdown: {username: {month: {week: count}}}
+    # And a daily breakdown for the selected week: {username: {day: count}}
     matrix = {}
     weekly = {}
+    daily = {}  # per-user day-of-month counts, only populated when a week is selected
 
     from src.users.history_manager import get_all_entries, resolve_entry_date
 
@@ -7086,6 +7110,7 @@ def admin_informe():
         entries = get_all_entries(u)
         matrix[u] = {m: 0 for m in range(1, 13)}
         weekly[u] = {m: {1: 0, 2: 0, 3: 0, 4: 0} for m in range(1, 13)}
+        daily[u] = {}
         for e in entries:
             e_year, e_month, e_day = resolve_entry_date(e)
             # Count the entry if it belongs to the requested year.
@@ -7107,6 +7132,9 @@ def admin_informe():
                     continue
                 matrix[u][e_month] = matrix[u].get(e_month, 0) + 1
                 weekly[u][e_month][w] = weekly[u][e_month].get(w, 0) + 1
+                # Daily breakdown: only meaningful when a specific month+week are chosen
+                if filter_month > 0 and filter_week > 0 and e_day:
+                    daily[u][e_day] = daily[u].get(e_day, 0) + 1
 
     # Totals per month
     totals_per_month = {}
@@ -7126,6 +7154,7 @@ def admin_informe():
         "meta_mensual": meta_mensual,
         "matrix": matrix,
         "weekly": weekly,
+        "daily": daily,
         "totals_per_month": totals_per_month,
         "user_totals": user_totals,
         "current_month": eval_month,
