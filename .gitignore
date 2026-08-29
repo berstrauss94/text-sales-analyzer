@@ -16,6 +16,9 @@ env/
 # Temp files
 .kiro_tmp/
 
+# Hypothesis (property-based testing) cache
+.hypothesis/
+
 # OS
 .DS_Store
 Thumbs.db
