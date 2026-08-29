@@ -2590,7 +2590,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11 &middot; motion design</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11.1 &middot; entrada fluida</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -3618,6 +3618,8 @@ function renderResults(data, inputText) {
     el.style.display = 'block';
     // Focus-a-slice interactivity for the indicator distribution donut.
     setTimeout(function() { attachIndicatorPieInteractivity(); }, 0);
+    // Fluid staggered entrance for the freshly rendered analysis blocks.
+    setTimeout(function() { animateEntrance(el); }, 20);
 }
 
 function renderCommercial(c) {
@@ -5373,7 +5375,36 @@ document.addEventListener('touchend', function(e) {
 }, {passive: true});
 
 // Allow Ctrl+Enter to submit, and auto-analyze after 2s of inactivity
+// Motion Design entrance: fade+lift the main containers within `scope` in a
+// staggered cascade, so content reveals fluidly instead of appearing at once.
+// Reusable for page load AND for freshly rendered results.
+function animateEntrance(scope) {
+    // Respect users who prefer reduced motion.
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const root = scope || document;
+    const blocks = root.querySelectorAll(
+        '.input-section, .card, .commercial-section, .analysis-block, .result-grid > *, .history-entry'
+    );
+    let i = 0;
+    blocks.forEach(function(el) {
+        if (el.dataset.entered === '1') return;
+        el.dataset.entered = '1';
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(10px)';
+        el.style.transition = 'opacity 0.45s cubic-bezier(0.22,0.61,0.36,1), transform 0.45s cubic-bezier(0.22,0.61,0.36,1)';
+        const delay = Math.min(i * 55, 500);  // cap the cascade so nothing lags
+        i++;
+        setTimeout(function() {
+            el.style.opacity = '1';
+            el.style.transform = 'translateY(0)';
+        }, delay + 20);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    // Fluid entrance for the whole page on first load.
+    setTimeout(function() { animateEntrance(document); }, 30);
+
     let debounceTimer = null;
     const textarea = document.getElementById('textInput');
 
@@ -5997,6 +6028,8 @@ async function loadInforme() {
         container.innerHTML = tableHtml + totalsHtml + lineHtml + pieHtml + complianceHtml + synthesisHtml + card2Html;
         // Wire up chart interactivity now that the SVG/pie are in the DOM.
         setTimeout(function() { attachLineChartInteractivity(); attachPieInteractivity(); attachReportSectionInteractivity(); }, 0);
+        // Fluid staggered entrance for the report blocks.
+        setTimeout(function() { animateEntrance(container); }, 20);
     } catch (e) {
         container.innerHTML = '<div style="color:#f55b5b;">Error: ' + e.message + '</div>';
     }
