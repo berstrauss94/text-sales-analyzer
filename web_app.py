@@ -2282,7 +2282,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v7.1 &middot; deploy nuevo</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v8 &middot; impresion color</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5655,6 +5655,10 @@ function printInforme() {
     printWindow.document.write('<html><head><title>Informe Mi Primer Casa S.A.</title>');
     printWindow.document.write('<style>');
     printWindow.document.write('@page { size: A4; margin: 2cm 2.5cm; }');
+    // CRITICAL: force browsers to print colors and backgrounds at full saturation
+    // even when "Background graphics" is off. Without this the line chart, the
+    // blue numbers and the SVG fills print washed-out / pale.
+    printWindow.document.write('* { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }');
     printWindow.document.write('body { font-family: "Segoe UI", -apple-system, sans-serif; color: #222; line-height: 1.7; font-size: 12px; max-width: 100%; }');
     printWindow.document.write('.header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }');
     printWindow.document.write('.header h1 { font-size: 18px; font-weight: 400; color: #333; margin: 0; }');
@@ -5664,21 +5668,54 @@ function printInforme() {
     printWindow.document.write('hr { border: none; border-top: 1px solid #4a6cf7; margin: 12px 0; }');
     printWindow.document.write('table { width: 100%; border-collapse: collapse; font-size: 11px; margin: 12px 0; }');
     printWindow.document.write('th, td { border: 1px solid #ccc; padding: 5px 8px; text-align: center; }');
-    printWindow.document.write('th { background: #f5f5f5; font-weight: 600; }');
+    printWindow.document.write('th { background: #f5f5f5 !important; font-weight: 600; }');
     printWindow.document.write('p { text-align: justify; font-size: 12px; margin-bottom: 10px; }');
     printWindow.document.write('strong { color: #111; }');
     printWindow.document.write('.green { color: #1a7a3a; } .red { color: #c03030; } .yellow { color: #b08000; } .blue { color: #2a5af5; }');
+    // Keep SVG line-chart strokes/fills vivid on paper.
+    printWindow.document.write('svg { max-width: 100%; }');
+    printWindow.document.write('svg text { fill: #333 !important; }');
     printWindow.document.write('</style></head><body>');
     printWindow.document.write('<div class="header"><h1>Mi Primer Casa S.A.</h1><span class="date">' + dateStr + '</span></div>');
     printWindow.document.write('<div class="auditor">Auditor: Bernardo Strauss.</div>');
     printWindow.document.write('<div class="subtitle">Informe de Auditoria de Grabacion y Transcripciones ' + periodo + '.</div>');
     printWindow.document.write('<hr>');
-    // Strip dark-mode inline styles but preserve structure
+    // Adapt the dark-UI colors to WHITE PAPER. Goal: sheet stays white, and only
+    // the meaningful content (numbers, the blue line chart, highlighted words with
+    // their category colors) shows color — dark theme backgrounds become white and
+    // light-grey body text becomes dark so nothing prints pale or invisible.
     let cleanHtml = content.innerHTML;
-    cleanHtml = cleanHtml.replace(/style="[^"]*background:[^"]*"/g, '');
-    cleanHtml = cleanHtml.replace(/style="[^"]*color:#[0-9a-f]{3,6}[^"]*"/g, '');
-    cleanHtml = cleanHtml.replace(/border-left:[^;]*;?/g, '');
-    cleanHtml = cleanHtml.replace(/border-radius:[^;]*;?/g, '');
+
+    // Step A. All dark container/box backgrounds -> white sheet
+    const darkBgs = ['#0a0c14', '#0d1017', '#12141c', '#151823',
+                     '#0d1a0d', '#1a1a0d', '#1a0d0d'];
+    darkBgs.forEach(function(c) {
+        cleanHtml = cleanHtml.split('background:' + c).join('background:#ffffff');
+        cleanHtml = cleanHtml.split(c).join('#ffffff');
+    });
+
+    // Step B. Dark borders / grid strokes -> light grey, visible on white
+    ['#1e2130', '#232838', '#2a2d3a'].forEach(function(c) {
+        cleanHtml = cleanHtml.split(c).join('#d5d8e0');
+    });
+
+    // Step C. Light-grey body text meant for dark UI -> dark so it reads on paper
+    const grayText = { '#fff': '#111', '#ffffff': '#111', '#ccc': '#222',
+                       '#e0e0e0': '#222', '#aaa': '#555', '#888': '#555',
+                       '#777': '#666', '#666': '#666' };
+    Object.keys(grayText).forEach(function(g) {
+        cleanHtml = cleanHtml.split('color:' + g).join('color:' + grayText[g]);
+    });
+
+    // Step D. Semantic accents: keep them but darken the too-bright green/blue/yellow
+    //         so they contrast against white, staying vivid and print-safe.
+    const accentFix = { '#5bf5a3': '#1a7a3a', '#5bd4f5': '#1668a8',
+                        '#7b9cff': '#3a5ad6', '#f5d75b': '#a87f00' };
+    Object.keys(accentFix).forEach(function(a) {
+        cleanHtml = cleanHtml.split(a).join(accentFix[a]);
+    });
+    // Blue #4a6cf7, red #f55b5b and violet #b38bff already contrast on white so kept.
+
     printWindow.document.write(cleanHtml);
     printWindow.document.write('</body></html>');
     printWindow.document.close();
