@@ -1174,6 +1174,76 @@ HTML = """
             transform: scale(1.12);
             filter: drop-shadow(0 0 6px rgba(123, 156, 255, 0.6));
         }
+
+        /* ════════════════════════════════════════════════════════════════════
+           MOTION DESIGN — reusable entrance-animation utilities.
+           Moderate, fluid UI animations (300–600ms) with natural easing.
+           Add the class to any element to play its entrance once.
+           Respects prefers-reduced-motion (see the media query below).
+           ════════════════════════════════════════════════════════════════════ */
+
+        /* 1. .fade-in-smooth — gradual opacity fade with a soft upward lift.
+              Apply to cards, panels or text blocks as they appear. */
+        @keyframes fadeInSmooth {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in-smooth {
+            animation: fadeInSmooth 450ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+        }
+
+        /* 2. .graph-line-reveal — progressive stroke draw for SVG line charts.
+              Apply to an SVG <path>/<polyline>; the stroke "draws" itself.
+              Note: pathLength="1" on the SVG element normalizes the dash math. */
+        @keyframes graphLineReveal {
+            from { stroke-dashoffset: 1; }
+            to   { stroke-dashoffset: 0; }
+        }
+        .graph-line-reveal {
+            stroke-dasharray: 1;
+            stroke-dashoffset: 1;
+            animation: graphLineReveal 600ms ease-in-out forwards;
+        }
+
+        /* 3. .pie-chart-expand — circular reveal growing from the center.
+              Apply to a pie/donut container; it scales up while fading in. */
+        @keyframes pieChartExpand {
+            from { opacity: 0; transform: scale(0.6); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+        .pie-chart-expand {
+            transform-origin: center center;
+            animation: pieChartExpand 500ms cubic-bezier(0.34, 1.2, 0.64, 1) both;
+        }
+
+        /* 4. .staggered-entry — base for sequential delays on sibling items.
+              Put .staggered-entry on each child; the :nth-child rules below
+              cascade the animation-delay so items appear one after another. */
+        .staggered-entry {
+            animation: fadeInSmooth 400ms ease-in-out both;
+        }
+        .staggered-entry:nth-child(1) { animation-delay: 0ms; }
+        .staggered-entry:nth-child(2) { animation-delay: 60ms; }
+        .staggered-entry:nth-child(3) { animation-delay: 120ms; }
+        .staggered-entry:nth-child(4) { animation-delay: 180ms; }
+        .staggered-entry:nth-child(5) { animation-delay: 240ms; }
+        .staggered-entry:nth-child(6) { animation-delay: 300ms; }
+        .staggered-entry:nth-child(7) { animation-delay: 360ms; }
+        .staggered-entry:nth-child(8) { animation-delay: 420ms; }
+        .staggered-entry:nth-child(n+9) { animation-delay: 480ms; }
+
+        /* Accessibility: honor users who prefer reduced motion. */
+        @media (prefers-reduced-motion: reduce) {
+            .fade-in-smooth,
+            .graph-line-reveal,
+            .pie-chart-expand,
+            .staggered-entry {
+                animation: none !important;
+                opacity: 1 !important;
+                transform: none !important;
+                stroke-dashoffset: 0 !important;
+            }
+        }
         /* Buttons glow on hover (Analizar, Limpiar, Guardar, etc.) */
         button {
             transition: box-shadow 0.15s ease, transform 0.1s ease;
@@ -2520,7 +2590,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v10.7 &middot; porcion destacada</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11 &middot; motion design</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -3633,7 +3703,7 @@ function renderCommercial(c) {
         const missingPanel = '<div id="' + missingPanelId + '" style="display:none;margin-top:4px;padding:8px;background:#0a0c14;border:1px solid #2a1a1a;border-radius:8px;border-left:3px solid #f55b5b;' + scrollStyle + '"><div style="font-size:0.62rem;color:#f55b5b;font-weight:600;margin-bottom:4px;">Frases no detectadas (' + totalMissing + ')</div>' + missingHtml + '</div>';
 
         return `
-        <div>
+        <div class="staggered-entry">
             <div class="indicator-item has-detail"
                  style="border-top: 2px solid ${ind.color}; --accent: ${ind.color}; position:relative;"
                  onclick="toggleDetail('${detailId}', this);">
@@ -3767,7 +3837,7 @@ function renderTextProgressChart(c) {
     return '<div class="analysis-block" style="margin-top:16px;padding:14px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">' +
         '<div style="font-size:0.75rem;color:#888;font-weight:600;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em;">Distribucion de Indicadores — Este Texto</div>' +
         '<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center;">' +
-            '<div id="' + indPieId + '" style="position:relative;width:140px;height:140px;border-radius:50%;background:conic-gradient(' + gradientParts.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:transform 0.2s ease, box-shadow 0.2s ease;">' +
+            '<div id="' + indPieId + '" class="pie-chart-expand" style="position:relative;width:140px;height:140px;border-radius:50%;background:conic-gradient(' + gradientParts.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:transform 0.2s ease, box-shadow 0.2s ease;">' +
                 pctLabels +
                 '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60px;height:60px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;"><span style="font-size:0.6rem;color:#aaa;">' + total + ' ind.</span></div>' +
             '</div>' +
@@ -5604,7 +5674,7 @@ async function loadInforme() {
         });
 
         let pieHtml = '<div style="display:flex;align-items:center;gap:20px;justify-content:center;margin-top:14px;flex-wrap:wrap;">';
-        pieHtml += '<div id="' + pieId + '" style="width:140px;height:140px;border-radius:50%;background:conic-gradient(' + pieGradient.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;transition:transform 0.2s;">';
+        pieHtml += '<div id="' + pieId + '" class="pie-chart-expand" style="width:140px;height:140px;border-radius:50%;background:conic-gradient(' + pieGradient.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;transition:transform 0.2s;">';
         pieHtml += '<div style="width:60px;height:60px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;pointer-events:none;"><span id="' + pieId + '-center" style="font-size:0.6rem;color:#aaa;text-align:center;line-height:1.1;">' + data.total_general + '</span></div></div>';
         pieHtml += '<div style="display:flex;flex-direction:column;gap:2px;">' + pieLegend + '</div></div>';
         // Store base gradient so we can restore it after focusing a slice.
@@ -5718,7 +5788,7 @@ async function loadInforme() {
         });
         // Value readout box (updates on hover/tap)
         const lineHead = lineTitle + (data.filter_seller && data.filter_seller !== '_all' ? ' · ' + data.filter_seller : '');
-        let lineHtml = '<div style="margin-top:14px;padding:12px 10px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
+        let lineHtml = '<div class="fade-in-smooth" style="margin-top:14px;padding:12px 10px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
         lineHtml += '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px;">';
         lineHtml += '<div style="font-size:0.72rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">' + lineHead + '</div>';
         lineHtml += '<div id="' + lcId + '-readout" style="font-size:0.7rem;color:#7b9cff;font-weight:600;min-height:0.9rem;"></div>';
