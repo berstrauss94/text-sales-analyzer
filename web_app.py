@@ -1130,6 +1130,14 @@ HTML = """
             border-color: #7b9cff !important;
             box-shadow: 0 0 18px -5px rgba(123, 156, 255, 0.5);
         }
+        /* Commercial analysis container highlights when pointed at/tapped. */
+        .commercial-section {
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .commercial-section:hover {
+            border-color: #7b9cff;
+            box-shadow: 0 0 18px -5px rgba(123, 156, 255, 0.5);
+        }
         /* The small indicator donuts zoom slightly when pointed at/tapped. */
         .pie-chart-click {
             transition: transform 0.15s ease, filter 0.15s ease;
@@ -2484,7 +2492,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v10.4 &middot; interactividad completa</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v10.5 &middot; interactividad total</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
