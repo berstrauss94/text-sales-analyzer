@@ -1075,6 +1075,63 @@ HTML = """
             box-shadow: 0 0 18px -6px rgba(123, 156, 255, 0.5);
         }
 
+        /* ── GLOBAL HOVER for ALL content blocks (analysis, intent, pills,
+           questions, keywords, formula, narrative, etc.). Every information
+           container subtly lights up when pointed at or tapped. ────────── */
+        .ext-data-row,
+        .intent-detail-section,
+        .lead-extended-item,
+        .ext-data-pill,
+        .concept-detail-item,
+        .lead-ext-card,
+        .ext-question,
+        .input-preview {
+            transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .ext-data-row:hover,
+        .intent-detail-section:hover,
+        .lead-extended-item:hover,
+        .concept-detail-item:hover {
+            background: rgba(123, 156, 255, 0.06) !important;
+            border-color: #7b9cff !important;
+            box-shadow: 0 0 14px -5px rgba(123, 156, 255, 0.45);
+        }
+        .ext-data-pill:hover,
+        .lead-ext-card:hover {
+            border-color: #7b9cff !important;
+            box-shadow: 0 0 12px -4px rgba(123, 156, 255, 0.5);
+            transform: translateY(-1px);
+        }
+        .ext-data-pill,
+        .lead-ext-card {
+            transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+        }
+        .ext-question:hover {
+            background: rgba(123, 156, 255, 0.06);
+            border-left-color: #7b9cff !important;
+        }
+        .phrase-chip {
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+        .phrase-chip:hover {
+            transform: scale(1.08);
+            box-shadow: 0 0 8px -2px rgba(123, 156, 255, 0.6);
+        }
+        .input-preview:hover {
+            border-left-color: #7b9cff !important;
+            background: rgba(123, 156, 255, 0.04) !important;
+        }
+        /* Buttons glow on hover (Analizar, Limpiar, Guardar, etc.) */
+        button {
+            transition: box-shadow 0.15s ease, transform 0.1s ease;
+        }
+        button:hover {
+            box-shadow: 0 0 14px -4px rgba(123, 156, 255, 0.55);
+        }
+        button:active {
+            transform: scale(0.97);
+        }
+
         .card-info-icon {
             position: absolute;
             top: -2px;
@@ -2410,7 +2467,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v10.2 &middot; interactividad global</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v10.3 &middot; interactividad total</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
