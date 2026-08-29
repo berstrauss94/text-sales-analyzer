@@ -2520,7 +2520,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v10.6 &middot; preguntas + cajas</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v10.7 &middot; porcion destacada</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -3546,6 +3546,8 @@ function renderResults(data, inputText) {
         ${renderSaveConfirmation(data)}
     `;
     el.style.display = 'block';
+    // Focus-a-slice interactivity for the indicator distribution donut.
+    setTimeout(function() { attachIndicatorPieInteractivity(); }, 0);
 }
 
 function renderCommercial(c) {
@@ -3711,29 +3713,41 @@ function renderTextProgressChart(c) {
     ];
     const total = indicators.reduce((s, ind) => s + (c[ind.key] || 0), 0) || 1;
 
+    const indPieId = 'indpie_' + Math.random().toString(36).slice(2, 8);
     let gradientParts = [];
     let currentDeg = 0;
     let pctLabels = '';
-    indicators.forEach(ind => {
+    let indSegments = [];
+    indicators.forEach((ind, i) => {
         const val = c[ind.key] || 0;
         const pct = Math.round((val / total) * 100);
         const degSpan = (val / total) * 360;
         gradientParts.push(ind.color + ' ' + currentDeg + 'deg ' + (currentDeg + degSpan) + 'deg');
+        indSegments.push({ i: i, start: currentDeg, end: currentDeg + degSpan, color: ind.color });
         if (pct >= 5) {
             const midDeg = currentDeg + degSpan / 2;
             const rad = (midDeg - 90) * Math.PI / 180;
             const x = 50 + 35 * Math.cos(rad);
             const y = 50 + 35 * Math.sin(rad);
-            pctLabels += '<span style="position:absolute;left:' + x + '%;top:' + y + '%;transform:translate(-50%,-50%);font-size:0.6rem;color:#fff;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,0.9);pointer-events:none;">' + pct + '%</span>';
+            // Each % label is hoverable and focuses its slice (data-i links them).
+            pctLabels += '<span class="' + indPieId + '-pct" data-i="' + i + '" style="position:absolute;left:' + x + '%;top:' + y + '%;transform:translate(-50%,-50%);font-size:0.6rem;color:#fff;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,0.9);cursor:pointer;">' + pct + '%</span>';
         }
         currentDeg += degSpan;
     });
 
-    const legend = indicators.map(ind => {
+    const legend = indicators.map((ind, i) => {
         const val = c[ind.key] || 0;
         const pct = Math.round((val / total) * 100);
-        return '<div class="pie-legend-row" style="display:flex;align-items:center;gap:5px;font-size:0.65rem;padding:2px 5px;"><div style="width:8px;height:8px;border-radius:2px;background:' + ind.color + ';"></div><span style="color:#aaa;">' + ind.label + ': ' + val + ' (' + pct + '%)</span></div>';
+        const seg = indSegments[i];
+        return '<div class="pie-legend-row ' + indPieId + '-leg" data-i="' + i + '" data-start="' + seg.start.toFixed(2) + '" data-end="' + seg.end.toFixed(2) + '" data-col="' + ind.color + '" style="display:flex;align-items:center;gap:5px;font-size:0.65rem;padding:2px 5px;cursor:pointer;"><div style="width:8px;height:8px;border-radius:2px;background:' + ind.color + ';"></div><span style="color:#aaa;">' + ind.label + ': ' + val + ' (' + pct + '%)</span></div>';
     }).join('');
+
+    // Register this pie so its slice can be focused on hover/tap of a % or legend.
+    window._indPieInteractive = window._indPieInteractive || {};
+    window._indPieInteractive[indPieId] = {
+        base: 'conic-gradient(' + gradientParts.join(',') + ')',
+        segments: indSegments
+    };
 
     // Action buttons row: toggle highlight all + print highlighted transcript
     const btnRow =
@@ -3753,7 +3767,7 @@ function renderTextProgressChart(c) {
     return '<div class="analysis-block" style="margin-top:16px;padding:14px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">' +
         '<div style="font-size:0.75rem;color:#888;font-weight:600;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em;">Distribucion de Indicadores — Este Texto</div>' +
         '<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center;">' +
-            '<div style="position:relative;width:140px;height:140px;border-radius:50%;background:conic-gradient(' + gradientParts.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);">' +
+            '<div id="' + indPieId + '" style="position:relative;width:140px;height:140px;border-radius:50%;background:conic-gradient(' + gradientParts.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:transform 0.2s ease, box-shadow 0.2s ease;">' +
                 pctLabels +
                 '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60px;height:60px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;"><span style="font-size:0.6rem;color:#aaa;">' + total + ' ind.</span></div>' +
             '</div>' +
@@ -6037,6 +6051,61 @@ function attachPieInteractivity() {
             row.addEventListener('touchstart', function(ev) { ev.preventDefault(); focusSlice(row); }, { passive: false });
             row.addEventListener('click', function() { focusSlice(row); });
         });
+    });
+}
+
+// Indicator donut: hovering/tapping a % label inside the donut OR a legend row
+// makes that slice stand out above the others (rest dimmed to grey).
+function attachIndicatorPieInteractivity() {
+    const reg = window._indPieInteractive || {};
+    Object.keys(reg).forEach(function(id) {
+        const donut = document.getElementById(id);
+        if (!donut || donut.dataset.wired === '1') return;
+        donut.dataset.wired = '1';
+        const info = reg[id];
+        const legs = Array.prototype.slice.call(document.querySelectorAll('.' + id + '-leg'));
+        const pcts = Array.prototype.slice.call(document.querySelectorAll('.' + id + '-pct'));
+
+        function focusIndex(i) {
+            const seg = info.segments[i];
+            if (!seg) return;
+            // Rebuild the gradient: active slice keeps its color, the rest go grey.
+            const parts = info.segments.map(function(s) {
+                const col = (s.i === i) ? s.color : '#24272f';
+                return col + ' ' + s.start.toFixed(2) + 'deg ' + s.end.toFixed(2) + 'deg';
+            });
+            donut.style.background = 'conic-gradient(' + parts.join(',') + ')';
+            donut.style.transform = 'scale(1.05)';
+            donut.style.boxShadow = '0 6px 20px rgba(0,0,0,0.5), 0 0 22px -3px ' + seg.color + 'cc';
+            // Emphasize the matching legend row and % label.
+            legs.forEach(function(l) {
+                l.style.background = (parseInt(l.getAttribute('data-i'), 10) === i) ? 'rgba(255,255,255,0.10)' : '';
+                l.style.opacity = (parseInt(l.getAttribute('data-i'), 10) === i) ? '1' : '0.5';
+            });
+            pcts.forEach(function(p) {
+                const pi = parseInt(p.getAttribute('data-i'), 10);
+                p.style.opacity = (pi === i) ? '1' : '0.35';
+                p.style.transform = (pi === i) ? 'translate(-50%,-50%) scale(1.35)' : 'translate(-50%,-50%)';
+            });
+        }
+        function resetInd() {
+            donut.style.background = info.base;
+            donut.style.transform = 'scale(1)';
+            donut.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+            legs.forEach(function(l) { l.style.background = ''; l.style.opacity = ''; });
+            pcts.forEach(function(p) { p.style.opacity = ''; p.style.transform = 'translate(-50%,-50%)'; });
+        }
+
+        function bind(el) {
+            const i = parseInt(el.getAttribute('data-i'), 10);
+            el.style.transition = 'opacity 0.15s ease, transform 0.15s ease, background 0.15s ease';
+            el.addEventListener('mouseenter', function() { focusIndex(i); });
+            el.addEventListener('mouseleave', resetInd);
+            el.addEventListener('touchstart', function(ev) { ev.preventDefault(); focusIndex(i); }, { passive: false });
+            el.addEventListener('click', function() { focusIndex(i); });
+        }
+        legs.forEach(bind);
+        pcts.forEach(bind);
     });
 }
 
