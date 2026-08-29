@@ -945,31 +945,37 @@ HTML = """
             border-radius: 10px;
             padding: 16px;
             position: relative;
-            /* Fallback (no color-mix): plain elevation + inner highlight. */
+        }
+        /* Neo-morphic / neon depth applied to ALL main information bubbles.
+           Fallback (no color-mix): plain elevation + inner top highlight. */
+        .card,
+        .input-section {
             box-shadow: var(--depth-shadow), var(--depth-inset);
             transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
         }
-        /* Progressive enhancement: only browsers that support color-mix get the
-           neon halo tinted by --accent. Layered depth stays subtle and readable. */
+        /* Progressive enhancement: browsers with color-mix get the neon halo
+           tinted by --accent. Visible but still clean. */
         @supports (background: color-mix(in srgb, red, blue)) {
-            .card {
+            .card,
+            .input-section {
                 box-shadow:
                     var(--depth-shadow),
                     var(--depth-inset),
-                    0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent),
-                    0 0 14px -4px color-mix(in srgb, var(--accent) 30%, transparent);
+                    0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent),
+                    0 0 20px -2px color-mix(in srgb, var(--accent) 42%, transparent);
             }
-            .card:hover {
-                border-color: color-mix(in srgb, var(--accent) 45%, #2a2d3a);
+            .card:hover,
+            .input-section:hover {
+                border-color: color-mix(in srgb, var(--accent) 55%, #2a2d3a);
                 box-shadow:
                     var(--depth-shadow),
                     var(--depth-inset),
-                    0 0 0 1px color-mix(in srgb, var(--accent) 38%, transparent),
-                    0 0 22px -3px color-mix(in srgb, var(--accent) 45%, transparent);
+                    0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent),
+                    0 0 30px -1px color-mix(in srgb, var(--accent) 58%, transparent);
             }
         }
 
-        /* Depth for the other information bubbles. Each can set --accent inline
+        /* Depth for the smaller information bubbles. Each can set --accent inline
            to tint its own halo (e.g. indicator cards use their category color). */
         .indicator-item,
         .history-entry,
@@ -986,7 +992,8 @@ HTML = """
                 box-shadow:
                     0 4px 12px rgba(0, 0, 0, 0.4),
                     var(--depth-inset),
-                    0 0 10px -4px color-mix(in srgb, var(--accent) 30%, transparent);
+                    0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent),
+                    0 0 14px -3px color-mix(in srgb, var(--accent) 40%, transparent);
             }
             .indicator-item:hover,
             .history-entry:hover {
@@ -994,7 +1001,7 @@ HTML = """
                 box-shadow:
                     0 8px 18px rgba(0, 0, 0, 0.5),
                     var(--depth-inset),
-                    0 0 16px -3px color-mix(in srgb, var(--accent) 45%, transparent);
+                    0 0 20px -2px color-mix(in srgb, var(--accent) 55%, transparent);
             }
         }
 
@@ -2343,7 +2350,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v9 &middot; profundidad neon</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v9.1 &middot; neon visible</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
