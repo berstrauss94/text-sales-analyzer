@@ -2282,7 +2282,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v8.2 &middot; total verde/amarillo</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v8.3 &middot; colores solo impresion</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5322,9 +5322,9 @@ async function loadInforme() {
         let totalsHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">';
         for (let m = 1; m <= 12; m++) {
             const t = data.totals_per_month[m] || 0;
-            if (t > 0) totalsHtml += '<span style="background:#bfe3f5;border:1px solid #7fc4e6;border-radius:6px;padding:3px 8px;font-size:0.68rem;color:#0d0d0d;">' + months[m] + ': <strong style="color:#0d0d0d;">' + t + '</strong></span>';
+            if (t > 0) totalsHtml += '<span style="background:#0d0f18;border:1px solid #2a2d3a;border-radius:6px;padding:3px 8px;font-size:0.68rem;color:#aaa;">' + months[m] + ': <strong style="color:#e0e0e0;">' + t + '</strong></span>';
         }
-        totalsHtml += '<span style="background:#2e9e58;border:1px solid #248048;border-radius:6px;padding:3px 10px;font-size:0.68rem;color:#fff23d;font-weight:700;">Total ' + year + ': ' + data.total_general + '</span>';
+        totalsHtml += '<span style="background:#1a3a2a;border:1px solid #2a5a3a;border-radius:6px;padding:3px 10px;font-size:0.68rem;color:#5bf5a3;font-weight:700;">Total ' + year + ': ' + data.total_general + '</span>';
         totalsHtml += '</div>';
 
         // Pie chart (monthly distribution)
@@ -5332,7 +5332,7 @@ async function loadInforme() {
         for (let m = 1; m <= 12; m++) {
             if ((data.totals_per_month[m] || 0) > 0) monthsWithData.push(m);
         }
-        const pieColors = ['#fa8072', '#f5a35b', '#4a6cf7', '#f5d75b', '#5bc47a', '#e0645a', '#b38bff', '#5bd4f5', '#ff8c00', '#a35bf5', '#88cc88', '#cc8888'];
+        const pieColors = ['#4a6cf7', '#f5a35b', '#7b9cff', '#f5d75b', '#5bf5a3', '#f55b5b', '#b38bff', '#5bd4f5', '#ff8c00', '#a35bf5', '#88cc88', '#cc8888'];
         let pieGradient = [];
         let pieLegend = '';
         let currentDeg = 0;
@@ -5348,7 +5348,7 @@ async function loadInforme() {
 
         let pieHtml = '<div style="display:flex;align-items:center;gap:20px;justify-content:center;margin-top:14px;flex-wrap:wrap;">';
         pieHtml += '<div style="width:140px;height:140px;border-radius:50%;background:conic-gradient(' + pieGradient.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">';
-        pieHtml += '<div style="width:60px;height:60px;border-radius:50%;background:#ffffff;display:flex;align-items:center;justify-content:center;"><span style="font-size:0.62rem;color:#222;font-weight:700;">' + data.total_general + '</span></div></div>';
+        pieHtml += '<div style="width:60px;height:60px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;"><span style="font-size:0.6rem;color:#aaa;">' + data.total_general + '</span></div></div>';
         pieHtml += '<div style="display:flex;flex-direction:column;gap:3px;">' + pieLegend + '</div></div>';
 
         // ── LINE CHART (trend) — rendered ABOVE the pie chart ──
@@ -5685,6 +5685,24 @@ function printInforme() {
     // their category colors) shows color — dark theme backgrounds become white and
     // light-grey body text becomes dark so nothing prints pale or invisible.
     let cleanHtml = content.innerHTML;
+
+    // Step 0 (PRINT-ONLY re-skin). These specific pieces keep their dark colors
+    // on screen but get print-friendly colors here. Done BEFORE the generic
+    // passes so the shared hex codes (#aaa, #5bf5a3...) are already resolved.
+
+    // 0.1 Monthly cells: dark box -> light-blue box with black text (Ene: 92 ...)
+    //     The inner <strong style="color:#e0e0e0"> number becomes dark via Step C,
+    //     so it prints crisp/black on the light-blue cell.
+    cleanHtml = cleanHtml.split('background:#0d0f18;border:1px solid #2a2d3a;border-radius:6px;padding:3px 8px;font-size:0.68rem;color:#aaa;')
+                         .join('background:#bfe3f5;border:1px solid #7fc4e6;border-radius:6px;padding:3px 8px;font-size:0.68rem;color:#0d0d0d;');
+
+    // 0.2 "Total AAAA: N" pill: dark green -> lighter green with yellow text
+    cleanHtml = cleanHtml.split('background:#1a3a2a;border:1px solid #2a5a3a;border-radius:6px;padding:3px 10px;font-size:0.68rem;color:#5bf5a3;font-weight:700;')
+                         .join('background:#2e9e58;border:1px solid #248048;border-radius:6px;padding:3px 10px;font-size:0.68rem;color:#fff23d;font-weight:700;');
+
+    // 0.3 Donut center hole: dark disc -> white disc with dark number (no black heart)
+    cleanHtml = cleanHtml.split('width:60px;height:60px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;"><span style="font-size:0.6rem;color:#aaa;')
+                         .join('width:60px;height:60px;border-radius:50%;background:#ffffff;display:flex;align-items:center;justify-content:center;"><span style="font-size:0.62rem;color:#222;font-weight:700;');
 
     // Step A. All dark container/box backgrounds -> white sheet
     const darkBgs = ['#0a0c14', '#0d1017', '#12141c', '#151823',
