@@ -2,15 +2,19 @@
 """
 restore_backup.py - Restaurar el CODIGO al ultimo estado estable conocido.
 
-Punto de restauracion actual: backup-estable-2026-08-29-v10
+Punto de restauracion actual: backup-estable-2026-08-29-v11
 Ese backup incluye:
 - Carga de textos funcionando (SyntaxError del banner de backup resuelto)
 - Backups automaticos de DATOS activos (cada 10 guardados / 5 min) + Auto-Fix
 - Deteccion de perdida con alerta admin y restauracion entrada por entrada
 - Informe con filtros de periodo (Enero a la fecha, mes, semanas)
-- Graficos interactivos: line chart resalta la tendencia hacia atras al
-  hover/tap un punto (con readout y delta); pie con leyenda interactiva que
-  enfoca el mes en el donut. Touch-friendly.
+- Motion design: clases de animacion de entrada reutilizables
+  (fade-in-smooth, graph-line-reveal, pie-chart-expand, staggered-entry)
+  con easing suave y respeto a prefers-reduced-motion
+- Interactividad total: line chart resalta tendencia hacia atras; tortas
+  (informe e indicadores) destacan la porcion al apuntar %/leyenda; secciones
+  del informe, tablas, filas, selectores, tarjetas de analisis, preguntas
+  abiertas y cajas se resaltan al hover/tap. Touch-friendly.
 - Efecto neomorfico/neon en tarjetas (.card / .input-section)
 - Impresion del informe en hoja blanca con colores (numeros, grafico azul,
   palabras resaltadas); cuadrilla meses celeste, total verde/amarillo y donut
@@ -43,7 +47,7 @@ def run(cmd: str) -> tuple[int, str]:
 
 
 # Punto de restauracion actual. Actualizar cuando se cree un nuevo backup estable.
-BACKUP_TAG = "backup-estable-2026-08-29-v10"
+BACKUP_TAG = "backup-estable-2026-08-29-v11"
 
 
 def main():
