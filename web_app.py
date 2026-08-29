@@ -1037,6 +1037,44 @@ HTML = """
             color: #a9c2ff;
         }
 
+        /* ── GLOBAL INTERACTIVITY: subtle highlight on point/tap ──────────────
+           Table rows glow and lift, selects light up their border, and the admin
+           donut scales slightly when pointed at. Keeps everything readable. */
+        table tbody tr {
+            transition: background 0.15s ease, box-shadow 0.15s ease;
+        }
+        table tbody tr:hover {
+            background: rgba(123, 156, 255, 0.10) !important;
+            box-shadow: inset 3px 0 0 #7b9cff;
+        }
+        select:hover,
+        select:focus {
+            border-color: #7b9cff !important;
+            box-shadow: 0 0 12px -3px rgba(123, 156, 255, 0.6);
+            outline: none;
+        }
+        select { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+        /* Admin donut: gentle zoom + glow when pointed/tapped */
+        #statsPieChart {
+            transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+        }
+        #statsPieChart:hover,
+        #statsPieChart.pie-active {
+            transform: scale(1.05);
+            box-shadow: 0 8px 26px rgba(0,0,0,0.55), 0 0 24px -4px rgba(123,156,255,0.55);
+        }
+        /* Wrap the seller table so it reads as a framed, hover-aware block. */
+        .seller-table-frame {
+            border: 1px solid #2a2d3a;
+            border-radius: 10px;
+            padding: 4px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .seller-table-frame:hover {
+            border-color: #7b9cff;
+            box-shadow: 0 0 18px -6px rgba(123, 156, 255, 0.5);
+        }
+
         .card-info-icon {
             position: absolute;
             top: -2px;
@@ -2372,7 +2410,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v10.1 &middot; secciones interactivas</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v10.2 &middot; interactividad global</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5379,7 +5417,7 @@ async function loadInforme() {
         const meta = data.meta_mensual;
 
         // Table header
-        let tableHtml = '<div style="overflow-x:auto;max-height:400px;border:1px solid #2a2d3a;border-radius:8px;">';
+        let tableHtml = '<div class="seller-table-frame" style="overflow-x:auto;max-height:400px;border-radius:8px;">';
         tableHtml += '<table style="width:100%;border-collapse:collapse;font-size:0.72rem;">';
         tableHtml += '<thead><tr style="background:#111828;position:sticky;top:0;">';
         tableHtml += '<th style="padding:6px 8px;text-align:left;color:#888;border-bottom:1px solid #2a2d3a;">Vendedor</th>';
