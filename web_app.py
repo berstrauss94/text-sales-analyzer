@@ -1106,9 +1106,16 @@ HTML = """
         .lead-ext-card {
             transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
         }
+        .ext-question {
+            transition: background 0.18s ease, border-left-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease, transform 0.18s ease;
+        }
         .ext-question:hover {
-            background: rgba(123, 156, 255, 0.06);
+            background: rgba(123, 156, 255, 0.14) !important;
             border-left-color: #7b9cff !important;
+            border-left-width: 4px !important;
+            color: #e8eeff !important;
+            box-shadow: 0 0 14px -4px rgba(123, 156, 255, 0.55);
+            transform: translateX(2px);
         }
         .phrase-chip {
             transition: transform 0.1s ease, box-shadow 0.1s ease;
@@ -1137,6 +1144,27 @@ HTML = """
         .commercial-section:hover {
             border-color: #7b9cff;
             box-shadow: 0 0 18px -5px rgba(123, 156, 255, 0.5);
+        }
+        /* Recommendation box, probability formula and the lead-gap verdict box. */
+        .recomendacion-box,
+        .formula-result,
+        .lead-gap {
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        }
+        .recomendacion-box:hover,
+        .formula-result:hover,
+        .lead-gap:hover {
+            border-color: #7b9cff !important;
+            box-shadow: 0 0 16px -5px rgba(123, 156, 255, 0.55);
+        }
+        /* Pie legend rows (indicator distribution) glow on point/tap. */
+        .pie-legend-row {
+            transition: background 0.15s ease, box-shadow 0.15s ease;
+            border-radius: 5px;
+        }
+        .pie-legend-row:hover {
+            background: rgba(123, 156, 255, 0.1);
+            box-shadow: 0 0 10px -3px rgba(123, 156, 255, 0.5);
         }
         /* The small indicator donuts zoom slightly when pointed at/tapped. */
         .pie-chart-click {
@@ -2492,7 +2520,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v10.5 &middot; interactividad total</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v10.6 &middot; preguntas + cajas</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -3704,7 +3732,7 @@ function renderTextProgressChart(c) {
     const legend = indicators.map(ind => {
         const val = c[ind.key] || 0;
         const pct = Math.round((val / total) * 100);
-        return '<div style="display:flex;align-items:center;gap:5px;font-size:0.65rem;"><div style="width:8px;height:8px;border-radius:2px;background:' + ind.color + ';"></div><span style="color:#aaa;">' + ind.label + ': ' + val + ' (' + pct + '%)</span></div>';
+        return '<div class="pie-legend-row" style="display:flex;align-items:center;gap:5px;font-size:0.65rem;padding:2px 5px;"><div style="width:8px;height:8px;border-radius:2px;background:' + ind.color + ';"></div><span style="color:#aaa;">' + ind.label + ': ' + val + ' (' + pct + '%)</span></div>';
     }).join('');
 
     // Action buttons row: toggle highlight all + print highlighted transcript
