@@ -2350,7 +2350,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v9.1 &middot; neon visible</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v10 &middot; graficos interactivos</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5405,19 +5405,30 @@ async function loadInforme() {
         let pieLegend = '';
         let currentDeg = 0;
         const totalForPie = data.total_general || 1;
+        const pieId = 'pie_' + Math.random().toString(36).slice(2, 8);
         monthsWithData.forEach((m, i) => {
             const val = data.totals_per_month[m];
             const pct = (val / totalForPie * 100).toFixed(1);
             const deg = val / totalForPie * 360;
-            pieGradient.push(pieColors[i % pieColors.length] + ' ' + currentDeg + 'deg ' + (currentDeg + deg) + 'deg');
-            pieLegend += '<div style="display:flex;align-items:center;gap:4px;font-size:0.65rem;"><div style="width:8px;height:8px;border-radius:2px;background:' + pieColors[i % pieColors.length] + ';"></div><span style="color:#aaa;">' + months[m] + ': ' + pct + '% (' + val + ')</span></div>';
+            const col = pieColors[i % pieColors.length];
+            pieGradient.push(col + ' ' + currentDeg + 'deg ' + (currentDeg + deg) + 'deg');
+            // Interactive legend row: hover/click focuses that month on the donut.
+            pieLegend += '<div class="' + pieId + '-leg" data-i="' + i + '" data-start="' + currentDeg.toFixed(2) + '" data-end="' + (currentDeg + deg).toFixed(2) + '" data-col="' + col + '" style="display:flex;align-items:center;gap:5px;font-size:0.65rem;cursor:pointer;padding:2px 5px;border-radius:5px;transition:background 0.15s;">' +
+                '<div style="width:9px;height:9px;border-radius:2px;background:' + col + ';flex:none;"></div>' +
+                '<span style="color:#aaa;">' + months[m] + ': ' + pct + '% (' + val + ')</span></div>';
             currentDeg += deg;
         });
 
         let pieHtml = '<div style="display:flex;align-items:center;gap:20px;justify-content:center;margin-top:14px;flex-wrap:wrap;">';
-        pieHtml += '<div style="width:140px;height:140px;border-radius:50%;background:conic-gradient(' + pieGradient.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">';
-        pieHtml += '<div style="width:60px;height:60px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;"><span style="font-size:0.6rem;color:#aaa;">' + data.total_general + '</span></div></div>';
-        pieHtml += '<div style="display:flex;flex-direction:column;gap:3px;">' + pieLegend + '</div></div>';
+        pieHtml += '<div id="' + pieId + '" style="width:140px;height:140px;border-radius:50%;background:conic-gradient(' + pieGradient.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;transition:transform 0.2s;">';
+        pieHtml += '<div style="width:60px;height:60px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;pointer-events:none;"><span id="' + pieId + '-center" style="font-size:0.6rem;color:#aaa;text-align:center;line-height:1.1;">' + data.total_general + '</span></div></div>';
+        pieHtml += '<div style="display:flex;flex-direction:column;gap:2px;">' + pieLegend + '</div></div>';
+        // Store base gradient so we can restore it after focusing a slice.
+        window._pieInteractive = window._pieInteractive || {};
+        window._pieInteractive[pieId] = {
+            base: 'conic-gradient(' + pieGradient.join(',') + ')',
+            total: data.total_general
+        };
 
         // ── LINE CHART (trend) — rendered ABOVE the pie chart ──
         // Levels of detail, responding to the active filters:
@@ -5498,23 +5509,47 @@ async function loadInforme() {
             points.forEach(p => { areaPath += ' L' + p[0].toFixed(1) + ',' + p[1].toFixed(1); });
             areaPath += ' L' + points[n - 1][0].toFixed(1) + ',' + (lcPadT + plotH) + ' Z';
         }
-        // Dots + x labels + value labels
-        let dotsSvg = '', xlabelsSvg = '', vlabelsSvg = '';
+        // Unique id so multiple renders / interactivity don't collide.
+        const lcId = 'lc_' + Math.random().toString(36).slice(2, 8);
+
+        // Per-segment paths (i-1 -> i) so we can highlight the trend BACKWARD
+        // from a hovered/tapped node to all previous nodes.
+        let segsSvg = '';
+        for (let i = 1; i < n; i++) {
+            const a = points[i - 1], b = points[i];
+            segsSvg += '<path class="' + lcId + '-seg" data-seg="' + i + '" d="M' + a[0].toFixed(1) + ',' + a[1].toFixed(1) +
+                       ' L' + b[0].toFixed(1) + ',' + b[1].toFixed(1) +
+                       '" fill="none" stroke="#4a6cf7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+        }
+        // Dots + x labels + value labels + big transparent hit targets (touch-friendly)
+        let dotsSvg = '', xlabelsSvg = '', vlabelsSvg = '', hitSvg = '';
         points.forEach((p, i) => {
-            dotsSvg += '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3.5" fill="#4a6cf7" stroke="#0a0c14" stroke-width="1.5"/>';
+            dotsSvg += '<circle class="' + lcId + '-dot" data-idx="' + i + '" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3.5" fill="#4a6cf7" stroke="#0a0c14" stroke-width="1.5"/>';
             xlabelsSvg += '<text x="' + p[0].toFixed(1) + '" y="' + (lcH - 8) + '" text-anchor="middle" font-size="9" fill="#888">' + lineLabels[i] + '</text>';
             if (lineValues[i] > 0) {
-                vlabelsSvg += '<text x="' + p[0].toFixed(1) + '" y="' + (p[1] - 7).toFixed(1) + '" text-anchor="middle" font-size="9" fill="#e0e0e0" font-weight="600">' + lineValues[i] + '</text>';
+                vlabelsSvg += '<text class="' + lcId + '-vlbl" data-idx="' + i + '" x="' + p[0].toFixed(1) + '" y="' + (p[1] - 7).toFixed(1) + '" text-anchor="middle" font-size="9" fill="#e0e0e0" font-weight="600">' + lineValues[i] + '</text>';
             }
+            // Large invisible hit area for comfortable hover/tap on mobile
+            hitSvg += '<circle class="' + lcId + '-hit" data-idx="' + i + '" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="16" fill="transparent" style="cursor:pointer;"/>';
         });
+        // Value readout box (updates on hover/tap)
+        const lineHead = lineTitle + (data.filter_seller && data.filter_seller !== '_all' ? ' · ' + data.filter_seller : '');
         let lineHtml = '<div style="margin-top:14px;padding:12px 10px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
-        lineHtml += '<div style="font-size:0.72rem;color:#888;font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em;">' + lineTitle + (data.filter_seller && data.filter_seller !== '_all' ? ' · ' + data.filter_seller : '') + '</div>';
-        lineHtml += '<div style="width:100%;overflow-x:auto;"><svg viewBox="0 0 ' + lcW + ' ' + lcH + '" style="width:100%;min-width:420px;height:auto;display:block;">';
+        lineHtml += '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px;">';
+        lineHtml += '<div style="font-size:0.72rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">' + lineHead + '</div>';
+        lineHtml += '<div id="' + lcId + '-readout" style="font-size:0.7rem;color:#7b9cff;font-weight:600;min-height:0.9rem;"></div>';
+        lineHtml += '</div>';
+        lineHtml += '<div style="width:100%;overflow-x:auto;"><svg id="' + lcId + '" viewBox="0 0 ' + lcW + ' ' + lcH + '" style="width:100%;min-width:420px;height:auto;display:block;touch-action:pan-y;">';
         lineHtml += gridSvg;
         if (areaPath) lineHtml += '<path d="' + areaPath + '" fill="rgba(74,108,247,0.12)"/>';
-        lineHtml += '<path d="' + linePath + '" fill="none" stroke="#4a6cf7" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
-        lineHtml += dotsSvg + vlabelsSvg + xlabelsSvg;
+        lineHtml += segsSvg;
+        lineHtml += dotsSvg + vlabelsSvg + xlabelsSvg + hitSvg;
         lineHtml += '</svg></div></div>';
+
+        // Interactivity: hovering/tapping a node highlights the trend backward.
+        // Registered after innerHTML is set (see the setTimeout at the end).
+        window._lcInteractive = window._lcInteractive || {};
+        window._lcInteractive[lcId] = { labels: lineLabels, values: lineValues };
 
         // Compliance summary
         let complianceHtml = '<div style="margin-top:12px;padding:10px;background:#0a0c14;border:1px solid #1e2130;border-radius:8px;font-size:0.72rem;">';
@@ -5706,9 +5741,133 @@ async function loadInforme() {
         card2Html += '</div>';
 
         container.innerHTML = tableHtml + totalsHtml + lineHtml + pieHtml + complianceHtml + synthesisHtml + card2Html;
+        // Wire up chart interactivity now that the SVG/pie are in the DOM.
+        setTimeout(function() { attachLineChartInteractivity(); attachPieInteractivity(); }, 0);
     } catch (e) {
         container.innerHTML = '<div style="color:#f55b5b;">Error: ' + e.message + '</div>';
     }
+}
+
+// Line-chart interactivity: hovering (desktop) or tapping (mobile) a data point
+// highlights the trend line BACKWARD from that node to all previous ones, dims
+// the rest, and shows a readout (label + value). Fully re-entrant per render.
+function attachLineChartInteractivity() {
+    const reg = window._lcInteractive || {};
+    Object.keys(reg).forEach(function(lcId) {
+        const svg = document.getElementById(lcId);
+        if (!svg || svg.dataset.wired === '1') return;
+        svg.dataset.wired = '1';
+        const info = reg[lcId];
+        const segs = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-seg'));
+        const dots = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-dot'));
+        const hits = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-hit'));
+        const readout = document.getElementById(lcId + '-readout');
+
+        function highlight(idx) {
+            // Segments up to idx (backward path) get the neon accent; rest dim.
+            segs.forEach(function(s) {
+                const seg = parseInt(s.getAttribute('data-seg'), 10); // segment i connects i-1 -> i
+                if (seg <= idx) {
+                    s.setAttribute('stroke', '#7b9cff');
+                    s.setAttribute('stroke-width', '3.5');
+                    s.style.filter = 'drop-shadow(0 0 4px rgba(123,156,255,0.8))';
+                } else {
+                    s.setAttribute('stroke', '#33384a');
+                    s.setAttribute('stroke-width', '2');
+                    s.style.filter = 'none';
+                }
+            });
+            dots.forEach(function(d) {
+                const di = parseInt(d.getAttribute('data-idx'), 10);
+                if (di <= idx) {
+                    d.setAttribute('r', di === idx ? '5.5' : '4');
+                    d.setAttribute('fill', '#7b9cff');
+                } else {
+                    d.setAttribute('r', '3');
+                    d.setAttribute('fill', '#33384a');
+                }
+            });
+            if (readout) {
+                const lbl = info.labels[idx];
+                const val = info.values[idx];
+                let txt = lbl + ': ' + val;
+                if (idx > 0) {
+                    const prev = info.values[idx - 1];
+                    const diff = val - prev;
+                    const arrow = diff > 0 ? '▲ +' + diff : (diff < 0 ? '▼ ' + diff : '● 0');
+                    txt += '  (' + arrow + ' vs ' + info.labels[idx - 1] + ')';
+                }
+                readout.textContent = txt;
+            }
+        }
+
+        function reset() {
+            segs.forEach(function(s) {
+                s.setAttribute('stroke', '#4a6cf7');
+                s.setAttribute('stroke-width', '2');
+                s.style.filter = 'none';
+            });
+            dots.forEach(function(d) {
+                d.setAttribute('r', '3.5');
+                d.setAttribute('fill', '#4a6cf7');
+            });
+            if (readout) readout.textContent = '';
+        }
+
+        hits.forEach(function(h) {
+            const idx = parseInt(h.getAttribute('data-idx'), 10);
+            h.addEventListener('mouseenter', function() { highlight(idx); });
+            h.addEventListener('mouseleave', reset);
+            h.addEventListener('touchstart', function(ev) {
+                ev.preventDefault();
+                highlight(idx);
+            }, { passive: false });
+            h.addEventListener('click', function() { highlight(idx); });
+        });
+    });
+}
+
+// Pie interactivity: hovering/tapping a legend row focuses that month's slice
+// on the donut (the rest is dimmed) and shows its value in the center hole.
+function attachPieInteractivity() {
+    const reg = window._pieInteractive || {};
+    Object.keys(reg).forEach(function(pieId) {
+        const donut = document.getElementById(pieId);
+        if (!donut || donut.dataset.wired === '1') return;
+        donut.dataset.wired = '1';
+        const info = reg[pieId];
+        const center = document.getElementById(pieId + '-center');
+        const rows = Array.prototype.slice.call(document.querySelectorAll('.' + pieId + '-leg'));
+
+        function focusSlice(row) {
+            const start = parseFloat(row.getAttribute('data-start'));
+            const end = parseFloat(row.getAttribute('data-end'));
+            const col = row.getAttribute('data-col');
+            // Highlight the active slice; dim everything else.
+            donut.style.background = 'conic-gradient(#20232e 0deg ' + start + 'deg, ' +
+                col + ' ' + start + 'deg ' + end + 'deg, #20232e ' + end + 'deg 360deg)';
+            donut.style.transform = 'scale(1.04)';
+            rows.forEach(function(r) { r.style.background = (r === row) ? 'rgba(255,255,255,0.08)' : ''; });
+            if (center) {
+                const label = row.textContent.trim();
+                center.style.fontSize = '0.5rem';
+                center.textContent = label;
+            }
+        }
+        function resetPie() {
+            donut.style.background = info.base;
+            donut.style.transform = 'scale(1)';
+            rows.forEach(function(r) { r.style.background = ''; });
+            if (center) { center.style.fontSize = '0.6rem'; center.textContent = info.total; }
+        }
+
+        rows.forEach(function(row) {
+            row.addEventListener('mouseenter', function() { focusSlice(row); });
+            row.addEventListener('mouseleave', resetPie);
+            row.addEventListener('touchstart', function(ev) { ev.preventDefault(); focusSlice(row); }, { passive: false });
+            row.addEventListener('click', function() { focusSlice(row); });
+        });
+    });
 }
 
 function printInforme() {
