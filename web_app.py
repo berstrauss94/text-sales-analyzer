@@ -396,6 +396,15 @@ HTML = """
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
+        /* Theme tokens for the neo-morphic / neon depth system.
+           --accent drives the neon glow; override it per-container to tint
+           the halo to that card's category color. */
+        :root {
+            --accent: #4a6cf7;
+            --depth-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+            --depth-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: #0f1117;
@@ -935,6 +944,58 @@ HTML = """
             border: 1px solid #2a2d3a;
             border-radius: 10px;
             padding: 16px;
+            position: relative;
+            /* Fallback (no color-mix): plain elevation + inner highlight. */
+            box-shadow: var(--depth-shadow), var(--depth-inset);
+            transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+        }
+        /* Progressive enhancement: only browsers that support color-mix get the
+           neon halo tinted by --accent. Layered depth stays subtle and readable. */
+        @supports (background: color-mix(in srgb, red, blue)) {
+            .card {
+                box-shadow:
+                    var(--depth-shadow),
+                    var(--depth-inset),
+                    0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent),
+                    0 0 14px -4px color-mix(in srgb, var(--accent) 30%, transparent);
+            }
+            .card:hover {
+                border-color: color-mix(in srgb, var(--accent) 45%, #2a2d3a);
+                box-shadow:
+                    var(--depth-shadow),
+                    var(--depth-inset),
+                    0 0 0 1px color-mix(in srgb, var(--accent) 38%, transparent),
+                    0 0 22px -3px color-mix(in srgb, var(--accent) 45%, transparent);
+            }
+        }
+
+        /* Depth for the other information bubbles. Each can set --accent inline
+           to tint its own halo (e.g. indicator cards use their category color). */
+        .indicator-item,
+        .history-entry,
+        .formula-result,
+        .recomendacion-box {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), var(--depth-inset);
+            transition: box-shadow 0.25s ease, transform 0.2s ease, border-color 0.25s ease;
+        }
+        @supports (background: color-mix(in srgb, red, blue)) {
+            .indicator-item,
+            .history-entry,
+            .formula-result,
+            .recomendacion-box {
+                box-shadow:
+                    0 4px 12px rgba(0, 0, 0, 0.4),
+                    var(--depth-inset),
+                    0 0 10px -4px color-mix(in srgb, var(--accent) 30%, transparent);
+            }
+            .indicator-item:hover,
+            .history-entry:hover {
+                transform: translateY(-1px);
+                box-shadow:
+                    0 8px 18px rgba(0, 0, 0, 0.5),
+                    var(--depth-inset),
+                    0 0 16px -3px color-mix(in srgb, var(--accent) 45%, transparent);
+            }
         }
 
         .card-title {
@@ -2282,7 +2343,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v8.3 &middot; colores solo impresion</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v9 &middot; profundidad neon</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -3395,7 +3456,7 @@ function renderCommercial(c) {
         return `
         <div>
             <div class="indicator-item has-detail"
-                 style="border-top: 2px solid ${ind.color}; position:relative;"
+                 style="border-top: 2px solid ${ind.color}; --accent: ${ind.color}; position:relative;"
                  onclick="toggleDetail('${detailId}', this);">
                 <span class="card-info-icon" style="position:absolute;top:2px;right:2px;font-size:0.55rem;width:14px;height:14px;line-height:14px;" onclick="event.stopPropagation()">!</span>
                 <div class="card-info-tooltip" style="top:18px;right:0;min-width:180px;max-width:220px;font-size:0.6rem;">${ind.desc}</div>
