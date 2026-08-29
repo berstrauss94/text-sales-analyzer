@@ -1015,6 +1015,28 @@ HTML = """
             position: relative;
         }
 
+        /* Report sections: highlight the whole section (title + paragraphs) when
+           hovered with the cursor or tapped on touch (.rep-active). Subtle glow
+           tied to the section accent (#7b9cff). Keeps text fully readable. */
+        .report-section {
+            padding: 8px 12px;
+            margin: 0 -12px 4px -12px;
+            border-radius: 8px;
+            border-left: 3px solid transparent;
+            transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            cursor: default;
+        }
+        .report-section:hover,
+        .report-section.rep-active {
+            background: rgba(123, 156, 255, 0.08);
+            border-left-color: #7b9cff;
+            box-shadow: 0 0 16px -6px rgba(123, 156, 255, 0.5);
+        }
+        .report-section:hover .rep-sec-title,
+        .report-section.rep-active .rep-sec-title {
+            color: #a9c2ff;
+        }
+
         .card-info-icon {
             position: absolute;
             top: -2px;
@@ -2350,7 +2372,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v10 &middot; graficos interactivos</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v10.1 &middot; secciones interactivas</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5615,19 +5637,19 @@ async function loadInforme() {
         synthesisHtml += '<hr style="border:none;border-top:1px solid #2a2d3a;margin-bottom:14px;">';
 
         // Section heading: 1. Objeto del informe
-        synthesisHtml += '<div style="font-size:0.72rem;color:#7b9cff;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">1. Objeto del informe</div>';
+        synthesisHtml += '<div class="rep-sec-title" style="font-size:0.72rem;color:#7b9cff;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">1. Objeto del informe</div>';
         synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.8;margin-bottom:12px;text-align:justify;">';
         synthesisHtml += 'El presente documento tiene por finalidad documentar de manera formal el proceso de seguimiento, evaluacion y analisis de las grabaciones de audio y transcripciones comerciales incorporadas al sistema de autoevaluacion durante el periodo <strong style="color:#e0e0e0;">' + periodLabel + '</strong>. A traves de esta auditoria se procura determinar el nivel de calidad de las interacciones comerciales, comunicacionales y operativas registradas, identificando fortalezas consolidadas, oportunidades concretas de mejora y patrones de desempeno relevantes para el desarrollo profesional de los vendedores. El informe se circunscribe estrictamente al alcance seleccionado (' + sellerLabel + '), de modo que las cifras, graficos y conclusiones aqui expuestos corresponden unica y exclusivamente al recorte temporal y de personal definido en los filtros activos.';
         synthesisHtml += '</p>';
 
         // Section heading: 2. Metodologia
-        synthesisHtml += '<div style="font-size:0.72rem;color:#7b9cff;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">2. Metodologia de evaluacion</div>';
+        synthesisHtml += '<div class="rep-sec-title" style="font-size:0.72rem;color:#7b9cff;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">2. Metodologia de evaluacion</div>';
         synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.8;margin-bottom:12px;text-align:justify;">';
         synthesisHtml += 'El sistema realiza un analisis integral de cada grabacion considerando las respuestas emitidas, la estructura de la conversacion, la capacidad de deteccion de necesidades, el manejo de objeciones, la claridad del mensaje, el nivel de escucha activa, el grado de vinculacion con el interlocutor y demas indicadores previamente definidos dentro de los criterios de evaluacion establecidos. Cada registro es procesado de forma independiente y sus metricas se consolidan luego a nivel individual y grupal, garantizando trazabilidad y comparabilidad entre periodos.';
         synthesisHtml += '</p>';
 
         // Section heading: 3. Analisis de resultados
-        synthesisHtml += '<div style="font-size:0.72rem;color:#7b9cff;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">3. Analisis de resultados del periodo</div>';
+        synthesisHtml += '<div class="rep-sec-title" style="font-size:0.72rem;color:#7b9cff;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">3. Analisis de resultados del periodo</div>';
         // Paragraph 4: Data-driven analysis
         synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.8;margin-bottom:12px;text-align:justify;">';
         synthesisHtml += 'En el periodo analizado (<strong style="color:#e0e0e0;">' + periodLabel + '</strong>) se contabilizaron <strong style="color:#5bd4f5;">' + data.total_general + '</strong> registros correspondientes a ' + activeUsers + ' vendedor(es) con actividad. El volumen consolidado de audios y transcripciones cargados al sistema ';
@@ -5652,7 +5674,7 @@ async function loadInforme() {
 
         // Retained legacy variable to avoid breaking downstream references
         // Section heading: 4. Desempeno individual
-        synthesisHtml += '<div style="font-size:0.72rem;color:#7b9cff;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">4. Desempeno individual</div>';
+        synthesisHtml += '<div class="rep-sec-title" style="font-size:0.72rem;color:#7b9cff;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">4. Desempeno individual</div>';
         // Paragraph 5: Top performer detail
         if (topUser && topCount > 0) {
             synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.8;margin-bottom:12px;text-align:justify;">';
@@ -5680,7 +5702,7 @@ async function loadInforme() {
         }
 
         // Section heading: 5. Conclusiones
-        synthesisHtml += '<div style="font-size:0.72rem;color:#7b9cff;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">5. Conclusiones del periodo</div>';
+        synthesisHtml += '<div class="rep-sec-title" style="font-size:0.72rem;color:#7b9cff;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">5. Conclusiones del periodo</div>';
         // Paragraph 7: Conclusion
         synthesisHtml += '<p style="font-size:0.76rem;color:#ccc;line-height:1.8;margin-bottom:12px;text-align:justify;">';
         synthesisHtml += 'Del analisis del periodo <strong style="color:#e0e0e0;">' + periodLabel + '</strong> se desprende que ';
@@ -5742,7 +5764,7 @@ async function loadInforme() {
 
         container.innerHTML = tableHtml + totalsHtml + lineHtml + pieHtml + complianceHtml + synthesisHtml + card2Html;
         // Wire up chart interactivity now that the SVG/pie are in the DOM.
-        setTimeout(function() { attachLineChartInteractivity(); attachPieInteractivity(); }, 0);
+        setTimeout(function() { attachLineChartInteractivity(); attachPieInteractivity(); attachReportSectionInteractivity(); }, 0);
     } catch (e) {
         container.innerHTML = '<div style="color:#f55b5b;">Error: ' + e.message + '</div>';
     }
@@ -5866,6 +5888,41 @@ function attachPieInteractivity() {
             row.addEventListener('mouseleave', resetPie);
             row.addEventListener('touchstart', function(ev) { ev.preventDefault(); focusSlice(row); }, { passive: false });
             row.addEventListener('click', function() { focusSlice(row); });
+        });
+    });
+}
+
+// Report sections interactivity: each section (title + its following paragraphs)
+// gets highlighted when the cursor hovers it or the user taps it on touch. We
+// group each .rep-sec-title with the sibling <p>/content until the next title,
+// wrapping them into a .report-section box that reacts on hover/tap.
+function attachReportSectionInteractivity() {
+    const titles = Array.prototype.slice.call(document.querySelectorAll('.rep-sec-title'));
+    titles.forEach(function(title) {
+        // Skip if already wrapped.
+        if (title.parentElement && title.parentElement.classList.contains('report-section')) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'report-section';
+        const parent = title.parentNode;
+        parent.insertBefore(wrap, title);
+        // Move the title and following siblings (until next title) into the wrap.
+        let node = title;
+        while (node && !(node !== title && node.classList && node.classList.contains('rep-sec-title'))) {
+            const next = node.nextSibling;
+            wrap.appendChild(node);
+            node = next;
+            if (node && node.classList && node.classList.contains('rep-sec-title')) break;
+        }
+        // Touch: tap toggles the highlight (hover handles desktop via CSS).
+        wrap.addEventListener('touchstart', function() {
+            const wasActive = wrap.classList.contains('rep-active');
+            document.querySelectorAll('.report-section.rep-active').forEach(function(s) { s.classList.remove('rep-active'); });
+            if (!wasActive) wrap.classList.add('rep-active');
+        }, { passive: true });
+        wrap.addEventListener('click', function() {
+            const wasActive = wrap.classList.contains('rep-active');
+            document.querySelectorAll('.report-section.rep-active').forEach(function(s) { s.classList.remove('rep-active'); });
+            if (!wasActive) wrap.classList.add('rep-active');
         });
     });
 }
