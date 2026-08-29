@@ -1121,6 +1121,23 @@ HTML = """
             border-left-color: #7b9cff !important;
             background: rgba(123, 156, 255, 0.04) !important;
         }
+        /* Analysis blocks below the intent cards: Distribucion de Indicadores,
+           Informe del Texto, Analisis Narrativo. */
+        .analysis-block {
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .analysis-block:hover {
+            border-color: #7b9cff !important;
+            box-shadow: 0 0 18px -5px rgba(123, 156, 255, 0.5);
+        }
+        /* The small indicator donuts zoom slightly when pointed at/tapped. */
+        .pie-chart-click {
+            transition: transform 0.15s ease, filter 0.15s ease;
+        }
+        .pie-chart-click:hover {
+            transform: scale(1.12);
+            filter: drop-shadow(0 0 6px rgba(123, 156, 255, 0.6));
+        }
         /* Buttons glow on hover (Analizar, Limpiar, Guardar, etc.) */
         button {
             transition: box-shadow 0.15s ease, transform 0.1s ease;
@@ -2467,7 +2484,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v10.3 &middot; interactividad total</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v10.4 &middot; interactividad completa</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -3697,7 +3714,7 @@ function renderTextProgressChart(c) {
             '</button>' +
         '</div>';
 
-    return '<div style="margin-top:16px;padding:14px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">' +
+    return '<div class="analysis-block" style="margin-top:16px;padding:14px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">' +
         '<div style="font-size:0.75rem;color:#888;font-weight:600;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em;">Distribucion de Indicadores — Este Texto</div>' +
         '<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center;">' +
             '<div style="position:relative;width:140px;height:140px;border-radius:50%;background:conic-gradient(' + gradientParts.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);">' +
@@ -3744,7 +3761,7 @@ function renderTextReport(data) {
     const indSummary = Object.entries(indLabels).map(([k, label]) => label + ': ' + (c[k] || 0)).join(' | ');
 
     // Build report
-    let report = '<div style="margin-top:16px;padding:16px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
+    let report = '<div class="analysis-block" style="margin-top:16px;padding:16px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
     report += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-size:0.75rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">📋 Informe del Texto</div><button onclick="copyReport()" style="background:#1a1d27;border:1px solid #2a2d3e;color:#aaa;padding:4px 10px;border-radius:6px;font-size:0.6rem;cursor:pointer;">📋 Copiar</button></div>';
 
     report += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.65rem;">';
@@ -3772,7 +3789,7 @@ function renderTextReport(data) {
     }
 
     // --- Expanded Narrative Summary ---
-    report += '<div style="margin-top:14px;padding:14px;background:#080a10;border:1px solid #1e2130;border-radius:8px;border-left:3px solid #4a6cf7;">';
+    report += '<div class="analysis-block" style="margin-top:14px;padding:14px;background:#080a10;border:1px solid #1e2130;border-radius:8px;border-left:3px solid #4a6cf7;">';
     report += '<div style="font-size:0.7rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px;">Analisis Narrativo del Texto</div>';
 
     // Intent analysis
