@@ -2282,7 +2282,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v8.1 &middot; colores torta/meses</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v8.2 &middot; total verde/amarillo</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5324,7 +5324,7 @@ async function loadInforme() {
             const t = data.totals_per_month[m] || 0;
             if (t > 0) totalsHtml += '<span style="background:#bfe3f5;border:1px solid #7fc4e6;border-radius:6px;padding:3px 8px;font-size:0.68rem;color:#0d0d0d;">' + months[m] + ': <strong style="color:#0d0d0d;">' + t + '</strong></span>';
         }
-        totalsHtml += '<span style="background:#1a3a2a;border:1px solid #2a5a3a;border-radius:6px;padding:3px 10px;font-size:0.68rem;color:#5bf5a3;font-weight:700;">Total ' + year + ': ' + data.total_general + '</span>';
+        totalsHtml += '<span style="background:#2e9e58;border:1px solid #248048;border-radius:6px;padding:3px 10px;font-size:0.68rem;color:#fff23d;font-weight:700;">Total ' + year + ': ' + data.total_general + '</span>';
         totalsHtml += '</div>';
 
         // Pie chart (monthly distribution)
