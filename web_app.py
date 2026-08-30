@@ -2684,7 +2684,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.6 &middot; audio campana</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.7 &middot; orquesta afinando</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5549,22 +5549,24 @@ var UISound = (function() {
             master = ctx.createGain();
             master.gain.value = 0.85;
             master.connect(ctx.destination);
-            // Longer, lush synthesized reverb tail for a soft, spacious feel.
+            // Concert-hall reverb: long (~2.6s), diffuse, wide stereo. Each channel
+            // gets an independent decorrelated tail for a broad, enveloping field.
             verb = ctx.createConvolver();
-            var len = Math.floor(ctx.sampleRate * 1.1);   // ~1.1s tail
+            var len = Math.floor(ctx.sampleRate * 2.6);
             var buf = ctx.createBuffer(2, len, ctx.sampleRate);
             for (var ch = 0; ch < 2; ch++) {
                 var d = buf.getChannelData(ch);
                 for (var i = 0; i < len; i++) {
-                    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
+                    // Smooth exponential decay (high diffusion) + independent per-channel noise.
+                    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 1.8);
                 }
             }
             verb.buffer = buf;
-            // Soften the reverb with a low-pass so it isn't harsh.
+            // Warm the tail: emphasize mids/lows (wood & metal), tame the top.
             var vlp = ctx.createBiquadFilter();
-            vlp.type = 'lowpass'; vlp.frequency.value = 3200;
+            vlp.type = 'lowpass'; vlp.frequency.value = 2600;
             var vgain = ctx.createGain();
-            vgain.gain.value = 0.55;   // more present reverb
+            vgain.gain.value = 0.6;
             verb.connect(vlp); vlp.connect(vgain); vgain.connect(master);
         } catch (e) { ctx = null; }
         return ctx;
@@ -5620,18 +5622,61 @@ var UISound = (function() {
         } catch (e) { /* audio must never break the UI */ }
     }
 
+    // "Orchestra tuning" startup: from silence, several detuned voices around
+    // A4 (440Hz) slowly converge to 440 with a very slow attack — no impact
+    // transient. Warm, cinematic, concert-hall space. (per audio perspective)
+    function orchestraTuning() {
+        if (muted) return;
+        var c = ac();
+        if (!c || !master) return;
+        try {
+            if (c.state === 'suspended') c.resume();
+            var now = c.currentTime;
+            var A4 = 440;
+            // Voices spread across the harmonic series, each starting slightly
+            // detuned (micro-dissonance) and gliding to its true pitch.
+            var voices = [
+                { mult: 0.5,  detune: -7 },   // A3 (warm low body)
+                { mult: 1.0,  detune: +9 },   // A4 (reference)
+                { mult: 1.0,  detune: -5 },
+                { mult: 1.5,  detune: +6 },   // E5 (fifth)
+                { mult: 2.0,  detune: -8 }    // A5 (octave)
+            ];
+            var attack = 4.5, sustain = 2.0, release = 3.5;
+            var total = attack + sustain + release;
+            voices.forEach(function(v, i) {
+                var osc = c.createOscillator();
+                var g = c.createGain();
+                var lp = c.createBiquadFilter();
+                var target = A4 * v.mult;
+                lp.type = 'lowpass'; lp.frequency.value = 2400;   // spectral warmth
+                osc.type = 'sine';
+                // Start detuned (dissonant), glide to the true note (convergence).
+                osc.frequency.setValueAtTime(target + v.detune, now);
+                osc.frequency.linearRampToValueAtTime(target, now + attack + sustain);
+                // Slow swell from absolute silence; rich sustain; long release.
+                var pk = 0.05 / (1 + i * 0.25);
+                g.gain.setValueAtTime(0.0001, now);
+                g.gain.linearRampToValueAtTime(pk, now + attack);              // 4.5s swell
+                g.gain.linearRampToValueAtTime(pk * 0.7, now + attack + sustain);
+                g.gain.exponentialRampToValueAtTime(0.0001, now + total);      // 3.5s fade
+                osc.connect(lp); lp.connect(g);
+                g.connect(master);
+                if (verb) { var s = c.createGain(); s.gain.value = 0.9; g.connect(s); s.connect(verb); }
+                osc.start(now); osc.stop(now + total + 0.1);
+            });
+        } catch (e) {}
+    }
+
     return {
-        // Soft glassy navigation tick.
-        tick: function() { tone(1660, 1660, 0.09, 0.03, 0.4); },
-        // Warm bell selection cue with generous echo.
-        click: function() { tone(1046, 1046, 0.5, 0.06, 0.85); },
-        // Back / dismiss — lower bell that fades.
-        cancel: function() { tone(560, 420, 0.5, 0.05, 0.9); },
-        // Rising initialization chime — two struck bells a fifth apart.
-        startup: function() {
-            tone(660, 660, 0.9, 0.045, 1.0);
-            setTimeout(function() { tone(990, 990, 1.1, 0.04, 1.0); }, 130);
-        },
+        // Soft, warm navigation tick derived from the A harmonic series.
+        tick: function() { tone(1320, 1320, 0.12, 0.028, 0.5); },
+        // Warm selection cue (A5) with concert-hall echo.
+        click: function() { tone(880, 880, 0.55, 0.055, 0.9); },
+        // Back / dismiss — lower, softly fading.
+        cancel: function() { tone(440, 330, 0.6, 0.05, 0.9); },
+        // Cinematic orchestra-tuning startup.
+        startup: orchestraTuning,
         // Create/resume the AudioContext after a user gesture (autoplay policy).
         unlock: function() {
             var c = ac();
@@ -7395,15 +7440,15 @@ var UISound = (function() {
             ctx = new AC();
             master = ctx.createGain(); master.gain.value = 0.85; master.connect(ctx.destination);
             verb = ctx.createConvolver();
-            var len = Math.floor(ctx.sampleRate * 1.1);
+            var len = Math.floor(ctx.sampleRate * 2.6);
             var b = ctx.createBuffer(2, len, ctx.sampleRate);
             for (var ch = 0; ch < 2; ch++) {
                 var d = b.getChannelData(ch);
-                for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
+                for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 1.8);
             }
             verb.buffer = b;
-            var vlp = ctx.createBiquadFilter(); vlp.type = 'lowpass'; vlp.frequency.value = 3200;
-            var vg = ctx.createGain(); vg.gain.value = 0.55; verb.connect(vlp); vlp.connect(vg); vg.connect(master);
+            var vlp = ctx.createBiquadFilter(); vlp.type = 'lowpass'; vlp.frequency.value = 2600;
+            var vg = ctx.createGain(); vg.gain.value = 0.6; verb.connect(vlp); vlp.connect(vg); vg.connect(master);
         } catch (e) { ctx = null; }
         return ctx;
     }
@@ -7434,11 +7479,40 @@ var UISound = (function() {
             });
         } catch (e) {}
     }
+    function orchestraTuning() {
+        if (muted) return;
+        var c = ac(); if (!c || !master) return;
+        try {
+            if (c.state === 'suspended') c.resume();
+            var now = c.currentTime, A4 = 440;
+            var voices = [
+                { mult: 0.5, detune: -7 }, { mult: 1.0, detune: +9 }, { mult: 1.0, detune: -5 },
+                { mult: 1.5, detune: +6 }, { mult: 2.0, detune: -8 }
+            ];
+            var attack = 4.5, sustain = 2.0, release = 3.5, total = attack + sustain + release;
+            voices.forEach(function(v, i) {
+                var osc = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter();
+                var target = A4 * v.mult;
+                lp.type = 'lowpass'; lp.frequency.value = 2400;
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(target + v.detune, now);
+                osc.frequency.linearRampToValueAtTime(target, now + attack + sustain);
+                var pk = 0.05 / (1 + i * 0.25);
+                g.gain.setValueAtTime(0.0001, now);
+                g.gain.linearRampToValueAtTime(pk, now + attack);
+                g.gain.linearRampToValueAtTime(pk * 0.7, now + attack + sustain);
+                g.gain.exponentialRampToValueAtTime(0.0001, now + total);
+                osc.connect(lp); lp.connect(g); g.connect(master);
+                if (verb) { var s = c.createGain(); s.gain.value = 0.9; g.connect(s); s.connect(verb); }
+                osc.start(now); osc.stop(now + total + 0.1);
+            });
+        } catch (e) {}
+    }
     return {
-        tick: function() { tone(1660, 1660, 0.09, 0.03, 0.4); },
-        click: function() { tone(1046, 1046, 0.5, 0.06, 0.85); },
-        cancel: function() { tone(560, 420, 0.5, 0.05, 0.9); },
-        startup: function() { tone(660, 660, 0.9, 0.045, 1.0); setTimeout(function() { tone(990, 990, 1.1, 0.04, 1.0); }, 130); },
+        tick: function() { tone(1320, 1320, 0.12, 0.028, 0.5); },
+        click: function() { tone(880, 880, 0.55, 0.055, 0.9); },
+        cancel: function() { tone(440, 330, 0.6, 0.05, 0.9); },
+        startup: orchestraTuning,
         unlock: function() { var c = ac(); if (c && c.state === 'suspended') { try { c.resume(); } catch (e) {} } }
     };
 })();
