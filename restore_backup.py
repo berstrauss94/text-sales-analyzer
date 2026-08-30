@@ -2,8 +2,11 @@
 """
 restore_backup.py - Restaurar el CODIGO al ultimo estado estable conocido.
 
-Punto de restauracion actual: backup-estable-2026-08-29-v11
+Punto de restauracion actual: backup-estable-2026-08-29-v11.7
 Ese backup incluye:
+- Motion design completo: animaciones de entrada uniformes (--anim-duration),
+  Inline Text Replacement (text-swap al cargar textos guardados), despliegue
+  animado de triangulos/sub-info, clases de streaming por rol listas
 - Carga de textos funcionando (SyntaxError del banner de backup resuelto)
 - Backups automaticos de DATOS activos (cada 10 guardados / 5 min) + Auto-Fix
 - Deteccion de perdida con alerta admin y restauracion entrada por entrada
@@ -47,7 +50,7 @@ def run(cmd: str) -> tuple[int, str]:
 
 
 # Punto de restauracion actual. Actualizar cuando se cree un nuevo backup estable.
-BACKUP_TAG = "backup-estable-2026-08-29-v11"
+BACKUP_TAG = "backup-estable-2026-08-29-v11.7"
 
 
 def main():
