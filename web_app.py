@@ -2684,7 +2684,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.9 &middot; startup al ingresar</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.10 &middot; fix doble startup</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -7529,9 +7529,11 @@ var UISound = (function() {
     };
 })();
 window.addEventListener('DOMContentLoaded', function() {
+    // Only unlock audio on first gesture — do NOT play startup here, otherwise
+    // it collides with the startup fired on login submit. The tuning cue is
+    // reserved for the actual "enter" action (submit).
     function unlockOnce() {
         UISound.unlock();
-        setTimeout(function() { UISound.startup(); }, 40);
         document.removeEventListener('pointerdown', unlockOnce);
         document.removeEventListener('keydown', unlockOnce);
     }
