@@ -2684,7 +2684,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.13 &middot; cross-filter movil</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.14 &middot; cross-filter panel admin</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -4667,10 +4667,22 @@ async function loadAdminStats() {
             </div>
         `;
 
+        // Cross-filter: same as the indicator chart — highlight this category's
+        // keywords in the text box (if a text is loaded) and scroll to them.
+        function adminCrossFilter(cat) {
+            if (typeof highlightInText === 'function' &&
+                window._lastCommercialData && window._lastCommercialData.detalle &&
+                window._lastCommercialData.detalle[cat] &&
+                Object.keys(window._lastCommercialData.detalle[cat]).length > 0) {
+                highlightInText(cat);
+            }
+        }
+
         // Add click handlers to legend items
         container.querySelectorAll('.stats-legend-item').forEach(el => {
             el.addEventListener('click', function() {
                 const cat = this.getAttribute('data-cat');
+                adminCrossFilter(cat);   // highlight keywords in the text + scroll
                 const detail = window._adminWordDetail[cat] || {};
                 const detailEl = document.getElementById('statsWordDetail');
                 if (!detailEl) return;
@@ -4775,6 +4787,15 @@ async function loadAdminStats() {
                 lastSegKey = null;
             });
 
+            // Desktop click on a slice -> cross-filter keywords into the text.
+            pieEl.addEventListener('click', function(e) {
+                const rect = pieEl.getBoundingClientRect();
+                const angle = getAngleFromEvent(e, rect);
+                if (angle < 0) return;
+                const seg = getSegmentAtAngle(angle);
+                if (seg) adminCrossFilter(seg.key);
+            });
+
             // Mobile: long-press to show, release to hide
             let _pieTouchTimer = null;
             pieEl.addEventListener('touchstart', function(e) {
@@ -4782,6 +4803,8 @@ async function loadAdminStats() {
                 const angle = getAngleFromEvent(e, rect);
                 if (angle < 0) return;
                 const seg = getSegmentAtAngle(angle);
+                // Tap also cross-filters the text (same as the indicator chart).
+                if (seg) adminCrossFilter(seg.key);
                 _pieTouchTimer = setTimeout(function() {
                     showPieTooltip(seg);
                 }, 350);
