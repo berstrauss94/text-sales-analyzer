@@ -2684,7 +2684,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.4 &middot; audio refinado</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.5 &middot; audio suave</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5547,28 +5547,32 @@ var UISound = (function() {
             if (!AC) return null;
             ctx = new AC();
             master = ctx.createGain();
-            master.gain.value = 0.9;
+            master.gain.value = 0.85;
             master.connect(ctx.destination);
-            // Short synthesized reverb (spatial decay) for crisp selection sounds.
+            // Longer, lush synthesized reverb tail for a soft, spacious feel.
             verb = ctx.createConvolver();
-            var len = Math.floor(ctx.sampleRate * 0.18);
+            var len = Math.floor(ctx.sampleRate * 1.1);   // ~1.1s tail
             var buf = ctx.createBuffer(2, len, ctx.sampleRate);
             for (var ch = 0; ch < 2; ch++) {
                 var d = buf.getChannelData(ch);
                 for (var i = 0; i < len; i++) {
-                    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2);
+                    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
                 }
             }
             verb.buffer = buf;
+            // Soften the reverb with a low-pass so it isn't harsh.
+            var vlp = ctx.createBiquadFilter();
+            vlp.type = 'lowpass'; vlp.frequency.value = 3200;
             var vgain = ctx.createGain();
-            vgain.gain.value = 0.28;
-            verb.connect(vgain); vgain.connect(master);
+            vgain.gain.value = 0.55;   // more present reverb
+            verb.connect(vlp); vlp.connect(vgain); vgain.connect(master);
         } catch (e) { ctx = null; }
         return ctx;
     }
 
-    // Core voice. spatial=true routes a copy through the reverb for decay.
-    function tone(f0, f1, dur, peak, type, spatial) {
+    // Core voice: always a smooth sine through a gentle low-pass (no 8-bit edge),
+    // with a portion sent to the long reverb bus for echo/space.
+    function tone(f0, f1, dur, peak, type, verbAmt) {
         if (muted) return;
         var c = ac();
         if (!c || !master) return;
@@ -5576,38 +5580,42 @@ var UISound = (function() {
             if (c.state === 'suspended') c.resume();
             var osc = c.createOscillator();
             var g = c.createGain();
+            var lp = c.createBiquadFilter();
             var now = c.currentTime;
             osc.type = type || 'sine';
             osc.frequency.setValueAtTime(f0, now);
             if (f1 && f1 !== f0) osc.frequency.exponentialRampToValueAtTime(Math.max(1, f1), now + dur);
+            lp.type = 'lowpass'; lp.frequency.value = 5200;   // shave harsh highs
             g.gain.setValueAtTime(0.0001, now);
-            g.gain.exponentialRampToValueAtTime(peak, now + 0.004);   // surgical fast attack
-            g.gain.exponentialRampToValueAtTime(0.0001, now + dur);   // clean decay
-            osc.connect(g);
+            g.gain.exponentialRampToValueAtTime(peak, now + 0.012);   // soft attack
+            g.gain.exponentialRampToValueAtTime(0.0001, now + dur);   // smooth tail
+            osc.connect(lp); lp.connect(g);
             g.connect(master);
-            if (spatial && verb) g.connect(verb);
+            if (verb && verbAmt > 0) {
+                var send = c.createGain(); send.gain.value = verbAmt;
+                g.connect(send); send.connect(verb);
+            }
             osc.start(now);
-            osc.stop(now + dur + 0.02);
+            osc.stop(now + dur + 0.05);
         } catch (e) { /* audio must never break the UI */ }
     }
 
     return {
-        // Surgical high-frequency navigation tick: fundamental + faint harmonic.
+        // Soft, high, airy navigation tick with a touch of space.
         tick: function() {
-            tone(2100, 1900, 0.030, 0.045, 'sine', false);
-            tone(3600, 3400, 0.022, 0.018, 'sine', false);  // airy harmonic
+            tone(1900, 1750, 0.055, 0.035, 'sine', 0.35);
         },
-        // Crisp metallic/plastic selection click with short spatial decay.
+        // Smooth selection cue (two soft sines) with generous echo.
         click: function() {
-            tone(1400, 1750, 0.055, 0.09, 'square', true);
-            tone(2600, 2200, 0.040, 0.030, 'triangle', true);
+            tone(1180, 1360, 0.10, 0.07, 'sine', 0.7);
+            tone(1760, 1900, 0.08, 0.035, 'sine', 0.7);
         },
-        // Back / dismiss — soft descending cue.
-        cancel: function() { tone(680, 300, 0.14, 0.07, 'sine', true); },
-        // Rising initialization cue for page/menu startup.
+        // Back / dismiss — soft descending cue with tail.
+        cancel: function() { tone(720, 360, 0.20, 0.06, 'sine', 0.8); },
+        // Rising initialization cue, spacious — for page/menu startup.
         startup: function() {
-            tone(500, 1500, 0.28, 0.05, 'sine', true);
-            tone(1000, 2200, 0.32, 0.03, 'sine', true);
+            tone(440, 1320, 0.55, 0.045, 'sine', 0.9);
+            tone(880, 1980, 0.60, 0.028, 'sine', 0.9);
         },
         // Create/resume the AudioContext after a user gesture (autoplay policy).
         unlock: function() {
@@ -5695,35 +5703,37 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('pointerdown', unlockAudioOnce);
     document.addEventListener('keydown', unlockAudioOnce);
 
-    // GLOBAL acoustic feedback via event delegation, so EVERY card/box/button
-    // reacts on hover — not just the color quadrilla.
-    var _lastTick = 0;
+    // GLOBAL acoustic feedback: a tick fires each time the cursor ENTERS a new
+    // interactive element. Tracking the last element (not a time throttle) makes
+    // "gliding across the page" reliably audible without machine-gunning.
+    var HOVER_SEL = '.card, .input-section, .commercial-section, .analysis-block, ' +
+        '.indicator-item, .history-entry, .category-option, .pie-legend-row, ' +
+        '.stats-legend-item, .report-section, .lead-badge, .card-title-collapsible, ' +
+        '.phrase-chip, .ext-data-row, .intent-detail-section, button, select, input, a, circle';
+    var _lastHoverEl = null;
     document.addEventListener('mouseover', function(e) {
         var t = e.target;
         if (!t || !t.closest) return;
-        if (t.closest('.card, .input-section, .commercial-section, .analysis-block, .indicator-item, .history-entry, .category-option, .pie-legend-row, button, select, .lead-badge, .report-section')) {
-            var now = Date.now();
-            if (now - _lastTick > 55) { _lastTick = now; UISound.tick(); }
+        var el = (t.tagName && t.tagName.toLowerCase() === 'circle') ? t : t.closest(HOVER_SEL);
+        if (el && el !== _lastHoverEl) {
+            _lastHoverEl = el;
+            UISound.tick();
         }
+    });
+    document.addEventListener('mouseout', function(e) {
+        // Allow the same element to tick again after the pointer leaves it.
+        if (e.target === _lastHoverEl) _lastHoverEl = null;
     });
     document.addEventListener('click', function(e) {
         var t = e.target;
         if (!t || !t.closest) return;
-        if (t.closest('button, .category-option, .indicator-item, .pie-legend-row, .lead-badge, .card-title-collapsible, .pie-chart-click, .stats-legend-item')) {
+        if (t.closest('button, .category-option, .indicator-item, .pie-legend-row, .lead-badge, .card-title-collapsible, .pie-chart-click, .stats-legend-item, a')) {
             UISound.click();
         }
     });
     // Selectors (month, text, year, user, informe filters...) click on change.
     document.addEventListener('change', function(e) {
         if (e.target && e.target.tagName === 'SELECT') UISound.click();
-    });
-    // Line-chart data points and SVG dots: tick when pointed at.
-    document.addEventListener('mouseover', function(e) {
-        var t = e.target;
-        if (t && t.tagName && (t.tagName.toLowerCase() === 'circle' || (t.closest && t.closest('svg')))) {
-            var now = Date.now();
-            if (now - _lastTick > 70) { _lastTick = now; UISound.tick(); }
-        }
     });
 
     let debounceTimer = null;
@@ -7399,10 +7409,10 @@ var UISound = (function() {
         } catch (e) {}
     }
     return {
-        tick: function() { tone(2100, 1900, 0.030, 0.045, 'sine', false); tone(3600, 3400, 0.022, 0.018, 'sine', false); },
-        click: function() { tone(1400, 1750, 0.055, 0.09, 'square', true); tone(2600, 2200, 0.040, 0.030, 'triangle', true); },
-        cancel: function() { tone(680, 300, 0.14, 0.07, 'sine', true); },
-        startup: function() { tone(500, 1500, 0.28, 0.05, 'sine', true); tone(1000, 2200, 0.32, 0.03, 'sine', true); },
+        tick: function() { tone(1900, 1750, 0.055, 0.035, 'sine', 0.35); },
+        click: function() { tone(1180, 1360, 0.10, 0.07, 'sine', 0.7); tone(1760, 1900, 0.08, 0.035, 'sine', 0.7); },
+        cancel: function() { tone(720, 360, 0.20, 0.06, 'sine', 0.8); },
+        startup: function() { tone(440, 1320, 0.55, 0.045, 'sine', 0.9); tone(880, 1980, 0.60, 0.028, 'sine', 0.9); },
         unlock: function() { var c = ac(); if (c && c.state === 'suspended') { try { c.resume(); } catch (e) {} } }
     };
 })();
@@ -7415,14 +7425,15 @@ window.addEventListener('DOMContentLoaded', function() {
     }
     document.addEventListener('pointerdown', unlockOnce);
     document.addEventListener('keydown', unlockOnce);
-    var lastTick = 0;
+    var _lastHoverEl = null;
     document.addEventListener('mouseover', function(e) {
         var t = e.target;
         if (!t || !t.closest) return;
-        if (t.closest('button, input, .tab-btn, a, label')) {
-            var now = Date.now();
-            if (now - lastTick > 55) { lastTick = now; UISound.tick(); }
-        }
+        var el = t.closest('button, input, .tab-btn, a, label, .form-group');
+        if (el && el !== _lastHoverEl) { _lastHoverEl = el; UISound.tick(); }
+    });
+    document.addEventListener('mouseout', function(e) {
+        if (e.target === _lastHoverEl) _lastHoverEl = null;
     });
     document.addEventListener('click', function(e) {
         var t = e.target;
