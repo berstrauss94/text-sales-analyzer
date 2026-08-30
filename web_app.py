@@ -2684,7 +2684,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.8 &middot; audio grave/corto</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.9 &middot; startup al ingresar</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5753,13 +5753,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // on the first pointer/keyboard interaction.
     function unlockAudioOnce() {
         UISound.unlock();
-        // Play the rising startup cue once, right after audio is unlocked.
-        setTimeout(function() { UISound.startup(); }, 40);
+        UISound.startup();  // immediate on first gesture (no delay)
         document.removeEventListener('pointerdown', unlockAudioOnce);
         document.removeEventListener('keydown', unlockAudioOnce);
     }
-    document.addEventListener('pointerdown', unlockAudioOnce);
-    document.addEventListener('keydown', unlockAudioOnce);
+    // If we just came from the login submit, audio is already unlocked by that
+    // gesture — play the tuning cue right away on load (accompanies entering).
+    var _cameFromLogin = false;
+    try { _cameFromLogin = sessionStorage.getItem('playStartupOnLoad') === '1'; } catch (e) {}
+    if (_cameFromLogin) {
+        try { sessionStorage.removeItem('playStartupOnLoad'); } catch (e) {}
+        UISound.unlock();
+        setTimeout(function() { UISound.startup(); }, 150);  // ~0.15s after load
+    } else {
+        // Otherwise wait for the first gesture (browser autoplay policy).
+        document.addEventListener('pointerdown', unlockAudioOnce);
+        document.addEventListener('keydown', unlockAudioOnce);
+    }
 
     // GLOBAL acoustic feedback: a tick fires each time the cursor ENTERS a new
     // interactive element. Tracking the last element (not a time throttle) makes
@@ -7412,6 +7422,10 @@ document.getElementById('login-form').addEventListener('submit', function() {
     } else {
         localStorage.removeItem('saved_username');
     }
+    // Play the tuning cue on entry and flag the app to resume it on load
+    // (the submit click satisfies the browser's autoplay gesture requirement).
+    try { UISound.startup(); } catch (e) {}
+    try { sessionStorage.setItem('playStartupOnLoad', '1'); } catch (e) {}
 });
 
 // On load: prefill from localStorage if not already prefilled from server
