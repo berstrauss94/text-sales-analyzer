@@ -2684,7 +2684,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.3 &middot; audio total</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.4 &middot; audio refinado</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5536,7 +5536,7 @@ function animateEntrance(scope) {
 // avoids any third-party/copyrighted assets. Respects a persisted mute pref and
 // never blocks screen readers or app logic (pure audio side-effect).
 var UISound = (function() {
-    var ctx = null;
+    var ctx = null, master = null, verb = null;
     var muted = false;
     try { muted = localStorage.getItem('uiSoundMuted') === '1'; } catch (e) {}
 
@@ -5546,15 +5546,32 @@ var UISound = (function() {
             var AC = window.AudioContext || window.webkitAudioContext;
             if (!AC) return null;
             ctx = new AC();
+            master = ctx.createGain();
+            master.gain.value = 0.9;
+            master.connect(ctx.destination);
+            // Short synthesized reverb (spatial decay) for crisp selection sounds.
+            verb = ctx.createConvolver();
+            var len = Math.floor(ctx.sampleRate * 0.18);
+            var buf = ctx.createBuffer(2, len, ctx.sampleRate);
+            for (var ch = 0; ch < 2; ch++) {
+                var d = buf.getChannelData(ch);
+                for (var i = 0; i < len; i++) {
+                    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2);
+                }
+            }
+            verb.buffer = buf;
+            var vgain = ctx.createGain();
+            vgain.gain.value = 0.28;
+            verb.connect(vgain); vgain.connect(master);
         } catch (e) { ctx = null; }
         return ctx;
     }
 
-    // Play a short tone. type: waveform; f0/f1: start/end freq; dur seconds; gain peak.
-    function tone(f0, f1, dur, peak, type) {
+    // Core voice. spatial=true routes a copy through the reverb for decay.
+    function tone(f0, f1, dur, peak, type, spatial) {
         if (muted) return;
         var c = ac();
-        if (!c) return;
+        if (!c || !master) return;
         try {
             if (c.state === 'suspended') c.resume();
             var osc = c.createOscillator();
@@ -5564,21 +5581,34 @@ var UISound = (function() {
             osc.frequency.setValueAtTime(f0, now);
             if (f1 && f1 !== f0) osc.frequency.exponentialRampToValueAtTime(Math.max(1, f1), now + dur);
             g.gain.setValueAtTime(0.0001, now);
-            g.gain.exponentialRampToValueAtTime(peak, now + 0.006);           // fast attack
-            g.gain.exponentialRampToValueAtTime(0.0001, now + dur);           // smooth decay
-            osc.connect(g); g.connect(c.destination);
+            g.gain.exponentialRampToValueAtTime(peak, now + 0.004);   // surgical fast attack
+            g.gain.exponentialRampToValueAtTime(0.0001, now + dur);   // clean decay
+            osc.connect(g);
+            g.connect(master);
+            if (spatial && verb) g.connect(verb);
             osc.start(now);
             osc.stop(now + dur + 0.02);
         } catch (e) { /* audio must never break the UI */ }
     }
 
     return {
-        // High, crisp navigation tick.
-        tick: function() { tone(1760, 1500, 0.045, 0.06, 'sine'); },
-        // Selection / grid open — brighter, slightly longer.
-        click: function() { tone(920, 1200, 0.09, 0.10, 'triangle'); },
-        // Back / dismiss — descending tone.
-        cancel: function() { tone(620, 300, 0.16, 0.09, 'sine'); },
+        // Surgical high-frequency navigation tick: fundamental + faint harmonic.
+        tick: function() {
+            tone(2100, 1900, 0.030, 0.045, 'sine', false);
+            tone(3600, 3400, 0.022, 0.018, 'sine', false);  // airy harmonic
+        },
+        // Crisp metallic/plastic selection click with short spatial decay.
+        click: function() {
+            tone(1400, 1750, 0.055, 0.09, 'square', true);
+            tone(2600, 2200, 0.040, 0.030, 'triangle', true);
+        },
+        // Back / dismiss — soft descending cue.
+        cancel: function() { tone(680, 300, 0.14, 0.07, 'sine', true); },
+        // Rising initialization cue for page/menu startup.
+        startup: function() {
+            tone(500, 1500, 0.28, 0.05, 'sine', true);
+            tone(1000, 2200, 0.32, 0.03, 'sine', true);
+        },
         // Create/resume the AudioContext after a user gesture (autoplay policy).
         unlock: function() {
             var c = ac();
@@ -5657,6 +5687,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // on the first pointer/keyboard interaction.
     function unlockAudioOnce() {
         UISound.unlock();
+        // Play the rising startup cue once, right after audio is unlocked.
+        setTimeout(function() { UISound.startup(); }, 40);
         document.removeEventListener('pointerdown', unlockAudioOnce);
         document.removeEventListener('keydown', unlockAudioOnce);
     }
@@ -7328,16 +7360,30 @@ window.addEventListener('DOMContentLoaded', function() {
 
 // ── UI SOUND ENGINE (login page) — synthesized, no external assets ──
 var UISound = (function() {
-    var ctx = null, muted = false;
+    var ctx = null, master = null, verb = null, muted = false;
     try { muted = localStorage.getItem('uiSoundMuted') === '1'; } catch (e) {}
     function ac() {
         if (ctx) return ctx;
-        try { var AC = window.AudioContext || window.webkitAudioContext; if (AC) ctx = new AC(); } catch (e) { ctx = null; }
+        try {
+            var AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return null;
+            ctx = new AC();
+            master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
+            verb = ctx.createConvolver();
+            var len = Math.floor(ctx.sampleRate * 0.18);
+            var b = ctx.createBuffer(2, len, ctx.sampleRate);
+            for (var ch = 0; ch < 2; ch++) {
+                var d = b.getChannelData(ch);
+                for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2);
+            }
+            verb.buffer = b;
+            var vg = ctx.createGain(); vg.gain.value = 0.28; verb.connect(vg); vg.connect(master);
+        } catch (e) { ctx = null; }
         return ctx;
     }
-    function tone(f0, f1, dur, peak, type) {
+    function tone(f0, f1, dur, peak, type, spatial) {
         if (muted) return;
-        var c = ac(); if (!c) return;
+        var c = ac(); if (!c || !master) return;
         try {
             if (c.state === 'suspended') c.resume();
             var osc = c.createOscillator(), g = c.createGain(), now = c.currentTime;
@@ -7345,22 +7391,25 @@ var UISound = (function() {
             osc.frequency.setValueAtTime(f0, now);
             if (f1 && f1 !== f0) osc.frequency.exponentialRampToValueAtTime(Math.max(1, f1), now + dur);
             g.gain.setValueAtTime(0.0001, now);
-            g.gain.exponentialRampToValueAtTime(peak, now + 0.006);
+            g.gain.exponentialRampToValueAtTime(peak, now + 0.004);
             g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-            osc.connect(g); g.connect(c.destination);
+            osc.connect(g); g.connect(master);
+            if (spatial && verb) g.connect(verb);
             osc.start(now); osc.stop(now + dur + 0.02);
         } catch (e) {}
     }
     return {
-        tick: function() { tone(1760, 1500, 0.045, 0.06, 'sine'); },
-        click: function() { tone(920, 1200, 0.09, 0.10, 'triangle'); },
-        cancel: function() { tone(620, 300, 0.16, 0.09, 'sine'); },
+        tick: function() { tone(2100, 1900, 0.030, 0.045, 'sine', false); tone(3600, 3400, 0.022, 0.018, 'sine', false); },
+        click: function() { tone(1400, 1750, 0.055, 0.09, 'square', true); tone(2600, 2200, 0.040, 0.030, 'triangle', true); },
+        cancel: function() { tone(680, 300, 0.14, 0.07, 'sine', true); },
+        startup: function() { tone(500, 1500, 0.28, 0.05, 'sine', true); tone(1000, 2200, 0.32, 0.03, 'sine', true); },
         unlock: function() { var c = ac(); if (c && c.state === 'suspended') { try { c.resume(); } catch (e) {} } }
     };
 })();
 window.addEventListener('DOMContentLoaded', function() {
     function unlockOnce() {
         UISound.unlock();
+        setTimeout(function() { UISound.startup(); }, 40);
         document.removeEventListener('pointerdown', unlockOnce);
         document.removeEventListener('keydown', unlockOnce);
     }
