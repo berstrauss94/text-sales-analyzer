@@ -2684,7 +2684,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v13 &middot; login cyan</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v13.1 &middot; login con imagen</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -7109,34 +7109,46 @@ LOGIN_HTML = """
             position: relative;
         }
 
-        /* Animated background: radial cyan glow + drifting particle grid.
-           Fades in first (the card appears afterwards). */
+        /* Full-screen background IMAGE (desktop by default). Fades in with a
+           slow zoom first; the login card appears afterwards (sequence). */
         .login-bg-fx {
             position: fixed;
             inset: 0;
-            background: radial-gradient(circle at 50% 45%, #10233f 0%, #07090e 70%);
+            background-image: url('/static/login_bg_desktop.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
             z-index: -2;
             opacity: 0;
-            animation: bgFadeIn 1.4s ease forwards;
+            transform: scale(1.08);
+            animation: bgImgReveal 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+                       bgSlowDrift 24s ease-in-out 2.2s infinite;
         }
+        /* Subtle dark veil so the login card stays readable over the image. */
         .login-particles {
             position: fixed;
             inset: 0;
-            background-image: radial-gradient(var(--accent-cyan) 1px, transparent 1px);
-            background-size: 50px 50px;
-            opacity: 0;
+            background: radial-gradient(circle at 50% 45%, rgba(5,7,10,0.15) 0%, rgba(5,7,10,0.6) 100%);
             z-index: -1;
-            animation: particlesFadeIn 1.8s ease forwards, panBackground 30s linear infinite;
+            opacity: 0;
+            animation: veilFadeIn 2s ease forwards;
         }
-        @keyframes bgFadeIn { to { opacity: 1; } }
-        @keyframes particlesFadeIn { to { opacity: 0.06; } }
-        @keyframes panBackground {
-            0% { background-position: 0 0; }
-            100% { background-position: 50px 50px; }
+        @keyframes bgImgReveal {
+            0%   { opacity: 0; transform: scale(1.08); }
+            100% { opacity: 1; transform: scale(1); }
         }
-        /* When animation is cancelled, freeze the background statically. */
-        body.no-anim .login-bg-fx { animation: none; opacity: 1; }
-        body.no-anim .login-particles { animation: none; opacity: 0.05; }
+        @keyframes bgSlowDrift {
+            0%, 100% { transform: scale(1); }
+            50%      { transform: scale(1.05); }
+        }
+        @keyframes veilFadeIn { to { opacity: 1; } }
+        /* Mobile: use the vertical image, lighter (no heavy transform loop). */
+        @media (max-width: 900px) {
+            .login-bg-fx { background-image: url('/static/login_bg_mobile.jpg'); }
+        }
+        /* When animation is cancelled, show the image statically. */
+        body.no-anim .login-bg-fx { animation: none; opacity: 1; transform: none; }
+        body.no-anim .login-particles { animation: none; opacity: 1; }
 
         /* Toggle to cancel the entrance animation (persisted). */
         .anim-toggle {
