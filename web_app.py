@@ -2551,6 +2551,8 @@ HTML = """
 
         /* ── MOBILE (≤480px) ── */
         @media (max-width: 480px) {
+            /* On phones the x4 base felt too long — use x2.5 (base 1600 * 2.5). */
+            :root { --anim-duration: 4000ms; }
             body { font-size: 13px; }
             .container { padding: 8px; }
             .top-bar { padding: 8px; }
@@ -2682,7 +2684,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11.9 &middot; lista % + anim x4</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11.10 &middot; movil x2.5</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5508,7 +5510,8 @@ function animateEntrance(scope) {
         el.dataset.entered = '1';
         el.style.opacity = '0';
         el.style.transform = 'translateY(10px)';
-        el.style.transition = 'opacity 6.4s cubic-bezier(0.22,0.61,0.36,1), transform 6.4s cubic-bezier(0.22,0.61,0.36,1)';
+        var _ad = (window.innerWidth <= 480) ? '4s' : '6.4s';  // phones x2.5, else x4
+        el.style.transition = 'opacity ' + _ad + ' cubic-bezier(0.22,0.61,0.36,1), transform ' + _ad + ' cubic-bezier(0.22,0.61,0.36,1)';
         i++;
         // Uniform: all blocks reveal together with the same duration (no stagger).
         setTimeout(function() {
@@ -6272,7 +6275,7 @@ function attachLineChartInteractivity() {
 // on the donut (the rest is dimmed) and shows its value in the center hole.
 function attachPieInteractivity() {
     const reg = window._pieInteractive || {};
-    const DUR = '6.4s';  // uniform, matches --anim-duration
+    const DUR = (window.innerWidth <= 480) ? '4s' : '6.4s';  // phones x2.5, else x4
     Object.keys(reg).forEach(function(pieId) {
         const donut = document.getElementById(pieId);
         if (!donut || donut.dataset.wired === '1') return;
@@ -6345,8 +6348,8 @@ function attachPieInteractivity() {
 // makes that slice stand out above the others (rest dimmed to grey).
 function attachIndicatorPieInteractivity() {
     const reg = window._indPieInteractive || {};
-    // Uniform animation duration mirrored here in seconds to match --anim-duration.
-    const DUR = '6.4s';
+    // Mirror of --anim-duration in seconds; phones use the shorter x2.5 base.
+    const DUR = (window.innerWidth <= 480) ? '4s' : '6.4s';
     Object.keys(reg).forEach(function(id) {
         const donut = document.getElementById(id);
         if (!donut || donut.dataset.wired === '1') return;
@@ -6831,6 +6834,14 @@ LOGIN_HTML = """
         /* All fields fade in with the SAME uniform duration (no stagger). */
         .form-group {
             animation: fieldSlideIn 6400ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+        }
+        /* Phones: shorten login entrance to x2.5 (4000ms) to match the app. */
+        @media (max-width: 480px) {
+            .auth-card { animation-duration: 4000ms; }
+            .form-group { animation-duration: 4000ms; }
+            .text-swap-exit { animation-duration: 1500ms; }
+            .text-swap-enter { animation-duration: 1750ms; }
+            .stream-word { animation-duration: 1500ms; }
         }
         @media (prefers-reduced-motion: reduce) {
             .auth-card, .form-group { animation: none !important; opacity: 1 !important; transform: none !important; }
