@@ -2682,7 +2682,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11.5 &middot; despliegues + text swap</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11.6 &middot; text swap activo</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -4477,7 +4477,22 @@ async function loadSavedText(entryId) {
         const response = await fetch(`/saved-text/${entryId}`);
         const data = await response.json();
         if (data.text) {
-            document.getElementById('textInput').value = data.text;
+            const ta = document.getElementById('textInput');
+            // Inline text-replacement effect: old content fades out, new fades in.
+            // Purely visual — never changes the value used by the analyzer.
+            const applySwap = !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+            if (applySwap) {
+                ta.classList.remove('text-swap-enter');
+                ta.classList.add('text-swap-exit');
+                setTimeout(function() {
+                    ta.value = data.text;
+                    ta.classList.remove('text-swap-exit');
+                    ta.classList.add('text-swap-enter');
+                    setTimeout(function() { ta.classList.remove('text-swap-enter'); }, 400);
+                }, 160);
+            } else {
+                ta.value = data.text;
+            }
         }
         // Store entry_name globally for display in results preview
         window._currentEntryName = data.entry_name || '';
