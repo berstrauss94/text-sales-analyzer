@@ -1232,12 +1232,33 @@ HTML = """
         .staggered-entry:nth-child(8) { animation-delay: 420ms; }
         .staggered-entry:nth-child(n+9) { animation-delay: 480ms; }
 
+        /* AUTOMATIC page entrance (CSS-only, always fires on paint).
+           Top-level containers reveal top-to-bottom in a fluid cascade. */
+        @keyframes pageBlockIn {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .top-bar,
+        .input-section,
+        #adminStatsPanel,
+        .results {
+            animation: pageBlockIn 500ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+        }
+        .top-bar          { animation-delay: 40ms; }
+        .input-section    { animation-delay: 140ms; }
+        #adminStatsPanel  { animation-delay: 240ms; }
+        .results          { animation-delay: 320ms; }
+
         /* Accessibility: honor users who prefer reduced motion. */
         @media (prefers-reduced-motion: reduce) {
             .fade-in-smooth,
             .graph-line-reveal,
             .pie-chart-expand,
-            .staggered-entry {
+            .staggered-entry,
+            .top-bar,
+            .input-section,
+            #adminStatsPanel,
+            .results {
                 animation: none !important;
                 opacity: 1 !important;
                 transform: none !important;
@@ -2590,7 +2611,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11.1 &middot; entrada fluida</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11.2 &middot; entrada CSS</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5402,8 +5423,8 @@ function animateEntrance(scope) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Fluid entrance for the whole page on first load.
-    setTimeout(function() { animateEntrance(document); }, 30);
+    // Page entrance is handled by CSS (pageBlockIn) for reliability.
+    // animateEntrance() is still used for dynamically rendered results/report.
 
     let debounceTimer = null;
     const textarea = document.getElementById('textInput');
@@ -6593,11 +6614,34 @@ LOGIN_HTML = """
             font-size: 0.9rem;
         }
 
+        /* Entrance animations: reveal top-to-bottom, fluidly. */
+        @keyframes authDropIn {
+            from { opacity: 0; transform: translateY(-18px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fieldSlideIn {
+            from { opacity: 0; transform: translateX(-14px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
         .auth-card {
             background: #1a1d27;
             border: 1px solid #2a2d3a;
             border-radius: 12px;
             padding: 28px;
+            animation: authDropIn 500ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+        }
+        /* Each field slides in left-to-right, one after another (cascade). */
+        .form-group {
+            animation: fieldSlideIn 420ms ease-out both;
+        }
+        .form-group:nth-child(1) { animation-delay: 120ms; }
+        .form-group:nth-child(2) { animation-delay: 190ms; }
+        .form-group:nth-child(3) { animation-delay: 260ms; }
+        .form-group:nth-child(4) { animation-delay: 330ms; }
+        .form-group:nth-child(5) { animation-delay: 400ms; }
+        .form-group:nth-child(n+6) { animation-delay: 460ms; }
+        @media (prefers-reduced-motion: reduce) {
+            .auth-card, .form-group { animation: none !important; opacity: 1 !important; transform: none !important; }
         }
 
         .tabs {
