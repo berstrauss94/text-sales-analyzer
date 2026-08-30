@@ -2684,7 +2684,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11.11 &middot; movil x1.5</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12 &middot; cross-filtering</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -3889,7 +3889,7 @@ function renderTextProgressChart(c) {
         const pct = Math.round((val / total) * 100);
         const degSpan = (val / total) * 360;
         gradientParts.push(ind.color + ' ' + currentDeg + 'deg ' + (currentDeg + degSpan) + 'deg');
-        indSegments.push({ i: i, start: currentDeg, end: currentDeg + degSpan, color: ind.color });
+        indSegments.push({ i: i, start: currentDeg, end: currentDeg + degSpan, color: ind.color, key: ind.key, mid: currentDeg + degSpan / 2 });
         if (pct >= 5) {
             const midDeg = currentDeg + degSpan / 2;
             const rad = (midDeg - 90) * Math.PI / 180;
@@ -5079,6 +5079,14 @@ function highlightInText(indicatorKey) {
     overlay.innerHTML = highlightedHtml;
     overlay.classList.add('active');
     closeBtn.classList.add('active');
+
+    // Auto-scroll the viewport to the text box, then to the first highlight.
+    const wrapper = document.getElementById('textareaWrapper') || overlay;
+    wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(function() {
+        const firstHl = overlay.querySelector('.hl-' + indicatorKey);
+        if (firstHl) firstHl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 350);
 }
 
 function buildHighlightedText(text, words, indicatorKey) {
@@ -6408,6 +6416,26 @@ function attachIndicatorPieInteractivity() {
             return -1;
         }
 
+        // "Explode": nudge the whole donut a few px toward the slice's mid-angle
+        // and keep that slice focused, giving a detach/pop-out impression.
+        function explodeSlice(i) {
+            const seg = info.segments[i];
+            if (!seg || seg.end - seg.start < 0.01) return;
+            focusIndex(i);
+            const rad = (seg.mid - 90) * Math.PI / 180;
+            const dx = Math.cos(rad) * 6, dy = Math.sin(rad) * 6;  // ~6px pop-out
+            donut.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px) scale(1.06)';
+        }
+
+        // Cross-filter: clicking a SLICE highlights that category's keywords in
+        // the text box and scrolls to them. Uses the existing highlightInText().
+        function crossFilter(i) {
+            const seg = info.segments[i];
+            if (!seg || typeof highlightInText !== 'function') return;
+            explodeSlice(i);
+            highlightInText(seg.key);
+        }
+
         // Pointer over the FIGURE itself (not just the legend).
         donut.addEventListener('mousemove', function(e) {
             const i = sliceAtPointer(e.clientX, e.clientY);
@@ -6419,15 +6447,21 @@ function attachIndicatorPieInteractivity() {
             const i = sliceAtPointer(t.clientX, t.clientY);
             if (i >= 0) { e.preventDefault(); focusIndex(i); }
         }, { passive: false });
+        // Click on a slice -> cross-filter keywords into the text + scroll.
+        donut.style.cursor = 'pointer';
+        donut.addEventListener('click', function(e) {
+            const i = sliceAtPointer(e.clientX, e.clientY);
+            if (i >= 0) crossFilter(i);
+        });
 
-        // Legend rows and % labels still work as a secondary control.
+        // Legend rows: hover focuses; CLICK explodes the slice out a few px.
         function bind(el) {
             const i = parseInt(el.getAttribute('data-i'), 10);
             el.style.transition = 'opacity ' + DUR + ' ease, background ' + DUR + ' ease';
             el.addEventListener('mouseenter', function() { focusIndex(i); });
             el.addEventListener('mouseleave', resetInd);
-            el.addEventListener('touchstart', function(ev) { ev.preventDefault(); focusIndex(i); }, { passive: false });
-            el.addEventListener('click', function() { focusIndex(i); });
+            el.addEventListener('touchstart', function(ev) { ev.preventDefault(); explodeSlice(i); }, { passive: false });
+            el.addEventListener('click', function() { explodeSlice(i); });
         }
         legs.forEach(bind);
         pcts.forEach(bind);
