@@ -2682,7 +2682,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11.7 &middot; animacion x2 total</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11.8 &middot; torta por figura</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -6262,6 +6262,7 @@ function attachLineChartInteractivity() {
 // on the donut (the rest is dimmed) and shows its value in the center hole.
 function attachPieInteractivity() {
     const reg = window._pieInteractive || {};
+    const DUR = '1.6s';  // uniform, matches --anim-duration
     Object.keys(reg).forEach(function(pieId) {
         const donut = document.getElementById(pieId);
         if (!donut || donut.dataset.wired === '1') return;
@@ -6269,20 +6270,19 @@ function attachPieInteractivity() {
         const info = reg[pieId];
         const center = document.getElementById(pieId + '-center');
         const rows = Array.prototype.slice.call(document.querySelectorAll('.' + pieId + '-leg'));
+        donut.style.transition = 'background ' + DUR + ' cubic-bezier(0.22,0.61,0.36,1), transform ' + DUR + ' cubic-bezier(0.22,0.61,0.36,1)';
 
-        function focusSlice(row) {
+        function focusRow(row) {
             const start = parseFloat(row.getAttribute('data-start'));
             const end = parseFloat(row.getAttribute('data-end'));
             const col = row.getAttribute('data-col');
-            // Highlight the active slice; dim everything else.
             donut.style.background = 'conic-gradient(#20232e 0deg ' + start + 'deg, ' +
                 col + ' ' + start + 'deg ' + end + 'deg, #20232e ' + end + 'deg 360deg)';
             donut.style.transform = 'scale(1.04)';
             rows.forEach(function(r) { r.style.background = (r === row) ? 'rgba(255,255,255,0.08)' : ''; });
             if (center) {
-                const label = row.textContent.trim();
                 center.style.fontSize = '0.5rem';
-                center.textContent = label;
+                center.textContent = row.textContent.trim();
             }
         }
         function resetPie() {
@@ -6291,12 +6291,42 @@ function attachPieInteractivity() {
             rows.forEach(function(r) { r.style.background = ''; });
             if (center) { center.style.fontSize = '0.6rem'; center.textContent = info.total; }
         }
+        // Find the legend row whose start-end range contains the pointer angle.
+        function rowAtPointer(clientX, clientY) {
+            const rect = donut.getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+            const dx = clientX - cx, dy = clientY - cy;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < rect.width * 0.21 || dist > rect.width * 0.52) return null;
+            let angle = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+            if (angle < 0) angle += 360;
+            for (let k = 0; k < rows.length; k++) {
+                const s = parseFloat(rows[k].getAttribute('data-start'));
+                const e = parseFloat(rows[k].getAttribute('data-end'));
+                if (angle >= s && angle < e && (e - s) > 0.01) return rows[k];
+            }
+            return null;
+        }
 
+        // Interact by pointing/tapping the FIGURE itself.
+        donut.addEventListener('mousemove', function(e) {
+            const row = rowAtPointer(e.clientX, e.clientY);
+            if (row) focusRow(row); else resetPie();
+        });
+        donut.addEventListener('mouseleave', resetPie);
+        donut.addEventListener('touchstart', function(e) {
+            const t = e.touches[0];
+            const row = rowAtPointer(t.clientX, t.clientY);
+            if (row) { e.preventDefault(); focusRow(row); }
+        }, { passive: false });
+
+        // Legend rows still work too.
         rows.forEach(function(row) {
-            row.addEventListener('mouseenter', function() { focusSlice(row); });
+            row.addEventListener('mouseenter', function() { focusRow(row); });
             row.addEventListener('mouseleave', resetPie);
-            row.addEventListener('touchstart', function(ev) { ev.preventDefault(); focusSlice(row); }, { passive: false });
-            row.addEventListener('click', function() { focusSlice(row); });
+            row.addEventListener('touchstart', function(ev) { ev.preventDefault(); focusRow(row); }, { passive: false });
+            row.addEventListener('click', function() { focusRow(row); });
         });
     });
 }
@@ -6305,6 +6335,8 @@ function attachPieInteractivity() {
 // makes that slice stand out above the others (rest dimmed to grey).
 function attachIndicatorPieInteractivity() {
     const reg = window._indPieInteractive || {};
+    // Uniform animation duration mirrored here in seconds to match --anim-duration.
+    const DUR = '1.6s';
     Object.keys(reg).forEach(function(id) {
         const donut = document.getElementById(id);
         if (!donut || donut.dataset.wired === '1') return;
@@ -6312,10 +6344,12 @@ function attachIndicatorPieInteractivity() {
         const info = reg[id];
         const legs = Array.prototype.slice.call(document.querySelectorAll('.' + id + '-leg'));
         const pcts = Array.prototype.slice.call(document.querySelectorAll('.' + id + '-pct'));
+        // Slow, uniform transitions on the donut itself.
+        donut.style.transition = 'background ' + DUR + ' cubic-bezier(0.22,0.61,0.36,1), transform ' + DUR + ' cubic-bezier(0.22,0.61,0.36,1), box-shadow ' + DUR + ' cubic-bezier(0.22,0.61,0.36,1)';
 
         function focusIndex(i) {
             const seg = info.segments[i];
-            if (!seg) return;
+            if (!seg || seg.end - seg.start < 0.01) return;  // skip empty slices
             // Rebuild the gradient: active slice keeps its color, the rest go grey.
             const parts = info.segments.map(function(s) {
                 const col = (s.i === i) ? s.color : '#24272f';
@@ -6324,7 +6358,6 @@ function attachIndicatorPieInteractivity() {
             donut.style.background = 'conic-gradient(' + parts.join(',') + ')';
             donut.style.transform = 'scale(1.05)';
             donut.style.boxShadow = '0 6px 20px rgba(0,0,0,0.5), 0 0 22px -3px ' + seg.color + 'cc';
-            // Emphasize the matching legend row and % label.
             legs.forEach(function(l) {
                 l.style.background = (parseInt(l.getAttribute('data-i'), 10) === i) ? 'rgba(255,255,255,0.10)' : '';
                 l.style.opacity = (parseInt(l.getAttribute('data-i'), 10) === i) ? '1' : '0.5';
@@ -6343,9 +6376,41 @@ function attachIndicatorPieInteractivity() {
             pcts.forEach(function(p) { p.style.opacity = ''; p.style.transform = 'translate(-50%,-50%)'; });
         }
 
+        // Detect which slice the pointer is over, by the angle from the center.
+        // conic-gradient starts at the top and goes clockwise.
+        function sliceAtPointer(clientX, clientY) {
+            const rect = donut.getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+            const dx = clientX - cx, dy = clientY - cy;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            // Ignore the center hole and anything outside the donut.
+            if (dist < rect.width * 0.21 || dist > rect.width * 0.52) return -1;
+            let angle = Math.atan2(dy, dx) * 180 / Math.PI + 90;  // 0deg at top
+            if (angle < 0) angle += 360;
+            for (let k = 0; k < info.segments.length; k++) {
+                const s = info.segments[k];
+                if (angle >= s.start && angle < s.end && (s.end - s.start) > 0.01) return s.i;
+            }
+            return -1;
+        }
+
+        // Pointer over the FIGURE itself (not just the legend).
+        donut.addEventListener('mousemove', function(e) {
+            const i = sliceAtPointer(e.clientX, e.clientY);
+            if (i >= 0) focusIndex(i); else resetInd();
+        });
+        donut.addEventListener('mouseleave', resetInd);
+        donut.addEventListener('touchstart', function(e) {
+            const t = e.touches[0];
+            const i = sliceAtPointer(t.clientX, t.clientY);
+            if (i >= 0) { e.preventDefault(); focusIndex(i); }
+        }, { passive: false });
+
+        // Legend rows and % labels still work as a secondary control.
         function bind(el) {
             const i = parseInt(el.getAttribute('data-i'), 10);
-            el.style.transition = 'opacity 0.15s ease, transform 0.15s ease, background 0.15s ease';
+            el.style.transition = 'opacity ' + DUR + ' ease, background ' + DUR + ' ease';
             el.addEventListener('mouseenter', function() { focusIndex(i); });
             el.addEventListener('mouseleave', resetInd);
             el.addEventListener('touchstart', function(ev) { ev.preventDefault(); focusIndex(i); }, { passive: false });
