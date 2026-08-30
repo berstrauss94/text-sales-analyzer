@@ -1228,6 +1228,78 @@ HTML = """
             animation: fadeInSmooth var(--anim-duration) var(--anim-ease) both;
         }
 
+        /* ── INLINE TEXT REPLACEMENT — smooth content swap in one box ─────────
+           For content that reloads inside the same text box (e.g. the analyzed
+           text area). Old text fades out & lifts; new text fades in from below.
+           Subtle 250–400ms with an eased, professional feel. ──────────────── */
+
+        /* 1. .text-container-box — the box; animates its height fluidly and
+              clips content during the swap to avoid flicker. */
+        .text-container-box {
+            overflow: hidden;
+            transition: height 350ms cubic-bezier(0.25, 1, 0.5, 1),
+                        max-height 350ms cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        /* 2. .text-swap-exit — old text leaves: fade-out + slight upward lift. */
+        @keyframes textSwapExit {
+            from { opacity: 1; transform: translateY(0); }
+            to   { opacity: 0; transform: translateY(-8px); }
+        }
+        .text-swap-exit {
+            animation: textSwapExit 300ms ease-out both;
+        }
+
+        /* 3. .text-swap-enter — new text arrives: fade-in rising from below. */
+        @keyframes textSwapEnter {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .text-swap-enter {
+            animation: textSwapEnter 350ms cubic-bezier(0.25, 1, 0.5, 1) both;
+        }
+
+        /* 4. .typing-loader-inline — 3 blinking dots while new text loads. */
+        .typing-loader-inline {
+            display: inline-flex;
+            gap: 4px;
+            align-items: center;
+            vertical-align: middle;
+        }
+        .typing-loader-inline span {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: #7b9cff;
+            animation: typingBlink 1s infinite ease-in-out both;
+        }
+        .typing-loader-inline span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-loader-inline span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typingBlink {
+            0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); }
+            40%           { opacity: 1;    transform: scale(1); }
+        }
+
+        /* ── PROGRESSIVE TEXT STREAMING — word-by-word reveal with role color ─
+           Each word starts hidden and fades in sequentially (JS sets the
+           per-word --d delay). Role classes tint the words as they appear. */
+        @keyframes wordReveal {
+            from { opacity: 0; transform: translateY(4px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .stream-word {
+            opacity: 0;
+            display: inline;
+            animation: wordReveal 300ms ease-out forwards;
+            animation-delay: var(--d, 0ms);
+        }
+        .stream-word.role-vendedor { color: #5bd4f5; }  /* Vendedor → celeste */
+        .stream-word.role-cliente  { color: #f5a35b; }  /* Cliente  → naranja */
+        @media (prefers-reduced-motion: reduce) {
+            .text-swap-exit, .text-swap-enter, .stream-word {
+                animation: none !important; opacity: 1 !important; transform: none !important;
+            }
+        }
+
         /* AUTOMATIC page entrance (CSS-only, always fires on paint).
            Top-level containers reveal top-to-bottom in a fluid cascade. */
         @keyframes pageBlockIn {
@@ -1363,6 +1435,7 @@ HTML = """
             font-size: 0.7rem;
             color: #999;
             line-height: 1.5;
+            animation: slideDown var(--anim-duration) var(--anim-ease);
         }
         .src-fragment-inline .src-phrase {
             display: block;
@@ -2056,7 +2129,10 @@ HTML = """
             text-align: left;
         }
 
-        .indicator-detail.open { display: block; }
+        .indicator-detail.open {
+            display: block;
+            animation: slideDown var(--anim-duration) var(--anim-ease);
+        }
 
         .detail-word-row {
             display: flex;
@@ -2107,7 +2183,10 @@ HTML = """
             margin-top: -2px;
         }
 
-        .lead-detail-panel.open { display: block; }
+        .lead-detail-panel.open {
+            display: block;
+            animation: slideDown var(--anim-duration) var(--anim-ease);
+        }
 
         .formula-table {
             width: 100%;
@@ -2603,7 +2682,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11.4 &middot; animacion uniforme</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11.5 &middot; despliegues + text swap</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5412,6 +5491,43 @@ function animateEntrance(scope) {
             el.style.transform = 'translateY(0)';
         }, 20);
     });
+}
+
+// Progressive word-by-word reveal of a transcript, tinting each word by the
+// detected speaker role (Vendedor -> celeste, Cliente -> naranja). Non-blocking:
+// uses CSS animation-delay per word, so the UI stays responsive.
+function streamTranscript(targetEl, rawText) {
+    if (!targetEl || !rawText) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        targetEl.textContent = rawText;
+        return;
+    }
+    // Detect role per line via "Vendedor:" / "Cliente:" prefixes (case-insensitive).
+    const lines = rawText.split(/\\n/);
+    let html = '';
+    let wordIndex = 0;
+    const stepMs = 45;           // delay between words
+    const maxDelay = 4000;       // cap so long texts don't take forever
+    lines.forEach(function(line) {
+        let role = '';
+        const m = line.match(/^\\s*(vendedor|cliente|asesor|agente)\\s*:/i);
+        if (m) {
+            const r = m[1].toLowerCase();
+            role = (r === 'cliente') ? 'role-cliente' : 'role-vendedor';
+        }
+        const words = line.split(/(\\s+)/);  // keep spaces
+        words.forEach(function(w) {
+            if (/^\\s+$/.test(w) || w === '') { html += w; return; }
+            const d = Math.min(wordIndex * stepMs, maxDelay);
+            wordIndex++;
+            const cls = 'stream-word' + (role ? ' ' + role : '');
+            html += '<span class="' + cls + '" style="--d:' + d + 'ms;">' +
+                    w.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
+        });
+        html += '<br>';
+    });
+    targetEl.classList.add('text-swap-enter');
+    targetEl.innerHTML = html;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
