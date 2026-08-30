@@ -405,7 +405,7 @@ HTML = """
             --depth-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05);
             /* Single, uniform animation duration used across the whole UI:
                page entrance, section reveals and collapsible expand/collapse. */
-            --anim-duration: 800ms;
+            --anim-duration: 1600ms;
             --anim-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
         }
 
@@ -1237,8 +1237,8 @@ HTML = """
               clips content during the swap to avoid flicker. */
         .text-container-box {
             overflow: hidden;
-            transition: height 350ms cubic-bezier(0.25, 1, 0.5, 1),
-                        max-height 350ms cubic-bezier(0.25, 1, 0.5, 1);
+            transition: height 700ms cubic-bezier(0.25, 1, 0.5, 1),
+                        max-height 700ms cubic-bezier(0.25, 1, 0.5, 1);
         }
 
         /* 2. .text-swap-exit — old text leaves: fade-out + slight upward lift. */
@@ -1247,7 +1247,7 @@ HTML = """
             to   { opacity: 0; transform: translateY(-8px); }
         }
         .text-swap-exit {
-            animation: textSwapExit 300ms ease-out both;
+            animation: textSwapExit 600ms ease-out both;
         }
 
         /* 3. .text-swap-enter — new text arrives: fade-in rising from below. */
@@ -1256,7 +1256,7 @@ HTML = """
             to   { opacity: 1; transform: translateY(0); }
         }
         .text-swap-enter {
-            animation: textSwapEnter 350ms cubic-bezier(0.25, 1, 0.5, 1) both;
+            animation: textSwapEnter 700ms cubic-bezier(0.25, 1, 0.5, 1) both;
         }
 
         /* 4. .typing-loader-inline — 3 blinking dots while new text loads. */
@@ -1289,7 +1289,7 @@ HTML = """
         .stream-word {
             opacity: 0;
             display: inline;
-            animation: wordReveal 300ms ease-out forwards;
+            animation: wordReveal 600ms ease-out forwards;
             animation-delay: var(--d, 0ms);
         }
         .stream-word.role-vendedor { color: #5bd4f5; }  /* Vendedor → celeste */
@@ -2682,7 +2682,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11.6 &middot; text swap activo</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11.7 &middot; animacion x2 total</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -4488,8 +4488,8 @@ async function loadSavedText(entryId) {
                     ta.value = data.text;
                     ta.classList.remove('text-swap-exit');
                     ta.classList.add('text-swap-enter');
-                    setTimeout(function() { ta.classList.remove('text-swap-enter'); }, 400);
-                }, 160);
+                    setTimeout(function() { ta.classList.remove('text-swap-enter'); }, 800);
+                }, 320);
             } else {
                 ta.value = data.text;
             }
@@ -5498,7 +5498,7 @@ function animateEntrance(scope) {
         el.dataset.entered = '1';
         el.style.opacity = '0';
         el.style.transform = 'translateY(10px)';
-        el.style.transition = 'opacity 0.8s cubic-bezier(0.22,0.61,0.36,1), transform 0.8s cubic-bezier(0.22,0.61,0.36,1)';
+        el.style.transition = 'opacity 1.6s cubic-bezier(0.22,0.61,0.36,1), transform 1.6s cubic-bezier(0.22,0.61,0.36,1)';
         i++;
         // Uniform: all blocks reveal together with the same duration (no stagger).
         setTimeout(function() {
@@ -5521,8 +5521,8 @@ function streamTranscript(targetEl, rawText) {
     const lines = rawText.split(/\\n/);
     let html = '';
     let wordIndex = 0;
-    const stepMs = 45;           // delay between words
-    const maxDelay = 4000;       // cap so long texts don't take forever
+    const stepMs = 90;           // delay between words
+    const maxDelay = 8000;       // cap so long texts don't take forever
     lines.forEach(function(line) {
         let role = '';
         const m = line.match(/^\\s*(vendedor|cliente|asesor|agente)\\s*:/i);
@@ -6751,11 +6751,11 @@ LOGIN_HTML = """
             border: 1px solid #2a2d3a;
             border-radius: 12px;
             padding: 28px;
-            animation: authDropIn 800ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+            animation: authDropIn 1600ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
         }
         /* All fields fade in with the SAME uniform duration (no stagger). */
         .form-group {
-            animation: fieldSlideIn 800ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+            animation: fieldSlideIn 1600ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
         }
         @media (prefers-reduced-motion: reduce) {
             .auth-card, .form-group { animation: none !important; opacity: 1 !important; transform: none !important; }
