@@ -405,7 +405,7 @@ HTML = """
             --depth-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05);
             /* Single, uniform animation duration used across the whole UI:
                page entrance, section reveals and collapsible expand/collapse. */
-            --anim-duration: 1600ms;
+            --anim-duration: 6400ms;
             --anim-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
         }
 
@@ -1237,8 +1237,8 @@ HTML = """
               clips content during the swap to avoid flicker. */
         .text-container-box {
             overflow: hidden;
-            transition: height 700ms cubic-bezier(0.25, 1, 0.5, 1),
-                        max-height 700ms cubic-bezier(0.25, 1, 0.5, 1);
+            transition: height 2800ms cubic-bezier(0.25, 1, 0.5, 1),
+                        max-height 2800ms cubic-bezier(0.25, 1, 0.5, 1);
         }
 
         /* 2. .text-swap-exit — old text leaves: fade-out + slight upward lift. */
@@ -1247,7 +1247,7 @@ HTML = """
             to   { opacity: 0; transform: translateY(-8px); }
         }
         .text-swap-exit {
-            animation: textSwapExit 600ms ease-out both;
+            animation: textSwapExit 2400ms ease-out both;
         }
 
         /* 3. .text-swap-enter — new text arrives: fade-in rising from below. */
@@ -1256,7 +1256,7 @@ HTML = """
             to   { opacity: 1; transform: translateY(0); }
         }
         .text-swap-enter {
-            animation: textSwapEnter 700ms cubic-bezier(0.25, 1, 0.5, 1) both;
+            animation: textSwapEnter 2800ms cubic-bezier(0.25, 1, 0.5, 1) both;
         }
 
         /* 4. .typing-loader-inline — 3 blinking dots while new text loads. */
@@ -1289,7 +1289,7 @@ HTML = """
         .stream-word {
             opacity: 0;
             display: inline;
-            animation: wordReveal 600ms ease-out forwards;
+            animation: wordReveal 2400ms ease-out forwards;
             animation-delay: var(--d, 0ms);
         }
         .stream-word.role-vendedor { color: #5bd4f5; }  /* Vendedor → celeste */
@@ -2682,7 +2682,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11.8 &middot; torta por figura</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11.9 &middot; lista % + anim x4</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -4488,8 +4488,8 @@ async function loadSavedText(entryId) {
                     ta.value = data.text;
                     ta.classList.remove('text-swap-exit');
                     ta.classList.add('text-swap-enter');
-                    setTimeout(function() { ta.classList.remove('text-swap-enter'); }, 800);
-                }, 320);
+                    setTimeout(function() { ta.classList.remove('text-swap-enter'); }, 3200);
+                }, 1280);
             } else {
                 ta.value = data.text;
             }
@@ -4720,22 +4720,32 @@ async function loadAdminStats() {
                 // seg.pct is the segment's % of the total pie (e.g. 5%)
                 // Each word's share = (wordCount / segTotal) * seg.pct
                 // So all words inside sum exactly to seg.pct
-                let html = '<div style="font-size:0.75rem;color:' + seg.color + ';font-weight:700;margin-bottom:6px;border-bottom:1px solid ' + seg.color + '33;padding-bottom:4px;">' + seg.pct + '% ' + seg.label + '</div>';
+                let html = '<div style="font-size:0.8rem;color:' + seg.color + ';font-weight:700;margin-bottom:8px;border-bottom:1px solid ' + seg.color + '44;padding-bottom:6px;letter-spacing:0.02em;">' + seg.pct + '% · ' + seg.label + '</div>';
                 if (entries.length > 0) {
-                    html += '<div style="display:flex;flex-direction:column;gap:3px;">';
+                    const maxCount = entries[0][1] || 1;  // top word for relative bar scaling
+                    html += '<div style="display:flex;flex-direction:column;gap:4px;">';
                     entries.slice(0, 15).forEach(function(e) {
                         // Proportion of this word within the segment's total percentage
                         const wordShare = (e[1] / segTotal) * seg.pct;
                         const displayPct = wordShare < 0.1 ? '<0.1' : wordShare.toFixed(1);
-                        const barWidth = Math.max(Math.round((e[1] / segTotal) * 100), 3);
-                        html += '<div style="display:flex;align-items:center;gap:6px;"><div style="width:36px;text-align:right;font-size:0.62rem;color:' + seg.color + ';font-weight:600;">' + displayPct + '%</div><div style="flex:1;background:#1a1d27;border-radius:4px;height:14px;position:relative;overflow:hidden;"><div style="position:absolute;left:0;top:0;height:100%;width:' + Math.min(barWidth, 100) + '%;background:' + seg.color + '33;border-radius:4px;"></div><span style="position:relative;z-index:1;font-size:0.58rem;color:#ddd;padding-left:4px;line-height:14px;">' + e[0] + '</span></div><div style="font-size:0.55rem;color:#666;min-width:20px;">' + e[1] + 'x</div></div>';
+                        // Bar scaled relative to the most frequent word (clearer visual).
+                        const barWidth = Math.max(Math.round((e[1] / maxCount) * 100), 6);
+                        html += '' +
+                          '<div style="display:flex;align-items:center;gap:8px;">' +
+                            '<div style="width:42px;text-align:right;font-size:0.64rem;color:' + seg.color + ';font-weight:700;font-variant-numeric:tabular-nums;">' + displayPct + '%</div>' +
+                            '<div style="flex:1;background:#12141c;border:1px solid ' + seg.color + '22;border-radius:5px;height:18px;position:relative;overflow:hidden;">' +
+                              '<div style="position:absolute;left:0;top:0;height:100%;width:' + Math.min(barWidth, 100) + '%;background:linear-gradient(90deg,' + seg.color + '55,' + seg.color + '22);border-radius:5px;"></div>' +
+                              '<span style="position:relative;z-index:1;font-size:0.62rem;color:#f0f0f0;padding-left:8px;line-height:18px;white-space:nowrap;">' + e[0] + '</span>' +
+                            '</div>' +
+                            '<div style="font-size:0.6rem;color:#999;min-width:32px;text-align:right;font-variant-numeric:tabular-nums;">' + e[1] + 'x</div>' +
+                          '</div>';
                     });
                     if (entries.length > 15) {
-                        html += '<div style="font-size:0.55rem;color:#555;text-align:center;margin-top:2px;">... y ' + (entries.length - 15) + ' mas</div>';
+                        html += '<div style="font-size:0.58rem;color:#666;text-align:center;margin-top:4px;">+ ' + (entries.length - 15) + ' palabras mas</div>';
                     }
                     html += '</div>';
                 } else {
-                    html += '<div style="font-size:0.6rem;color:#666;">Sin detalle de palabras disponible</div>';
+                    html += '<div style="font-size:0.62rem;color:#666;">Sin detalle de palabras disponible</div>';
                 }
                 tooltipEl.innerHTML = html;
                 tooltipEl.style.display = 'block';
@@ -5498,7 +5508,7 @@ function animateEntrance(scope) {
         el.dataset.entered = '1';
         el.style.opacity = '0';
         el.style.transform = 'translateY(10px)';
-        el.style.transition = 'opacity 1.6s cubic-bezier(0.22,0.61,0.36,1), transform 1.6s cubic-bezier(0.22,0.61,0.36,1)';
+        el.style.transition = 'opacity 6.4s cubic-bezier(0.22,0.61,0.36,1), transform 6.4s cubic-bezier(0.22,0.61,0.36,1)';
         i++;
         // Uniform: all blocks reveal together with the same duration (no stagger).
         setTimeout(function() {
@@ -6262,7 +6272,7 @@ function attachLineChartInteractivity() {
 // on the donut (the rest is dimmed) and shows its value in the center hole.
 function attachPieInteractivity() {
     const reg = window._pieInteractive || {};
-    const DUR = '1.6s';  // uniform, matches --anim-duration
+    const DUR = '6.4s';  // uniform, matches --anim-duration
     Object.keys(reg).forEach(function(pieId) {
         const donut = document.getElementById(pieId);
         if (!donut || donut.dataset.wired === '1') return;
@@ -6336,7 +6346,7 @@ function attachPieInteractivity() {
 function attachIndicatorPieInteractivity() {
     const reg = window._indPieInteractive || {};
     // Uniform animation duration mirrored here in seconds to match --anim-duration.
-    const DUR = '1.6s';
+    const DUR = '6.4s';
     Object.keys(reg).forEach(function(id) {
         const donut = document.getElementById(id);
         if (!donut || donut.dataset.wired === '1') return;
@@ -6816,11 +6826,11 @@ LOGIN_HTML = """
             border: 1px solid #2a2d3a;
             border-radius: 12px;
             padding: 28px;
-            animation: authDropIn 1600ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+            animation: authDropIn 6400ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
         }
         /* All fields fade in with the SAME uniform duration (no stagger). */
         .form-group {
-            animation: fieldSlideIn 1600ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+            animation: fieldSlideIn 6400ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
         }
         @media (prefers-reduced-motion: reduce) {
             .auth-card, .form-group { animation: none !important; opacity: 1 !important; transform: none !important; }
