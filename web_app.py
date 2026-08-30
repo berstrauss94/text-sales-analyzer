@@ -2684,7 +2684,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.2 &middot; audio global</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.3 &middot; audio total</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5677,8 +5677,20 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', function(e) {
         var t = e.target;
         if (!t || !t.closest) return;
-        if (t.closest('button, .category-option, .indicator-item, .pie-legend-row, .lead-badge, .card-title-collapsible')) {
+        if (t.closest('button, .category-option, .indicator-item, .pie-legend-row, .lead-badge, .card-title-collapsible, .pie-chart-click, .stats-legend-item')) {
             UISound.click();
+        }
+    });
+    // Selectors (month, text, year, user, informe filters...) click on change.
+    document.addEventListener('change', function(e) {
+        if (e.target && e.target.tagName === 'SELECT') UISound.click();
+    });
+    // Line-chart data points and SVG dots: tick when pointed at.
+    document.addEventListener('mouseover', function(e) {
+        var t = e.target;
+        if (t && t.tagName && (t.tagName.toLowerCase() === 'circle' || (t.closest && t.closest('svg')))) {
+            var now = Date.now();
+            if (now - _lastTick > 70) { _lastTick = now; UISound.tick(); }
         }
     });
 
@@ -7312,6 +7324,61 @@ window.addEventListener('DOMContentLoaded', function() {
             document.getElementById('remember').checked = true;
         }
     }
+});
+
+// ── UI SOUND ENGINE (login page) — synthesized, no external assets ──
+var UISound = (function() {
+    var ctx = null, muted = false;
+    try { muted = localStorage.getItem('uiSoundMuted') === '1'; } catch (e) {}
+    function ac() {
+        if (ctx) return ctx;
+        try { var AC = window.AudioContext || window.webkitAudioContext; if (AC) ctx = new AC(); } catch (e) { ctx = null; }
+        return ctx;
+    }
+    function tone(f0, f1, dur, peak, type) {
+        if (muted) return;
+        var c = ac(); if (!c) return;
+        try {
+            if (c.state === 'suspended') c.resume();
+            var osc = c.createOscillator(), g = c.createGain(), now = c.currentTime;
+            osc.type = type || 'sine';
+            osc.frequency.setValueAtTime(f0, now);
+            if (f1 && f1 !== f0) osc.frequency.exponentialRampToValueAtTime(Math.max(1, f1), now + dur);
+            g.gain.setValueAtTime(0.0001, now);
+            g.gain.exponentialRampToValueAtTime(peak, now + 0.006);
+            g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+            osc.connect(g); g.connect(c.destination);
+            osc.start(now); osc.stop(now + dur + 0.02);
+        } catch (e) {}
+    }
+    return {
+        tick: function() { tone(1760, 1500, 0.045, 0.06, 'sine'); },
+        click: function() { tone(920, 1200, 0.09, 0.10, 'triangle'); },
+        cancel: function() { tone(620, 300, 0.16, 0.09, 'sine'); },
+        unlock: function() { var c = ac(); if (c && c.state === 'suspended') { try { c.resume(); } catch (e) {} } }
+    };
+})();
+window.addEventListener('DOMContentLoaded', function() {
+    function unlockOnce() {
+        UISound.unlock();
+        document.removeEventListener('pointerdown', unlockOnce);
+        document.removeEventListener('keydown', unlockOnce);
+    }
+    document.addEventListener('pointerdown', unlockOnce);
+    document.addEventListener('keydown', unlockOnce);
+    var lastTick = 0;
+    document.addEventListener('mouseover', function(e) {
+        var t = e.target;
+        if (!t || !t.closest) return;
+        if (t.closest('button, input, .tab-btn, a, label')) {
+            var now = Date.now();
+            if (now - lastTick > 55) { lastTick = now; UISound.tick(); }
+        }
+    });
+    document.addEventListener('click', function(e) {
+        var t = e.target;
+        if (t && t.closest && t.closest('button, .tab-btn, a')) UISound.click();
+    });
 });
 </script>
 </body>
