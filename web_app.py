@@ -2684,7 +2684,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.14 &middot; cross-filter panel admin</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v13 &middot; login cyan</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -7092,16 +7092,68 @@ LOGIN_HTML = """
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
+        :root {
+            --accent-cyan: #00f0ff;
+            --accent-glow: rgba(0, 240, 255, 0.3);
+        }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: #0f1117;
-            color: #e0e0e0;
+            background: #07090e;
+            color: #e2e8f0;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 20px;
+            overflow-x: hidden;
+            position: relative;
         }
+
+        /* Animated background: radial cyan glow + drifting particle grid.
+           Fades in first (the card appears afterwards). */
+        .login-bg-fx {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at 50% 45%, #10233f 0%, #07090e 70%);
+            z-index: -2;
+            opacity: 0;
+            animation: bgFadeIn 1.4s ease forwards;
+        }
+        .login-particles {
+            position: fixed;
+            inset: 0;
+            background-image: radial-gradient(var(--accent-cyan) 1px, transparent 1px);
+            background-size: 50px 50px;
+            opacity: 0;
+            z-index: -1;
+            animation: particlesFadeIn 1.8s ease forwards, panBackground 30s linear infinite;
+        }
+        @keyframes bgFadeIn { to { opacity: 1; } }
+        @keyframes particlesFadeIn { to { opacity: 0.06; } }
+        @keyframes panBackground {
+            0% { background-position: 0 0; }
+            100% { background-position: 50px 50px; }
+        }
+        /* When animation is cancelled, freeze the background statically. */
+        body.no-anim .login-bg-fx { animation: none; opacity: 1; }
+        body.no-anim .login-particles { animation: none; opacity: 0.05; }
+
+        /* Toggle to cancel the entrance animation (persisted). */
+        .anim-toggle {
+            position: fixed;
+            top: 14px; right: 14px;
+            z-index: 10;
+            background: rgba(18, 24, 38, 0.85);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            color: var(--accent-cyan);
+            font-size: 0.72rem;
+            padding: 6px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            backdrop-filter: blur(6px);
+            transition: box-shadow 0.2s, border-color 0.2s;
+        }
+        .anim-toggle:hover { box-shadow: 0 0 12px var(--accent-glow); }
 
         .auth-container {
             width: 100%;
@@ -7125,34 +7177,47 @@ LOGIN_HTML = """
             font-size: 0.9rem;
         }
 
-        /* Entrance animations: reveal top-to-bottom, fluidly. */
-        @keyframes authDropIn {
-            from { opacity: 0; transform: translateY(-18px); }
-            to   { opacity: 1; transform: translateY(0); }
+        /* Entrance: the card slides in from the left AFTER the background has
+           faded in (delay), so the sequence is bg first, then the login box. */
+        @keyframes authSlideIn {
+            0%   { opacity: 0; transform: translateX(-60px) scale(0.98); }
+            100% { opacity: 1; transform: translateX(0) scale(1); }
         }
         @keyframes fieldSlideIn {
             from { opacity: 0; transform: translateX(-14px); }
             to   { opacity: 1; transform: translateX(0); }
         }
         .auth-card {
-            background: #1a1d27;
-            border: 1px solid #2a2d3a;
+            background: rgba(18, 24, 38, 0.85);
+            border: 1px solid rgba(0, 240, 255, 0.2);
             border-radius: 12px;
             padding: 28px;
-            animation: authDropIn 6400ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6), inset 0 0 15px rgba(0,240,255,0.05);
+            /* 1.4s delay = wait for the background, then slide in over 1.2s. */
+            opacity: 0;
+            animation: authSlideIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) 1.4s forwards;
         }
-        /* All fields fade in with the SAME uniform duration (no stagger). */
         .form-group {
-            animation: fieldSlideIn 6400ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+            animation: fieldSlideIn 1s cubic-bezier(0.16, 1, 0.3, 1) both;
         }
-        /* Phones: shorten login entrance to x1.5 (2400ms) to match the app. */
+        /* Phones: lighter blur (perf on older devices) and quicker card entrance. */
         @media (max-width: 480px) {
-            .auth-card { animation-duration: 2400ms; }
-            .form-group { animation-duration: 2400ms; }
+            .auth-card {
+                backdrop-filter: blur(5px);
+                -webkit-backdrop-filter: blur(5px);
+                animation-delay: 1.0s;
+                animation-duration: 0.9s;
+            }
+            .form-group { animation-duration: 0.7s; }
             .text-swap-exit { animation-duration: 900ms; }
             .text-swap-enter { animation-duration: 1050ms; }
             .stream-word { animation-duration: 900ms; }
         }
+        /* Animation cancelled by the user: everything appears instantly. */
+        body.no-anim .auth-card { animation: none; opacity: 1; }
+        body.no-anim .form-group { animation: none; opacity: 1; }
         @media (prefers-reduced-motion: reduce) {
             .auth-card, .form-group { animation: none !important; opacity: 1 !important; transform: none !important; }
         }
@@ -7294,6 +7359,9 @@ LOGIN_HTML = """
     </style>
 </head>
 <body>
+<div class="login-bg-fx"></div>
+<div class="login-particles"></div>
+<button type="button" class="anim-toggle" id="animToggle" onclick="toggleLoginAnim()" aria-label="Activar o desactivar la animacion de inicio">&#9210; Animacion</button>
 <div class="auth-container">
     <div class="auth-header">
         <h1>Analizador de Textos</h1>
@@ -7472,6 +7540,24 @@ window.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// Cancel / restore the login entrance animation (persisted preference).
+function toggleLoginAnim() {
+    var off = document.body.classList.toggle('no-anim');
+    try { localStorage.setItem('loginAnimOff', off ? '1' : '0'); } catch (e) {}
+    refreshAnimToggle();
+}
+function refreshAnimToggle() {
+    var btn = document.getElementById('animToggle');
+    if (!btn) return;
+    var off = document.body.classList.contains('no-anim');
+    btn.innerHTML = off ? '&#9209; Animacion off' : '&#9210; Animacion';
+    btn.style.opacity = off ? '0.6' : '1';
+}
+// Apply saved preference as early as possible to avoid a flash of animation.
+(function() {
+    try { if (localStorage.getItem('loginAnimOff') === '1') document.body.classList.add('no-anim'); } catch (e) {}
+})();
+
 // ── UI SOUND ENGINE (login page) — synthesized, no external assets ──
 var UISound = (function() {
     var ctx = null, master = null, verb = null, muted = false;
@@ -7562,6 +7648,8 @@ var UISound = (function() {
     };
 })();
 window.addEventListener('DOMContentLoaded', function() {
+    // Reflect the saved animation preference on the toggle button.
+    refreshAnimToggle();
     // Only unlock audio on first gesture — do NOT play startup here, otherwise
     // it collides with the startup fired on login submit. The tuning cue is
     // reserved for the actual "enter" action (submit).
