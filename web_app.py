@@ -1189,7 +1189,7 @@ HTML = """
             to   { opacity: 1; transform: translateY(0); }
         }
         .fade-in-smooth {
-            animation: fadeInSmooth 450ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+            animation: fadeInSmooth 900ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
         }
 
         /* 2. .graph-line-reveal — progressive stroke draw for SVG line charts.
@@ -1202,7 +1202,7 @@ HTML = """
         .graph-line-reveal {
             stroke-dasharray: 1;
             stroke-dashoffset: 1;
-            animation: graphLineReveal 600ms ease-in-out forwards;
+            animation: graphLineReveal 1200ms ease-in-out forwards;
         }
 
         /* 3. .pie-chart-expand — circular reveal growing from the center.
@@ -1213,24 +1213,24 @@ HTML = """
         }
         .pie-chart-expand {
             transform-origin: center center;
-            animation: pieChartExpand 500ms cubic-bezier(0.34, 1.2, 0.64, 1) both;
+            animation: pieChartExpand 1000ms cubic-bezier(0.34, 1.2, 0.64, 1) both;
         }
 
         /* 4. .staggered-entry — base for sequential delays on sibling items.
               Put .staggered-entry on each child; the :nth-child rules below
               cascade the animation-delay so items appear one after another. */
         .staggered-entry {
-            animation: fadeInSmooth 400ms ease-in-out both;
+            animation: fadeInSmooth 800ms ease-in-out both;
         }
         .staggered-entry:nth-child(1) { animation-delay: 0ms; }
-        .staggered-entry:nth-child(2) { animation-delay: 60ms; }
-        .staggered-entry:nth-child(3) { animation-delay: 120ms; }
-        .staggered-entry:nth-child(4) { animation-delay: 180ms; }
-        .staggered-entry:nth-child(5) { animation-delay: 240ms; }
-        .staggered-entry:nth-child(6) { animation-delay: 300ms; }
-        .staggered-entry:nth-child(7) { animation-delay: 360ms; }
-        .staggered-entry:nth-child(8) { animation-delay: 420ms; }
-        .staggered-entry:nth-child(n+9) { animation-delay: 480ms; }
+        .staggered-entry:nth-child(2) { animation-delay: 120ms; }
+        .staggered-entry:nth-child(3) { animation-delay: 240ms; }
+        .staggered-entry:nth-child(4) { animation-delay: 360ms; }
+        .staggered-entry:nth-child(5) { animation-delay: 480ms; }
+        .staggered-entry:nth-child(6) { animation-delay: 600ms; }
+        .staggered-entry:nth-child(7) { animation-delay: 720ms; }
+        .staggered-entry:nth-child(8) { animation-delay: 840ms; }
+        .staggered-entry:nth-child(n+9) { animation-delay: 960ms; }
 
         /* AUTOMATIC page entrance (CSS-only, always fires on paint).
            Top-level containers reveal top-to-bottom in a fluid cascade. */
@@ -1242,12 +1242,12 @@ HTML = """
         .input-section,
         #adminStatsPanel,
         .results {
-            animation: pageBlockIn 500ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+            animation: pageBlockIn 1000ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
         }
-        .top-bar          { animation-delay: 40ms; }
-        .input-section    { animation-delay: 140ms; }
-        #adminStatsPanel  { animation-delay: 240ms; }
-        .results          { animation-delay: 320ms; }
+        .top-bar          { animation-delay: 80ms; }
+        .input-section    { animation-delay: 280ms; }
+        #adminStatsPanel  { animation-delay: 480ms; }
+        .results          { animation-delay: 640ms; }
 
         /* Accessibility: honor users who prefer reduced motion. */
         @media (prefers-reduced-motion: reduce) {
@@ -2611,7 +2611,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11.2 &middot; entrada CSS</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v11.3 &middot; animacion x2</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5412,8 +5412,8 @@ function animateEntrance(scope) {
         el.dataset.entered = '1';
         el.style.opacity = '0';
         el.style.transform = 'translateY(10px)';
-        el.style.transition = 'opacity 0.45s cubic-bezier(0.22,0.61,0.36,1), transform 0.45s cubic-bezier(0.22,0.61,0.36,1)';
-        const delay = Math.min(i * 55, 500);  // cap the cascade so nothing lags
+        el.style.transition = 'opacity 0.9s cubic-bezier(0.22,0.61,0.36,1), transform 0.9s cubic-bezier(0.22,0.61,0.36,1)';
+        const delay = Math.min(i * 110, 1000);  // cap the cascade so nothing lags
         i++;
         setTimeout(function() {
             el.style.opacity = '1';
@@ -6628,18 +6628,18 @@ LOGIN_HTML = """
             border: 1px solid #2a2d3a;
             border-radius: 12px;
             padding: 28px;
-            animation: authDropIn 500ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+            animation: authDropIn 1000ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
         }
         /* Each field slides in left-to-right, one after another (cascade). */
         .form-group {
-            animation: fieldSlideIn 420ms ease-out both;
+            animation: fieldSlideIn 840ms ease-out both;
         }
-        .form-group:nth-child(1) { animation-delay: 120ms; }
-        .form-group:nth-child(2) { animation-delay: 190ms; }
-        .form-group:nth-child(3) { animation-delay: 260ms; }
-        .form-group:nth-child(4) { animation-delay: 330ms; }
-        .form-group:nth-child(5) { animation-delay: 400ms; }
-        .form-group:nth-child(n+6) { animation-delay: 460ms; }
+        .form-group:nth-child(1) { animation-delay: 240ms; }
+        .form-group:nth-child(2) { animation-delay: 380ms; }
+        .form-group:nth-child(3) { animation-delay: 520ms; }
+        .form-group:nth-child(4) { animation-delay: 660ms; }
+        .form-group:nth-child(5) { animation-delay: 800ms; }
+        .form-group:nth-child(n+6) { animation-delay: 920ms; }
         @media (prefers-reduced-motion: reduce) {
             .auth-card, .form-group { animation: none !important; opacity: 1 !important; transform: none !important; }
         }
