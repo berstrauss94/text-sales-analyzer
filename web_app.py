@@ -2684,7 +2684,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.5 &middot; audio suave</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.6 &middot; audio campana</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5570,52 +5570,67 @@ var UISound = (function() {
         return ctx;
     }
 
-    // Core voice: always a smooth sine through a gentle low-pass (no 8-bit edge),
-    // with a portion sent to the long reverb bus for echo/space.
-    function tone(f0, f1, dur, peak, type, verbAmt) {
+    // Bell/glass voice: a fundamental + inharmonic partials give an organic,
+    // struck-bell timbre (not a flat/square beep). Percussive envelope with a
+    // long exponential tail; a portion is sent to the reverb bus for space.
+    // Partials at non-integer ratios (2.76, 5.4) evoke metal bars / glass.
+    var PARTIALS = [
+        { r: 1.0,  a: 1.0 },
+        { r: 2.76, a: 0.42 },
+        { r: 5.40, a: 0.16 }
+    ];
+    function tone(f0, f1, dur, peak, verbAmt) {
         if (muted) return;
         var c = ac();
         if (!c || !master) return;
         try {
             if (c.state === 'suspended') c.resume();
-            var osc = c.createOscillator();
-            var g = c.createGain();
-            var lp = c.createBiquadFilter();
             var now = c.currentTime;
-            osc.type = type || 'sine';
-            osc.frequency.setValueAtTime(f0, now);
-            if (f1 && f1 !== f0) osc.frequency.exponentialRampToValueAtTime(Math.max(1, f1), now + dur);
-            lp.type = 'lowpass'; lp.frequency.value = 5200;   // shave harsh highs
-            g.gain.setValueAtTime(0.0001, now);
-            g.gain.exponentialRampToValueAtTime(peak, now + 0.012);   // soft attack
-            g.gain.exponentialRampToValueAtTime(0.0001, now + dur);   // smooth tail
-            osc.connect(lp); lp.connect(g);
-            g.connect(master);
+            var out = c.createGain();
+            out.gain.value = 1;
+            out.connect(master);
             if (verb && verbAmt > 0) {
                 var send = c.createGain(); send.gain.value = verbAmt;
-                g.connect(send); send.connect(verb);
+                out.connect(send); send.connect(verb);
             }
-            osc.start(now);
-            osc.stop(now + dur + 0.05);
+            // Subtle vibrato so the tone breathes instead of sitting static.
+            var lfo = c.createOscillator();
+            var lfoGain = c.createGain();
+            lfo.frequency.value = 5.5;
+            lfoGain.gain.value = f0 * 0.006;
+            lfo.connect(lfoGain);
+            lfo.start(now); lfo.stop(now + dur + 0.1);
+
+            PARTIALS.forEach(function(p, idx) {
+                var osc = c.createOscillator();
+                var g = c.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(f0 * p.r, now);
+                if (f1 && f1 !== f0) osc.frequency.exponentialRampToValueAtTime(Math.max(1, f1 * p.r), now + dur);
+                lfoGain.connect(osc.frequency);
+                // Higher partials decay faster — natural bell behavior.
+                var pd = dur * (1 - idx * 0.22);
+                var pk = peak * p.a;
+                g.gain.setValueAtTime(0.0001, now);
+                g.gain.exponentialRampToValueAtTime(pk, now + 0.008);          // soft strike
+                g.gain.exponentialRampToValueAtTime(0.0001, now + Math.max(0.05, pd));
+                osc.connect(g); g.connect(out);
+                osc.start(now); osc.stop(now + dur + 0.08);
+            });
         } catch (e) { /* audio must never break the UI */ }
     }
 
     return {
-        // Soft, high, airy navigation tick with a touch of space.
-        tick: function() {
-            tone(1900, 1750, 0.055, 0.035, 'sine', 0.35);
-        },
-        // Smooth selection cue (two soft sines) with generous echo.
-        click: function() {
-            tone(1180, 1360, 0.10, 0.07, 'sine', 0.7);
-            tone(1760, 1900, 0.08, 0.035, 'sine', 0.7);
-        },
-        // Back / dismiss — soft descending cue with tail.
-        cancel: function() { tone(720, 360, 0.20, 0.06, 'sine', 0.8); },
-        // Rising initialization cue, spacious — for page/menu startup.
+        // Soft glassy navigation tick.
+        tick: function() { tone(1660, 1660, 0.09, 0.03, 0.4); },
+        // Warm bell selection cue with generous echo.
+        click: function() { tone(1046, 1046, 0.5, 0.06, 0.85); },
+        // Back / dismiss — lower bell that fades.
+        cancel: function() { tone(560, 420, 0.5, 0.05, 0.9); },
+        // Rising initialization chime — two struck bells a fifth apart.
         startup: function() {
-            tone(440, 1320, 0.55, 0.045, 'sine', 0.9);
-            tone(880, 1980, 0.60, 0.028, 'sine', 0.9);
+            tone(660, 660, 0.9, 0.045, 1.0);
+            setTimeout(function() { tone(990, 990, 1.1, 0.04, 1.0); }, 130);
         },
         // Create/resume the AudioContext after a user gesture (autoplay policy).
         unlock: function() {
@@ -7378,41 +7393,52 @@ var UISound = (function() {
             var AC = window.AudioContext || window.webkitAudioContext;
             if (!AC) return null;
             ctx = new AC();
-            master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
+            master = ctx.createGain(); master.gain.value = 0.85; master.connect(ctx.destination);
             verb = ctx.createConvolver();
-            var len = Math.floor(ctx.sampleRate * 0.18);
+            var len = Math.floor(ctx.sampleRate * 1.1);
             var b = ctx.createBuffer(2, len, ctx.sampleRate);
             for (var ch = 0; ch < 2; ch++) {
                 var d = b.getChannelData(ch);
-                for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2);
+                for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
             }
             verb.buffer = b;
-            var vg = ctx.createGain(); vg.gain.value = 0.28; verb.connect(vg); vg.connect(master);
+            var vlp = ctx.createBiquadFilter(); vlp.type = 'lowpass'; vlp.frequency.value = 3200;
+            var vg = ctx.createGain(); vg.gain.value = 0.55; verb.connect(vlp); vlp.connect(vg); vg.connect(master);
         } catch (e) { ctx = null; }
         return ctx;
     }
-    function tone(f0, f1, dur, peak, type, spatial) {
+    var PARTIALS = [{ r: 1.0, a: 1.0 }, { r: 2.76, a: 0.42 }, { r: 5.40, a: 0.16 }];
+    function tone(f0, f1, dur, peak, verbAmt) {
         if (muted) return;
         var c = ac(); if (!c || !master) return;
         try {
             if (c.state === 'suspended') c.resume();
-            var osc = c.createOscillator(), g = c.createGain(), now = c.currentTime;
-            osc.type = type || 'sine';
-            osc.frequency.setValueAtTime(f0, now);
-            if (f1 && f1 !== f0) osc.frequency.exponentialRampToValueAtTime(Math.max(1, f1), now + dur);
-            g.gain.setValueAtTime(0.0001, now);
-            g.gain.exponentialRampToValueAtTime(peak, now + 0.004);
-            g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-            osc.connect(g); g.connect(master);
-            if (spatial && verb) g.connect(verb);
-            osc.start(now); osc.stop(now + dur + 0.02);
+            var now = c.currentTime;
+            var out = c.createGain(); out.gain.value = 1; out.connect(master);
+            if (verb && verbAmt > 0) { var send = c.createGain(); send.gain.value = verbAmt; out.connect(send); send.connect(verb); }
+            var lfo = c.createOscillator(), lfoGain = c.createGain();
+            lfo.frequency.value = 5.5; lfoGain.gain.value = f0 * 0.006; lfo.connect(lfoGain);
+            lfo.start(now); lfo.stop(now + dur + 0.1);
+            PARTIALS.forEach(function(p, idx) {
+                var osc = c.createOscillator(), g = c.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(f0 * p.r, now);
+                if (f1 && f1 !== f0) osc.frequency.exponentialRampToValueAtTime(Math.max(1, f1 * p.r), now + dur);
+                lfoGain.connect(osc.frequency);
+                var pd = dur * (1 - idx * 0.22), pk = peak * p.a;
+                g.gain.setValueAtTime(0.0001, now);
+                g.gain.exponentialRampToValueAtTime(pk, now + 0.008);
+                g.gain.exponentialRampToValueAtTime(0.0001, now + Math.max(0.05, pd));
+                osc.connect(g); g.connect(out);
+                osc.start(now); osc.stop(now + dur + 0.08);
+            });
         } catch (e) {}
     }
     return {
-        tick: function() { tone(1900, 1750, 0.055, 0.035, 'sine', 0.35); },
-        click: function() { tone(1180, 1360, 0.10, 0.07, 'sine', 0.7); tone(1760, 1900, 0.08, 0.035, 'sine', 0.7); },
-        cancel: function() { tone(720, 360, 0.20, 0.06, 'sine', 0.8); },
-        startup: function() { tone(440, 1320, 0.55, 0.045, 'sine', 0.9); tone(880, 1980, 0.60, 0.028, 'sine', 0.9); },
+        tick: function() { tone(1660, 1660, 0.09, 0.03, 0.4); },
+        click: function() { tone(1046, 1046, 0.5, 0.06, 0.85); },
+        cancel: function() { tone(560, 420, 0.5, 0.05, 0.9); },
+        startup: function() { tone(660, 660, 0.9, 0.045, 1.0); setTimeout(function() { tone(990, 990, 1.1, 0.04, 1.0); }, 130); },
         unlock: function() { var c = ac(); if (c && c.state === 'suspended') { try { c.resume(); } catch (e) {} } }
     };
 })();
