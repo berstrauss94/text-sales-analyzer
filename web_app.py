@@ -2684,7 +2684,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.10 &middot; fix doble startup</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.11 &middot; audio suave sin startup</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5611,9 +5611,11 @@ var UISound = (function() {
                 // Higher partials decay faster — natural bell behavior.
                 var pd = dur * (1 - idx * 0.22);
                 var pk = peak * p.a;
+                // Gentle rounded attack (no percussive strike) so it blends in.
+                var atk = Math.min(0.06, dur * 0.35);
                 g.gain.setValueAtTime(0.0001, now);
-                g.gain.exponentialRampToValueAtTime(pk, now + 0.008);          // soft strike
-                g.gain.exponentialRampToValueAtTime(0.0001, now + Math.max(0.05, pd));
+                g.gain.exponentialRampToValueAtTime(pk, now + atk);
+                g.gain.exponentialRampToValueAtTime(0.0001, now + Math.max(0.06, pd));
                 osc.connect(g); g.connect(out);
                 osc.start(now); osc.stop(now + dur + 0.08);
             });
@@ -5667,12 +5669,12 @@ var UISound = (function() {
     }
 
     return {
-        // Lower, warm navigation tick (down an octave from before).
-        tick: function() { tone(660, 660, 0.13, 0.03, 0.35); },
-        // Deeper selection cue for button presses.
-        click: function() { tone(440, 440, 0.5, 0.06, 0.5); },
+        // Soft, breathy navigation tick — blends into the page, no sharp edge.
+        tick: function() { tone(520, 560, 0.28, 0.022, 0.55); },
+        // Rounded, warm selection cue for buttons — glides rather than clicks.
+        click: function() { tone(392, 440, 0.55, 0.045, 0.6); },
         // Back / dismiss — low, softly fading.
-        cancel: function() { tone(300, 220, 0.6, 0.05, 0.5); },
+        cancel: function() { tone(294, 220, 0.6, 0.04, 0.6); },
         // Cinematic orchestra-tuning startup (~2s).
         startup: orchestraTuning,
         // Create/resume the AudioContext after a user gesture (autoplay policy).
@@ -5752,24 +5754,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Browsers block audio until the first user gesture. Unlock the AudioContext
     // on the first pointer/keyboard interaction.
     function unlockAudioOnce() {
-        UISound.unlock();
-        UISound.startup();  // immediate on first gesture (no delay)
+        UISound.unlock();  // just enable audio; no startup cue (removed by request)
         document.removeEventListener('pointerdown', unlockAudioOnce);
         document.removeEventListener('keydown', unlockAudioOnce);
     }
-    // If we just came from the login submit, audio is already unlocked by that
-    // gesture — play the tuning cue right away on load (accompanies entering).
-    var _cameFromLogin = false;
-    try { _cameFromLogin = sessionStorage.getItem('playStartupOnLoad') === '1'; } catch (e) {}
-    if (_cameFromLogin) {
-        try { sessionStorage.removeItem('playStartupOnLoad'); } catch (e) {}
-        UISound.unlock();
-        setTimeout(function() { UISound.startup(); }, 150);  // ~0.15s after load
-    } else {
-        // Otherwise wait for the first gesture (browser autoplay policy).
-        document.addEventListener('pointerdown', unlockAudioOnce);
-        document.addEventListener('keydown', unlockAudioOnce);
-    }
+    // Unlock audio on the first gesture (browser autoplay policy). No startup
+    // cue on login/entry anymore — it was colliding with the first-gesture sound.
+    document.addEventListener('pointerdown', unlockAudioOnce);
+    document.addEventListener('keydown', unlockAudioOnce);
 
     // GLOBAL acoustic feedback: a tick fires each time the cursor ENTERS a new
     // interactive element. Tracking the last element (not a time throttle) makes
@@ -7422,10 +7414,6 @@ document.getElementById('login-form').addEventListener('submit', function() {
     } else {
         localStorage.removeItem('saved_username');
     }
-    // Play the tuning cue on entry and flag the app to resume it on load
-    // (the submit click satisfies the browser's autoplay gesture requirement).
-    try { UISound.startup(); } catch (e) {}
-    try { sessionStorage.setItem('playStartupOnLoad', '1'); } catch (e) {}
 });
 
 // On load: prefill from localStorage if not already prefilled from server
@@ -7483,9 +7471,10 @@ var UISound = (function() {
                 if (f1 && f1 !== f0) osc.frequency.exponentialRampToValueAtTime(Math.max(1, f1 * p.r), now + dur);
                 lfoGain.connect(osc.frequency);
                 var pd = dur * (1 - idx * 0.22), pk = peak * p.a;
+                var atk = Math.min(0.06, dur * 0.35);
                 g.gain.setValueAtTime(0.0001, now);
-                g.gain.exponentialRampToValueAtTime(pk, now + 0.008);
-                g.gain.exponentialRampToValueAtTime(0.0001, now + Math.max(0.05, pd));
+                g.gain.exponentialRampToValueAtTime(pk, now + atk);
+                g.gain.exponentialRampToValueAtTime(0.0001, now + Math.max(0.06, pd));
                 osc.connect(g); g.connect(out);
                 osc.start(now); osc.stop(now + dur + 0.08);
             });
@@ -7521,9 +7510,9 @@ var UISound = (function() {
         } catch (e) {}
     }
     return {
-        tick: function() { tone(660, 660, 0.13, 0.03, 0.35); },
-        click: function() { tone(440, 440, 0.5, 0.06, 0.5); },
-        cancel: function() { tone(300, 220, 0.6, 0.05, 0.5); },
+        tick: function() { tone(520, 560, 0.28, 0.022, 0.55); },
+        click: function() { tone(392, 440, 0.55, 0.045, 0.6); },
+        cancel: function() { tone(294, 220, 0.6, 0.04, 0.6); },
         startup: orchestraTuning,
         unlock: function() { var c = ac(); if (c && c.state === 'suspended') { try { c.resume(); } catch (e) {} } }
     };
