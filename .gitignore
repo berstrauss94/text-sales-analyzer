@@ -19,6 +19,9 @@ env/
 # Hypothesis (property-based testing) cache
 .hypothesis/
 
+# Local code backups (durable backups live as git tags)
+backups_codigo/
+
 # OS
 .DS_Store
 Thumbs.db
