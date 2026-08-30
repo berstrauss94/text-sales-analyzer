@@ -2684,10 +2684,11 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12 &middot; cross-filtering</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.1 &middot; audio UI</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
+            <button id="soundToggleBtn" type="button" onclick="toggleUISound()" title="Activar/silenciar sonidos de interfaz" aria-label="Activar o silenciar sonidos de interfaz" style="font-size:0.75rem;padding:4px 10px;margin-right:6px;background:#2a2d3a;color:#888;border:1px solid #3a3d4a;border-radius:6px;cursor:pointer;">&#128266; Sonido</button>
             <a href="/logout" class="btn-logout">Cerrar sesion</a>
         </div>
     </div>
@@ -5529,6 +5530,80 @@ function animateEntrance(scope) {
     });
 }
 
+// ── UI SOUND ENGINE (XMB-style, synthesized) ────────────────────────────────
+// Sounds are generated on the fly with the Web Audio API (oscillators +
+// envelopes) — no external audio files. This gives zero-latency playback and
+// avoids any third-party/copyrighted assets. Respects a persisted mute pref and
+// never blocks screen readers or app logic (pure audio side-effect).
+var UISound = (function() {
+    var ctx = null;
+    var muted = false;
+    try { muted = localStorage.getItem('uiSoundMuted') === '1'; } catch (e) {}
+
+    function ac() {
+        if (ctx) return ctx;
+        try {
+            var AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return null;
+            ctx = new AC();
+        } catch (e) { ctx = null; }
+        return ctx;
+    }
+
+    // Play a short tone. type: waveform; f0/f1: start/end freq; dur seconds; gain peak.
+    function tone(f0, f1, dur, peak, type) {
+        if (muted) return;
+        var c = ac();
+        if (!c) return;
+        try {
+            if (c.state === 'suspended') c.resume();
+            var osc = c.createOscillator();
+            var g = c.createGain();
+            var now = c.currentTime;
+            osc.type = type || 'sine';
+            osc.frequency.setValueAtTime(f0, now);
+            if (f1 && f1 !== f0) osc.frequency.exponentialRampToValueAtTime(Math.max(1, f1), now + dur);
+            g.gain.setValueAtTime(0.0001, now);
+            g.gain.exponentialRampToValueAtTime(peak, now + 0.006);           // fast attack
+            g.gain.exponentialRampToValueAtTime(0.0001, now + dur);           // smooth decay
+            osc.connect(g); g.connect(c.destination);
+            osc.start(now);
+            osc.stop(now + dur + 0.02);
+        } catch (e) { /* audio must never break the UI */ }
+    }
+
+    return {
+        // High, crisp navigation tick.
+        tick: function() { tone(1760, 1500, 0.045, 0.06, 'sine'); },
+        // Selection / grid open — brighter, slightly longer.
+        click: function() { tone(920, 1200, 0.09, 0.10, 'triangle'); },
+        // Back / dismiss — descending tone.
+        cancel: function() { tone(620, 300, 0.16, 0.09, 'sine'); },
+        isMuted: function() { return muted; },
+        setMuted: function(m) {
+            muted = !!m;
+            try { localStorage.setItem('uiSoundMuted', muted ? '1' : '0'); } catch (e) {}
+        },
+        toggle: function() { this.setMuted(!muted); return muted; }
+    };
+})();
+
+// Global mute toggle wired to the header button. Updates label + a11y state.
+function toggleUISound() {
+    const nowMuted = UISound.toggle();
+    if (!nowMuted) UISound.click();  // audible confirmation when turning ON
+    refreshSoundToggleBtn();
+}
+function refreshSoundToggleBtn() {
+    const btn = document.getElementById('soundToggleBtn');
+    if (!btn) return;
+    const m = UISound.isMuted();
+    btn.innerHTML = m ? '&#128263; Sonido' : '&#128266; Sonido';  // muted vs speaker
+    btn.style.color = m ? '#666' : '#7b9cff';
+    btn.style.borderColor = m ? '#3a3d4a' : '#4a6cf7';
+    btn.setAttribute('aria-pressed', m ? 'false' : 'true');
+}
+
 // Progressive word-by-word reveal of a transcript, tinting each word by the
 // detected speaker role (Vendedor -> celeste, Cliente -> naranja). Non-blocking:
 // uses CSS animation-delay per word, so the UI stays responsive.
@@ -5569,6 +5644,9 @@ function streamTranscript(targetEl, rawText) {
 document.addEventListener('DOMContentLoaded', () => {
     // Page entrance is handled by CSS (pageBlockIn) for reliability.
     // animateEntrance() is still used for dynamically rendered results/report.
+
+    // Reflect the saved mute preference on the header sound button.
+    refreshSoundToggleBtn();
 
     let debounceTimer = null;
     const textarea = document.getElementById('textInput');
@@ -5699,11 +5777,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!sel) {
                     hlInfo.textContent = 'Primero selecciona texto en el recuadro';
                     hlInfo.style.color = '#f5a35b';
+                    UISound.cancel();
                     return;
                 }
                 hlInfo.style.color = '';
+                const willOpen = !hlPopover.classList.contains('active');
                 hlPopover.classList.toggle('active');
+                if (willOpen) UISound.click(); else UISound.cancel();
             };
+
+            // XMB-style tick when hovering each color option in the grid.
+            hlGrid.querySelectorAll('.category-option').forEach(function(opt) {
+                opt.addEventListener('mouseenter', function() { UISound.tick(); });
+            });
 
             hlGrid.addEventListener('click', function(e) {
                 const opt = _closest(e, '[data-cat]');
@@ -5712,6 +5798,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const txt = window._selectedTextForHighlight;
                 if (!txt || !cat) return;
                 window._manualHighlights.push({ text: txt, category: cat });
+                UISound.click();  // color selected
                 hlPopover.classList.remove('active');
                 window._selectedTextForHighlight = '';
                 hlBtn.disabled = true;
@@ -5735,6 +5822,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.addEventListener('mousedown', function(e) {
                 if (hlPopover.classList.contains('active') && !hlPopover.contains(e.target) && e.target !== hlBtn) {
                     hlPopover.classList.remove('active');
+                    UISound.cancel();  // dismissed by clicking outside
                 }
             });
         }
