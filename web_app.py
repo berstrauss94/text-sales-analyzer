@@ -2684,7 +2684,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.1 &middot; audio UI</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.2 &middot; audio global</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5579,6 +5579,11 @@ var UISound = (function() {
         click: function() { tone(920, 1200, 0.09, 0.10, 'triangle'); },
         // Back / dismiss — descending tone.
         cancel: function() { tone(620, 300, 0.16, 0.09, 'sine'); },
+        // Create/resume the AudioContext after a user gesture (autoplay policy).
+        unlock: function() {
+            var c = ac();
+            if (c && c.state === 'suspended') { try { c.resume(); } catch (e) {} }
+        },
         isMuted: function() { return muted; },
         setMuted: function(m) {
             muted = !!m;
@@ -5647,6 +5652,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Reflect the saved mute preference on the header sound button.
     refreshSoundToggleBtn();
+
+    // Browsers block audio until the first user gesture. Unlock the AudioContext
+    // on the first pointer/keyboard interaction.
+    function unlockAudioOnce() {
+        UISound.unlock();
+        document.removeEventListener('pointerdown', unlockAudioOnce);
+        document.removeEventListener('keydown', unlockAudioOnce);
+    }
+    document.addEventListener('pointerdown', unlockAudioOnce);
+    document.addEventListener('keydown', unlockAudioOnce);
+
+    // GLOBAL acoustic feedback via event delegation, so EVERY card/box/button
+    // reacts on hover — not just the color quadrilla.
+    var _lastTick = 0;
+    document.addEventListener('mouseover', function(e) {
+        var t = e.target;
+        if (!t || !t.closest) return;
+        if (t.closest('.card, .input-section, .commercial-section, .analysis-block, .indicator-item, .history-entry, .category-option, .pie-legend-row, button, select, .lead-badge, .report-section')) {
+            var now = Date.now();
+            if (now - _lastTick > 55) { _lastTick = now; UISound.tick(); }
+        }
+    });
+    document.addEventListener('click', function(e) {
+        var t = e.target;
+        if (!t || !t.closest) return;
+        if (t.closest('button, .category-option, .indicator-item, .pie-legend-row, .lead-badge, .card-title-collapsible')) {
+            UISound.click();
+        }
+    });
 
     let debounceTimer = null;
     const textarea = document.getElementById('textInput');
