@@ -2684,7 +2684,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.12 &middot; startup al entrar</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v12.13 &middot; cross-filter movil</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -6690,26 +6690,31 @@ function attachIndicatorPieInteractivity() {
             if (i >= 0) focusIndex(i); else resetInd();
         });
         donut.addEventListener('mouseleave', resetInd);
+        // Mobile: tapping a slice must ALSO cross-filter (highlight keywords +
+        // scroll), not just focus. preventDefault stops the synthetic click, so
+        // we run crossFilter here directly.
         donut.addEventListener('touchstart', function(e) {
             const t = e.touches[0];
             const i = sliceAtPointer(t.clientX, t.clientY);
-            if (i >= 0) { e.preventDefault(); focusIndex(i); }
+            if (i >= 0) { e.preventDefault(); crossFilter(i); }
         }, { passive: false });
-        // Click on a slice -> cross-filter keywords into the text + scroll.
+        // Desktop click on a slice -> cross-filter keywords into the text + scroll.
         donut.style.cursor = 'pointer';
         donut.addEventListener('click', function(e) {
             const i = sliceAtPointer(e.clientX, e.clientY);
             if (i >= 0) crossFilter(i);
         });
 
-        // Legend rows: hover focuses; CLICK explodes the slice out a few px.
+        // Legend rows: hover focuses; click/tap explodes the slice AND cross-filters
+        // (highlights keywords + scrolls). On mobile the legend is a larger, easier
+        // touch target than the slice itself, so it must trigger the same action.
         function bind(el) {
             const i = parseInt(el.getAttribute('data-i'), 10);
             el.style.transition = 'opacity ' + DUR + ' ease, background ' + DUR + ' ease';
             el.addEventListener('mouseenter', function() { focusIndex(i); });
             el.addEventListener('mouseleave', resetInd);
-            el.addEventListener('touchstart', function(ev) { ev.preventDefault(); explodeSlice(i); }, { passive: false });
-            el.addEventListener('click', function() { explodeSlice(i); });
+            el.addEventListener('touchstart', function(ev) { ev.preventDefault(); crossFilter(i); }, { passive: false });
+            el.addEventListener('click', function() { crossFilter(i); });
         }
         legs.forEach(bind);
         pcts.forEach(bind);
