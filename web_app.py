@@ -2692,7 +2692,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v14.1{% if username == 'Berna.Strauss' %} &middot; toggle multi/unica{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v14.2{% if username == 'Berna.Strauss' %} &middot; resalte + blend lineas{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -6260,14 +6260,20 @@ async function loadInforme() {
         }
 
         // ── VIEW A: MULTI-LINE (one colored line per seller + name balloon) ──
-        let multiSvg = '';
-        series.forEach(function(s) {
+        // Lines are wrapped in a group with mix-blend-mode:screen so that where
+        // two lines CROSS, the overlapping colors add up (complementary blend).
+        let multiLinesSvg = '';   // the colored strokes (blended)
+        let multiDotsSvg = '';    // dots + balloons (drawn on top, no blend)
+        let multiHitSvg = '';     // wide transparent hit paths for hover
+        series.forEach(function(s, si) {
             let pts = [];
             for (let i = 0; i < nX; i++) pts.push([xAt(i), yAt(s.values[i])]);
             const path = pts.map(function(p, i){ return (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
-            multiSvg += '<path d="' + path + '" fill="none" stroke="' + s.color + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.92"/>';
+            multiLinesSvg += '<path class="' + lcId + '-sline" data-si="' + si + '" d="' + path + '" fill="none" stroke="' + s.color + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>';
+            // Wide invisible hit path (easy to point at, even on mobile).
+            multiHitSvg += '<path class="' + lcId + '-hit" data-si="' + si + '" d="' + path + '" fill="none" stroke="transparent" stroke-width="14" style="cursor:pointer;"/>';
             for (let i = 0; i < nX; i++) {
-                if (s.values[i] > 0) multiSvg += '<circle cx="' + pts[i][0].toFixed(1) + '" cy="' + pts[i][1].toFixed(1) + '" r="2.6" fill="' + s.color + '" stroke="#0a0c14" stroke-width="1"/>';
+                if (s.values[i] > 0) multiDotsSvg += '<circle class="' + lcId + '-sdot" data-si="' + si + '" cx="' + pts[i][0].toFixed(1) + '" cy="' + pts[i][1].toFixed(1) + '" r="2.6" fill="' + s.color + '" stroke="#0a0c14" stroke-width="1"/>';
             }
             let peakI = 0, peakV = -1;
             for (let i = 0; i < nX; i++) { if (s.values[i] > peakV) { peakV = s.values[i]; peakI = i; } }
@@ -6277,9 +6283,11 @@ async function loadInforme() {
             if (bxl < 2) bxl = 2;
             if (bxl + bw > lcW - 2) bxl = lcW - 2 - bw;
             const byl = Math.max(2, pts[peakI][1] - 20);
-            multiSvg += '<g opacity="0.95"><rect x="' + bxl.toFixed(1) + '" y="' + byl.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="13" rx="6" fill="' + s.color + '" opacity="0.16" stroke="' + s.color + '" stroke-width="0.8"/>' +
+            multiDotsSvg += '<g class="' + lcId + '-sballoon" data-si="' + si + '" opacity="0.95"><rect x="' + bxl.toFixed(1) + '" y="' + byl.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="13" rx="6" fill="' + s.color + '" opacity="0.16" stroke="' + s.color + '" stroke-width="0.8"/>' +
                 '<text x="' + (bxl + bw / 2).toFixed(1) + '" y="' + (byl + 9).toFixed(1) + '" text-anchor="middle" font-size="8.5" font-weight="700" fill="' + s.color + '">' + label + '</text></g>';
         });
+        // Assemble the multi-line body: blended lines group + dots/balloons + hit paths.
+        const multiSvg = '<g style="mix-blend-mode:screen;">' + multiLinesSvg + '</g>' + multiDotsSvg + multiHitSvg;
 
         // ── VIEW B: SINGLE LINE (team total; each segment colored by the
         //    dominant seller at that point + a name balloon on that segment) ──
@@ -6373,6 +6381,10 @@ async function loadInforme() {
         lineHtml += '<svg id="' + lcId + '-multi" viewBox="0 0 ' + lcW + ' ' + lcH + '" style="width:100%;min-width:460px;height:auto;display:block;touch-action:pan-y;">' + gridSvg + multiSvg + xlabelsSvg + '</svg>';
         lineHtml += '<svg id="' + lcId + '-single" viewBox="0 0 ' + lcW + ' ' + lcH + '" style="width:100%;min-width:460px;height:auto;display:none;touch-action:pan-y;">' + gridSingle + singleSvg + xlabelsSvg + '</svg>';
         lineHtml += '</div>' + legendSvg + '</div>';
+
+        // Register hover-highlight for the multi-line view (wired after render).
+        window._lcHover = window._lcHover || {};
+        window._lcHover[lcId] = { count: series.length };
 
         // Compliance summary
         let complianceHtml = '<div style="margin-top:12px;padding:10px;background:#0a0c14;border:1px solid #1e2130;border-radius:8px;font-size:0.72rem;">';
@@ -6565,7 +6577,7 @@ async function loadInforme() {
 
         container.innerHTML = tableHtml + totalsHtml + lineHtml + pieHtml + complianceHtml + synthesisHtml + card2Html;
         // Wire up chart interactivity now that the SVG/pie are in the DOM.
-        setTimeout(function() { attachLineChartInteractivity(); attachPieInteractivity(); attachReportSectionInteractivity(); }, 0);
+        setTimeout(function() { attachLineChartInteractivity(); attachLineChartHover(); attachPieInteractivity(); attachReportSectionInteractivity(); }, 0);
         // Fluid staggered entrance for the report blocks.
         setTimeout(function() { animateEntrance(container); }, 20);
     } catch (e) {
@@ -6721,6 +6733,42 @@ function attachPieInteractivity() {
             row.addEventListener('mouseleave', resetPie);
             row.addEventListener('touchstart', function(ev) { ev.preventDefault(); focusRow(row); }, { passive: false });
             row.addEventListener('click', function() { focusRow(row); });
+        });
+    });
+}
+
+// Hover-highlight for the multi-line trend chart: pointing at a line (or its
+// dot/balloon) makes it stand out and dims the others. Leaving resets all.
+function attachLineChartHover() {
+    const reg = window._lcHover || {};
+    Object.keys(reg).forEach(function(lcId) {
+        const svg = document.getElementById(lcId + '-multi');
+        if (!svg || svg.dataset.hoverWired === '1') return;
+        svg.dataset.hoverWired = '1';
+        const lines = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-sline'));
+        const dots = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-sdot'));
+        const balloons = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-sballoon'));
+        const hits = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-hit'));
+
+        function focus(si) {
+            lines.forEach(function(l) {
+                const on = (l.getAttribute('data-si') === String(si));
+                l.setAttribute('stroke-width', on ? '3.6' : '1.4');
+                l.setAttribute('opacity', on ? '1' : '0.18');
+            });
+            dots.forEach(function(d) { d.setAttribute('opacity', (d.getAttribute('data-si') === String(si)) ? '1' : '0.15'); });
+            balloons.forEach(function(b) { b.setAttribute('opacity', (b.getAttribute('data-si') === String(si)) ? '1' : '0.12'); });
+        }
+        function reset() {
+            lines.forEach(function(l) { l.setAttribute('stroke-width', '2.2'); l.setAttribute('opacity', '0.9'); });
+            dots.forEach(function(d) { d.setAttribute('opacity', '1'); });
+            balloons.forEach(function(b) { b.setAttribute('opacity', '0.95'); });
+        }
+        hits.forEach(function(h) {
+            const si = h.getAttribute('data-si');
+            h.addEventListener('mouseenter', function() { focus(si); });
+            h.addEventListener('mouseleave', reset);
+            h.addEventListener('touchstart', function(ev) { ev.preventDefault(); focus(si); }, { passive: false });
         });
     });
 }
