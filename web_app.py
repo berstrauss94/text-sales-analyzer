@@ -2692,7 +2692,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v13.7{% if username == 'Berna.Strauss' %} &middot; encabezado impresion{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v14{% if username == 'Berna.Strauss' %} &middot; lineas por vendedor{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -6180,63 +6180,59 @@ async function loadInforme() {
         //   • Month selected (no week)-> WEEKLY trend (S1-S4) of that month
         //   • No month                -> MONTHLY trend (Jan-Dec)
         // Always reflects the active seller filter.
+        // Palette for per-seller lines (distinct, high-contrast tones).
+        const sellerColors = ['#4da3ff', '#5bf5a3', '#f5a35b', '#f55b5b', '#b38bff',
+                              '#5bd4f5', '#f5d75b', '#ff8c8c', '#88cc88', '#c78bff',
+                              '#ffb84d', '#4dd2c0'];
+
+        // Decide the X axis (labels) and, for each seller, a value per X point.
+        // When "Todos los vendedores" is active we draw ONE LINE PER SELLER;
+        // when a single seller is filtered, just their line.
         let lineLabels = [];
-        let lineValues = [];
         let lineTitle = '';
+        const multiMode = (!data.filter_seller || data.filter_seller === '_all');
+        const seriesUsers = multiMode ? users.slice() : [data.filter_seller];
+
+        // valueAt(u, xIndex) resolves the count for a seller at a given X point.
+        let valueAt;
         if (data.filter_month > 0 && data.filter_week > 0) {
-            // DAILY breakdown for the selected week
             const wk = data.filter_week;
             const startDay = (wk - 1) * 7 + 1;
-            const endDay = (wk === 4) ? 31 : wk * 7;  // week 4 covers 22-31
+            const endDay = (wk === 4) ? 31 : wk * 7;
             lineTitle = 'Tendencia diaria — ' + months[data.filter_month] + ' · Dias ' + startDay + ' al ' + endDay;
-            const dusers = (data.filter_seller && data.filter_seller !== '_all')
-                ? [data.filter_seller] : Object.keys(data.daily || {});
-            for (let d = startDay; d <= endDay; d++) {
-                let dayTotal = 0;
-                dusers.forEach(u => {
-                    const dd = data.daily[u] || {};
-                    dayTotal += (dd[d] || dd[String(d)] || 0);
-                });
-                lineLabels.push(String(d));
-                lineValues.push(dayTotal);
-            }
+            const dayList = [];
+            for (let d = startDay; d <= endDay; d++) { dayList.push(d); lineLabels.push(String(d)); }
+            valueAt = function(u, i) { const dd = data.daily[u] || {}; const d = dayList[i]; return (dd[d] || dd[String(d)] || 0); };
         } else if (data.filter_month > 0) {
-            // DAILY trend for the WHOLE month (more informative than 4 weeks)
             lineTitle = 'Tendencia diaria — ' + months[data.filter_month] + ' ' + year;
-            const dusers = (data.filter_seller && data.filter_seller !== '_all')
-                ? [data.filter_seller] : Object.keys(data.daily || {});
             const daysInMonth = new Date(parseInt(year), parseInt(data.filter_month), 0).getDate();
-            for (let d = 1; d <= daysInMonth; d++) {
-                let dayTotal = 0;
-                dusers.forEach(u => {
-                    const dd = data.daily[u] || {};
-                    dayTotal += (dd[d] || dd[String(d)] || 0);
-                });
-                lineLabels.push(String(d));
-                lineValues.push(dayTotal);
-            }
+            const dayList = [];
+            for (let d = 1; d <= daysInMonth; d++) { dayList.push(d); lineLabels.push(String(d)); }
+            valueAt = function(u, i) { const dd = data.daily[u] || {}; const d = dayList[i]; return (dd[d] || dd[String(d)] || 0); };
         } else {
-            // MONTHLY trend for the year
             lineTitle = 'Tendencia mensual — ' + year;
-            for (let m = 1; m <= 12; m++) {
-                lineLabels.push(months[m]);
-                lineValues.push(data.totals_per_month[m] || 0);
-            }
+            for (let m = 1; m <= 12; m++) lineLabels.push(months[m]);
+            valueAt = function(u, i) { const mm = data.matrix[u] || {}; return (mm[i + 1] || 0); };
         }
 
-        // Build an SVG line chart
-        const lcW = 640, lcH = 180, lcPadL = 34, lcPadR = 14, lcPadT = 16, lcPadB = 26;
+        const nX = lineLabels.length;
+        // Build each seller's series (only those with activity).
+        const series = seriesUsers.map(function(u, si) {
+            const vals = [];
+            for (let i = 0; i < nX; i++) vals.push(valueAt(u, i));
+            return { user: u, values: vals, color: sellerColors[si % sellerColors.length], total: vals.reduce(function(a,b){return a+b;},0) };
+        }).filter(function(s) { return s.total > 0; });
+
+        // Chart geometry.
+        const lcW = 640, lcH = 190, lcPadL = 34, lcPadR = 14, lcPadT = 22, lcPadB = 26;
         const plotW = lcW - lcPadL - lcPadR;
         const plotH = lcH - lcPadT - lcPadB;
-        const maxV = Math.max(1, ...lineValues);
-        const n = lineValues.length;
-        const stepX = n > 1 ? plotW / (n - 1) : plotW;
-        let points = [];
-        for (let i = 0; i < n; i++) {
-            const x = lcPadL + (n > 1 ? i * stepX : plotW / 2);
-            const y = lcPadT + plotH - (lineValues[i] / maxV) * plotH;
-            points.push([x, y]);
-        }
+        let maxV = 1;
+        series.forEach(function(s){ s.values.forEach(function(v){ if (v > maxV) maxV = v; }); });
+        const stepX = nX > 1 ? plotW / (nX - 1) : plotW;
+        const xAt = function(i){ return lcPadL + (nX > 1 ? i * stepX : plotW / 2); };
+        const yAt = function(v){ return lcPadT + plotH - (v / maxV) * plotH; };
+
         // Grid lines (4 horizontal)
         let gridSvg = '';
         for (let g = 0; g <= 4; g++) {
@@ -6245,55 +6241,65 @@ async function loadInforme() {
             gridSvg += '<line x1="' + lcPadL + '" y1="' + gy + '" x2="' + (lcW - lcPadR) + '" y2="' + gy + '" stroke="#1e2130" stroke-width="1"/>';
             gridSvg += '<text x="' + (lcPadL - 6) + '" y="' + (gy + 3) + '" text-anchor="end" font-size="9" fill="#666">' + gv + '</text>';
         }
-        // Polyline path + area
-        const linePath = points.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
-        let areaPath = '';
-        if (n > 0) {
-            areaPath = 'M' + points[0][0].toFixed(1) + ',' + (lcPadT + plotH);
-            points.forEach(p => { areaPath += ' L' + p[0].toFixed(1) + ',' + p[1].toFixed(1); });
-            areaPath += ' L' + points[n - 1][0].toFixed(1) + ',' + (lcPadT + plotH) + ' Z';
-        }
-        // Unique id so multiple renders / interactivity don't collide.
+
         const lcId = 'lc_' + Math.random().toString(36).slice(2, 8);
 
-        // Per-segment paths (i-1 -> i) so we can highlight the trend BACKWARD
-        // from a hovered/tapped node to all previous nodes.
-        let segsSvg = '';
-        for (let i = 1; i < n; i++) {
-            const a = points[i - 1], b = points[i];
-            segsSvg += '<path class="' + lcId + '-seg" data-seg="' + i + '" d="M' + a[0].toFixed(1) + ',' + a[1].toFixed(1) +
-                       ' L' + b[0].toFixed(1) + ',' + b[1].toFixed(1) +
-                       '" fill="none" stroke="#4a6cf7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
-        }
-        // Dots + x labels + value labels + big transparent hit targets (touch-friendly)
-        let dotsSvg = '', xlabelsSvg = '', vlabelsSvg = '', hitSvg = '';
-        points.forEach((p, i) => {
-            dotsSvg += '<circle class="' + lcId + '-dot" data-idx="' + i + '" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3.5" fill="#4a6cf7" stroke="#0a0c14" stroke-width="1.5"/>';
-            xlabelsSvg += '<text x="' + p[0].toFixed(1) + '" y="' + (lcH - 8) + '" text-anchor="middle" font-size="9" fill="#888">' + lineLabels[i] + '</text>';
-            if (lineValues[i] > 0) {
-                vlabelsSvg += '<text class="' + lcId + '-vlbl" data-idx="' + i + '" x="' + p[0].toFixed(1) + '" y="' + (p[1] - 7).toFixed(1) + '" text-anchor="middle" font-size="9" fill="#e0e0e0" font-weight="600">' + lineValues[i] + '</text>';
+        // Draw every series: colored polyline + dots + a name balloon at the peak.
+        let seriesSvg = '';
+        let balloonsSvg = '';
+        series.forEach(function(s, si) {
+            let pts = [];
+            for (let i = 0; i < nX; i++) pts.push([xAt(i), yAt(s.values[i])]);
+            const path = pts.map(function(p, i){ return (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
+            seriesSvg += '<path d="' + path + '" fill="none" stroke="' + s.color + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.92"/>';
+            for (let i = 0; i < nX; i++) {
+                if (s.values[i] > 0) {
+                    seriesSvg += '<circle cx="' + pts[i][0].toFixed(1) + '" cy="' + pts[i][1].toFixed(1) + '" r="2.6" fill="' + s.color + '" stroke="#0a0c14" stroke-width="1"/>';
+                }
             }
-            // Large invisible hit area for comfortable hover/tap on mobile
-            hitSvg += '<circle class="' + lcId + '-hit" data-idx="' + i + '" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="16" fill="transparent" style="cursor:pointer;"/>';
+            // Name balloon at the series' highest point.
+            let peakI = 0, peakV = -1;
+            for (let i = 0; i < nX; i++) { if (s.values[i] > peakV) { peakV = s.values[i]; peakI = i; } }
+            const bx = pts[peakI][0], by = pts[peakI][1];
+            const label = s.user;
+            const bw = Math.max(30, label.length * 5.4 + 10);
+            let bxl = bx - bw / 2;
+            if (bxl < 2) bxl = 2;
+            if (bxl + bw > lcW - 2) bxl = lcW - 2 - bw;
+            const byl = Math.max(2, by - 20);
+            balloonsSvg += '<g opacity="0.95">' +
+                '<rect x="' + bxl.toFixed(1) + '" y="' + byl.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="13" rx="6" fill="' + s.color + '" opacity="0.16" stroke="' + s.color + '" stroke-width="0.8"/>' +
+                '<text x="' + (bxl + bw / 2).toFixed(1) + '" y="' + (byl + 9).toFixed(1) + '" text-anchor="middle" font-size="8.5" font-weight="700" fill="' + s.color + '">' + label + '</text>' +
+                '</g>';
         });
-        // Value readout box (updates on hover/tap)
-        const lineHead = lineTitle + (data.filter_seller && data.filter_seller !== '_all' ? ' · ' + data.filter_seller : '');
+
+        // X-axis labels (shared)
+        let xlabelsSvg = '';
+        for (let i = 0; i < nX; i++) {
+            xlabelsSvg += '<text x="' + xAt(i).toFixed(1) + '" y="' + (lcH - 8) + '" text-anchor="middle" font-size="9" fill="#888">' + lineLabels[i] + '</text>';
+        }
+
+        // Header + seller color legend.
+        const lineHead = lineTitle + (!multiMode ? ' · ' + data.filter_seller : '');
+        let legendSvg = '';
+        if (multiMode && series.length > 1) {
+            legendSvg = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">';
+            series.forEach(function(s){
+                legendSvg += '<span style="display:flex;align-items:center;gap:4px;font-size:0.62rem;color:#aaa;"><span style="width:10px;height:3px;border-radius:2px;background:' + s.color + ';display:inline-block;"></span>' + s.user + '</span>';
+            });
+            legendSvg += '</div>';
+        }
+
         let lineHtml = '<div class="fade-in-smooth" style="margin-top:14px;padding:12px 10px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
         lineHtml += '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px;">';
         lineHtml += '<div style="font-size:0.72rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">' + lineHead + '</div>';
-        lineHtml += '<div id="' + lcId + '-readout" style="font-size:0.7rem;color:#7b9cff;font-weight:600;min-height:0.9rem;"></div>';
         lineHtml += '</div>';
-        lineHtml += '<div style="width:100%;overflow-x:auto;"><svg id="' + lcId + '" viewBox="0 0 ' + lcW + ' ' + lcH + '" style="width:100%;min-width:420px;height:auto;display:block;touch-action:pan-y;">';
+        lineHtml += '<div style="width:100%;overflow-x:auto;"><svg id="' + lcId + '" viewBox="0 0 ' + lcW + ' ' + lcH + '" style="width:100%;min-width:460px;height:auto;display:block;touch-action:pan-y;">';
         lineHtml += gridSvg;
-        if (areaPath) lineHtml += '<path d="' + areaPath + '" fill="rgba(74,108,247,0.12)"/>';
-        lineHtml += segsSvg;
-        lineHtml += dotsSvg + vlabelsSvg + xlabelsSvg + hitSvg;
-        lineHtml += '</svg></div></div>';
-
-        // Interactivity: hovering/tapping a node highlights the trend backward.
-        // Registered after innerHTML is set (see the setTimeout at the end).
-        window._lcInteractive = window._lcInteractive || {};
-        window._lcInteractive[lcId] = { labels: lineLabels, values: lineValues };
+        lineHtml += seriesSvg;
+        lineHtml += balloonsSvg;
+        lineHtml += xlabelsSvg;
+        lineHtml += '</svg></div>' + legendSvg + '</div>';
 
         // Compliance summary
         let complianceHtml = '<div style="margin-top:12px;padding:10px;background:#0a0c14;border:1px solid #1e2130;border-radius:8px;font-size:0.72rem;">';
