@@ -2692,7 +2692,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v14.4{% if username == 'Berna.Strauss' %} &middot; resalte fijable linea{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v14.5{% if username == 'Berna.Strauss' %} &middot; globos separados + resalte single{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -6229,8 +6229,9 @@ async function loadInforme() {
             return { user: u, values: vals, color: sellerColors[si % sellerColors.length], total: vals.reduce(function(a,b){return a+b;},0) };
         }).filter(function(s) { return s.total > 0; });
 
-        // Chart geometry.
-        const lcW = 640, lcH = 190, lcPadL = 34, lcPadR = 14, lcPadT = 22, lcPadB = 26;
+        // Chart geometry. Taller top padding leaves room for the name balloons
+        // (two staggered rows) sitting above the plot without touching the line.
+        const lcW = 640, lcH = 205, lcPadL = 34, lcPadR = 14, lcPadT = 38, lcPadB = 26;
         const plotW = lcW - lcPadL - lcPadR;
         const plotH = lcH - lcPadT - lcPadB;
         let maxV = 1;
@@ -6310,37 +6311,57 @@ async function loadInforme() {
         const ySingle = function(v){ return lcPadT + plotH - (v / singleMaxV) * plotH; };
         let singlePts = [];
         for (let i = 0; i < nX; i++) singlePts.push([xAt(i), ySingle(totalVals[i])]);
+        // Map each seller to their index in `series` (for highlight targeting).
+        const siOf = {};
+        series.forEach(function(s, idx){ siOf[s.user] = idx; });
         let singleSvg = '';
         // Each segment i-1 -> i painted with the dominant seller's color of point i.
         for (let i = 1; i < nX; i++) {
             const a = singlePts[i - 1], b = singlePts[i];
-            const col = colorOf[domUser[i]] || '#4a6cf7';
-            singleSvg += '<path d="M' + a[0].toFixed(1) + ',' + a[1].toFixed(1) + ' L' + b[0].toFixed(1) + ',' + b[1].toFixed(1) + '" fill="none" stroke="' + col + '" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>';
+            const du = domUser[i];
+            const col = colorOf[du] || '#4a6cf7';
+            singleSvg += '<path class="' + lcId + '-sgseg" data-si="' + (siOf[du] !== undefined ? siOf[du] : -1) + '" d="M' + a[0].toFixed(1) + ',' + a[1].toFixed(1) + ' L' + b[0].toFixed(1) + ',' + b[1].toFixed(1) + '" fill="none" stroke="' + col + '" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>';
         }
         for (let i = 0; i < nX; i++) {
             if (totalVals[i] > 0) {
-                const col = colorOf[domUser[i]] || '#4a6cf7';
-                singleSvg += '<circle cx="' + singlePts[i][0].toFixed(1) + '" cy="' + singlePts[i][1].toFixed(1) + '" r="3" fill="' + col + '" stroke="#0a0c14" stroke-width="1.2"/>';
+                const du = domUser[i];
+                const col = colorOf[du] || '#4a6cf7';
+                singleSvg += '<circle class="' + lcId + '-sgdot" data-si="' + (siOf[du] !== undefined ? siOf[du] : -1) + '" cx="' + singlePts[i][0].toFixed(1) + '" cy="' + singlePts[i][1].toFixed(1) + '" r="3" fill="' + col + '" stroke="#0a0c14" stroke-width="1.2"/>';
                 singleSvg += '<text x="' + singlePts[i][0].toFixed(1) + '" y="' + (singlePts[i][1] - 7).toFixed(1) + '" text-anchor="middle" font-size="9" fill="#e0e0e0" font-weight="600">' + totalVals[i] + '</text>';
             }
         }
         // Name balloons: one per dominant seller at their strongest point.
+        // Balloons are lifted well ABOVE the line into an upper band, connected
+        // to their data point by a thin neon leader line, and staggered in two
+        // rows so their texts never overlap each other or the chart line.
         const domSeen = {};
         for (let i = 0; i < nX; i++) {
             const u = domUser[i];
             if (!u || totalVals[i] === 0) continue;
             if (domSeen[u] === undefined || totalVals[i] > totalVals[domSeen[u]]) domSeen[u] = i;
         }
-        Object.keys(domSeen).forEach(function(u){
-            const i = domSeen[u];
+        // Order balloons left-to-right and alternate two vertical levels.
+        const balloonList = Object.keys(domSeen).map(function(u){ return { u: u, i: domSeen[u], x: singlePts[domSeen[u]][0] }; });
+        balloonList.sort(function(a, b){ return a.x - b.x; });
+        balloonList.forEach(function(item, k){
+            const u = item.u, i = item.i;
             const col = colorOf[u] || '#4a6cf7';
             const bw = Math.max(30, u.length * 5.4 + 10);
             let bxl = singlePts[i][0] - bw / 2;
             if (bxl < 2) bxl = 2;
             if (bxl + bw > lcW - 2) bxl = lcW - 2 - bw;
-            const byl = Math.max(2, singlePts[i][1] - 20);
-            singleSvg += '<g opacity="0.95"><rect x="' + bxl.toFixed(1) + '" y="' + byl.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="13" rx="6" fill="' + col + '" opacity="0.16" stroke="' + col + '" stroke-width="0.8"/>' +
-                '<text x="' + (bxl + bw / 2).toFixed(1) + '" y="' + (byl + 9).toFixed(1) + '" text-anchor="middle" font-size="8.5" font-weight="700" fill="' + col + '">' + u + '</text></g>';
+            // Two staggered rows in the top band so labels don't collide.
+            const rowY = (k % 2 === 0) ? 2 : 15;
+            const byl = rowY;
+            const bcx = bxl + bw / 2;
+            const balloonBottom = byl + 13;
+            const px = singlePts[i][0], py = singlePts[i][1];
+            singleSvg += '<g class="' + lcId + '-sgl" data-si="' + (siOf[u] !== undefined ? siOf[u] : -1) + '">';
+            // Thin neon leader line from balloon to the data point.
+            singleSvg += '<line x1="' + bcx.toFixed(1) + '" y1="' + balloonBottom.toFixed(1) + '" x2="' + px.toFixed(1) + '" y2="' + (py - 4).toFixed(1) + '" stroke="' + col + '" stroke-width="0.8" opacity="0.7" style="filter:drop-shadow(0 0 2px ' + col + ');"/>';
+            singleSvg += '<rect x="' + bxl.toFixed(1) + '" y="' + byl.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="13" rx="6" fill="' + col + '" opacity="0.18" stroke="' + col + '" stroke-width="0.9"/>';
+            singleSvg += '<text x="' + bcx.toFixed(1) + '" y="' + (byl + 9).toFixed(1) + '" text-anchor="middle" font-size="8.5" font-weight="700" fill="' + col + '">' + u + '</text>';
+            singleSvg += '</g>';
         });
         // Grid for single view uses its own scale.
         let gridSingle = '';
@@ -6743,44 +6764,78 @@ function attachPieInteractivity() {
 function attachLineChartHover() {
     const reg = window._lcHover || {};
     Object.keys(reg).forEach(function(lcId) {
+        // ── MULTI-LINE view ──
         const svg = document.getElementById(lcId + '-multi');
-        if (!svg || svg.dataset.hoverWired === '1') return;
-        svg.dataset.hoverWired = '1';
-        const lines = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-sline'));
-        const dots = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-sdot'));
-        const balloons = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-sballoon'));
-        const hits = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-hit'));
-
-        let pinned = null;  // seller index locked by click (persistent highlight)
-
-        function focus(si) {
-            lines.forEach(function(l) {
-                const on = (l.getAttribute('data-si') === String(si));
-                l.setAttribute('stroke-width', on ? '3.6' : '1.4');
-                l.setAttribute('opacity', on ? '1' : '0.18');
+        if (svg && svg.dataset.hoverWired !== '1') {
+            svg.dataset.hoverWired = '1';
+            const lines = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-sline'));
+            const dots = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-sdot'));
+            const balloons = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-sballoon'));
+            const hits = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-hit'));
+            let pinned = null;
+            function focus(si) {
+                lines.forEach(function(l) {
+                    const on = (l.getAttribute('data-si') === String(si));
+                    l.setAttribute('stroke-width', on ? '3.6' : '1.4');
+                    l.setAttribute('opacity', on ? '1' : '0.18');
+                });
+                dots.forEach(function(d) { d.setAttribute('opacity', (d.getAttribute('data-si') === String(si)) ? '1' : '0.15'); });
+                balloons.forEach(function(b) { b.setAttribute('opacity', (b.getAttribute('data-si') === String(si)) ? '1' : '0.12'); });
+            }
+            function reset() {
+                lines.forEach(function(l) { l.setAttribute('stroke-width', '2.2'); l.setAttribute('opacity', '0.9'); });
+                dots.forEach(function(d) { d.setAttribute('opacity', '1'); });
+                balloons.forEach(function(b) { b.setAttribute('opacity', '0.95'); });
+            }
+            function toggle(si) {
+                if (pinned === si) { pinned = null; reset(); } else { pinned = si; focus(si); }
+                try { UISound.click(); } catch (e) {}
+            }
+            hits.forEach(function(h) {
+                const si = h.getAttribute('data-si');
+                h.addEventListener('mouseenter', function() { if (pinned === null) focus(si); });
+                h.addEventListener('mouseleave', function() { if (pinned === null) reset(); else focus(pinned); });
+                h.addEventListener('click', function() { toggle(si); });
+                h.addEventListener('touchstart', function(ev) { ev.preventDefault(); toggle(si); }, { passive: false });
             });
-            dots.forEach(function(d) { d.setAttribute('opacity', (d.getAttribute('data-si') === String(si)) ? '1' : '0.15'); });
-            balloons.forEach(function(b) { b.setAttribute('opacity', (b.getAttribute('data-si') === String(si)) ? '1' : '0.12'); });
         }
-        function reset() {
-            lines.forEach(function(l) { l.setAttribute('stroke-width', '2.2'); l.setAttribute('opacity', '0.9'); });
-            dots.forEach(function(d) { d.setAttribute('opacity', '1'); });
-            balloons.forEach(function(b) { b.setAttribute('opacity', '0.95'); });
+
+        // ── SINGLE-LINE view: highlight a seller's segments/dots/balloon ──
+        const svgS = document.getElementById(lcId + '-single');
+        if (svgS && svgS.dataset.hoverWired !== '1') {
+            svgS.dataset.hoverWired = '1';
+            const segs = Array.prototype.slice.call(svgS.querySelectorAll('.' + lcId + '-sgseg'));
+            const sdots = Array.prototype.slice.call(svgS.querySelectorAll('.' + lcId + '-sgdot'));
+            const sballs = Array.prototype.slice.call(svgS.querySelectorAll('.' + lcId + '-sgl'));
+            let pinnedS = null;
+            function focusS(si) {
+                segs.forEach(function(el) {
+                    const on = (el.getAttribute('data-si') === String(si));
+                    el.setAttribute('stroke-width', on ? '3.8' : '1.6');
+                    el.setAttribute('opacity', on ? '1' : '0.22');
+                });
+                sdots.forEach(function(d) { d.setAttribute('opacity', (d.getAttribute('data-si') === String(si)) ? '1' : '0.2'); });
+                sballs.forEach(function(b) { b.setAttribute('opacity', (b.getAttribute('data-si') === String(si)) ? '1' : '0.15'); });
+            }
+            function resetS() {
+                segs.forEach(function(el) { el.setAttribute('stroke-width', '2.6'); el.setAttribute('opacity', '1'); });
+                sdots.forEach(function(d) { d.setAttribute('opacity', '1'); });
+                sballs.forEach(function(b) { b.setAttribute('opacity', '1'); });
+            }
+            function toggleS(si) {
+                if (pinnedS === si) { pinnedS = null; resetS(); } else { pinnedS = si; focusS(si); }
+                try { UISound.click(); } catch (e) {}
+            }
+            // Balloons act as the clickable seller selector for the single view.
+            sballs.forEach(function(g) {
+                const si = g.getAttribute('data-si');
+                g.style.cursor = 'pointer';
+                g.addEventListener('mouseenter', function() { if (pinnedS === null) focusS(si); });
+                g.addEventListener('mouseleave', function() { if (pinnedS === null) resetS(); else focusS(pinnedS); });
+                g.addEventListener('click', function() { toggleS(si); });
+                g.addEventListener('touchstart', function(ev) { ev.preventDefault(); toggleS(si); }, { passive: false });
+            });
         }
-        // Click toggles a persistent highlight: select to pin, click again to
-        // release. Hover only previews while nothing is pinned.
-        function toggle(si) {
-            if (pinned === si) { pinned = null; reset(); }
-            else { pinned = si; focus(si); }
-            try { UISound.click(); } catch (e) {}
-        }
-        hits.forEach(function(h) {
-            const si = h.getAttribute('data-si');
-            h.addEventListener('mouseenter', function() { if (pinned === null) focus(si); });
-            h.addEventListener('mouseleave', function() { if (pinned === null) reset(); else focus(pinned); });
-            h.addEventListener('click', function() { toggle(si); });
-            h.addEventListener('touchstart', function(ev) { ev.preventDefault(); toggle(si); }, { passive: false });
-        });
     });
 }
 
