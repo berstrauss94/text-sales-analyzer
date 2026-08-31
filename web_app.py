@@ -2684,7 +2684,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v13.3 &middot; sonido ingresar</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v13.4 &middot; ingresar audible</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -7526,7 +7526,7 @@ switchTab('register');
 {% endif %}
 
 // Autoguardado: save username to localStorage on login submit
-document.getElementById('login-form').addEventListener('submit', function() {
+document.getElementById('login-form').addEventListener('submit', function(e) {
     const remember = document.getElementById('remember').checked;
     const username = document.getElementById('login-user').value;
     if (remember) {
@@ -7534,10 +7534,17 @@ document.getElementById('login-form').addEventListener('submit', function() {
     } else {
         localStorage.removeItem('saved_username');
     }
-    // Flag the app to play the tuning cue on load (NOT here — playing it here
-    // collides with the first-gesture unlock. The submit gesture unlocks audio,
-    // so the app can resume it right when it loads).
-    try { sessionStorage.setItem('playStartupOnLoad', '1'); } catch (e) {}
+    try { sessionStorage.setItem('playStartupOnLoad', '1'); } catch (e2) {}
+
+    // The submit normally navigates away instantly, cutting off the sound.
+    // Hold the navigation briefly so the "Ingresar" cue can actually play.
+    var form = this;
+    if (!form.dataset.sndDone) {
+        e.preventDefault();
+        try { UISound.click(); } catch (e3) {}
+        form.dataset.sndDone = '1';
+        setTimeout(function() { form.submit(); }, 320);
+    }
 });
 
 // On load: prefill from localStorage if not already prefilled from server
@@ -7686,6 +7693,9 @@ window.addEventListener('DOMContentLoaded', function() {
     });
     document.addEventListener('click', function(e) {
         var t = e.target;
+        // Submit button plays its own click via the form handler (with a delay
+        // so it isn't cut off by navigation) — skip it here to avoid doubling.
+        if (t && t.closest && t.closest('.btn-submit')) return;
         if (t && t.closest && t.closest('button, .tab-btn, a')) UISound.click();
     });
 });
