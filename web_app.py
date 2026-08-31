@@ -2692,7 +2692,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v14.5{% if username == 'Berna.Strauss' %} &middot; globos separados + resalte single{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v14.6{% if username == 'Berna.Strauss' %} &middot; globos junto al punto{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -6331,33 +6331,48 @@ async function loadInforme() {
             }
         }
         // Name balloons: one per dominant seller at their strongest point.
-        // Balloons are lifted well ABOVE the line into an upper band, connected
-        // to their data point by a thin neon leader line, and staggered in two
-        // rows so their texts never overlap each other or the chart line.
+        // Each balloon sits JUST above its own point (small gap), connected by a
+        // very short neon leader line. Only bumped up further if it would collide
+        // with a nearby balloon — never more separation than necessary.
         const domSeen = {};
         for (let i = 0; i < nX; i++) {
             const u = domUser[i];
             if (!u || totalVals[i] === 0) continue;
             if (domSeen[u] === undefined || totalVals[i] > totalVals[domSeen[u]]) domSeen[u] = i;
         }
-        // Order balloons left-to-right and alternate two vertical levels.
         const balloonList = Object.keys(domSeen).map(function(u){ return { u: u, i: domSeen[u], x: singlePts[domSeen[u]][0] }; });
         balloonList.sort(function(a, b){ return a.x - b.x; });
-        balloonList.forEach(function(item, k){
+        const placed = [];  // {xl, xr, byl} of already-placed balloons for collision checks
+        balloonList.forEach(function(item){
             const u = item.u, i = item.i;
             const col = colorOf[u] || '#4a6cf7';
             const bw = Math.max(30, u.length * 5.4 + 10);
+            const bh = 13;
             let bxl = singlePts[i][0] - bw / 2;
             if (bxl < 2) bxl = 2;
             if (bxl + bw > lcW - 2) bxl = lcW - 2 - bw;
-            // Two staggered rows in the top band so labels don't collide.
-            const rowY = (k % 2 === 0) ? 2 : 15;
-            const byl = rowY;
-            const bcx = bxl + bw / 2;
-            const balloonBottom = byl + 13;
             const px = singlePts[i][0], py = singlePts[i][1];
+            // Default: balloon just above the point (~3px visual gap + balloon height).
+            let byl = py - bh - 6;
+            // If this balloon horizontally overlaps a placed one at the same level,
+            // lift it just enough to clear it (step by one balloon height).
+            let guard = 0;
+            while (guard < 12) {
+                const clash = placed.some(function(p){
+                    const overlapX = !(bxl + bw < p.xl - 4 || bxl > p.xr + 4);
+                    const overlapY = Math.abs(byl - p.byl) < bh + 2;
+                    return overlapX && overlapY;
+                });
+                if (!clash) break;
+                byl -= (bh + 3);
+                guard++;
+            }
+            if (byl < 2) byl = 2;
+            placed.push({ xl: bxl, xr: bxl + bw, byl: byl });
+            const bcx = bxl + bw / 2;
+            const balloonBottom = byl + bh;
             singleSvg += '<g class="' + lcId + '-sgl" data-si="' + (siOf[u] !== undefined ? siOf[u] : -1) + '">';
-            // Thin neon leader line from balloon to the data point.
+            // Short neon leader line from balloon bottom to just above the point.
             singleSvg += '<line x1="' + bcx.toFixed(1) + '" y1="' + balloonBottom.toFixed(1) + '" x2="' + px.toFixed(1) + '" y2="' + (py - 4).toFixed(1) + '" stroke="' + col + '" stroke-width="0.8" opacity="0.7" style="filter:drop-shadow(0 0 2px ' + col + ');"/>';
             singleSvg += '<rect x="' + bxl.toFixed(1) + '" y="' + byl.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="13" rx="6" fill="' + col + '" opacity="0.18" stroke="' + col + '" stroke-width="0.9"/>';
             singleSvg += '<text x="' + bcx.toFixed(1) + '" y="' + (byl + 9).toFixed(1) + '" text-anchor="middle" font-size="8.5" font-weight="700" fill="' + col + '">' + u + '</text>';
