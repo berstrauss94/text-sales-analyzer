@@ -2684,7 +2684,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v13.4 &middot; ingresar audible</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v13.5 &middot; ingresar agudo</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -7660,9 +7660,8 @@ var UISound = (function() {
     }
     return {
         tick: function() { tone(520, 560, 0.28, 0.022, 0.55); },
-        // "Ingresar": slightly higher pitch + more reverb tail, same duration,
-        // so it feels less boxy and more spacious.
-        click: function() { tone(466, 523, 0.55, 0.045, 0.92); },
+        // "Ingresar": higher, brighter pitch with reverb tail, same duration.
+        click: function() { tone(698, 784, 0.55, 0.045, 0.92); },
         cancel: function() { tone(294, 220, 0.6, 0.04, 0.6); },
         startup: orchestraTuning,
         unlock: function() { var c = ac(); if (c && c.state === 'suspended') { try { c.resume(); } catch (e) {} } }
