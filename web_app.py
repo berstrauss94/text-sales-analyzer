@@ -1379,13 +1379,21 @@ HTML = """
             letter-spacing: 0;
             line-height: 1.5;
             width: 260px;
-            z-index: 20;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 9999;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            pointer-events: none;  /* don't let it block hovering the icon */
         }
         .card-info-icon:hover + .card-info-tooltip,
+        .card-info-icon:focus + .card-info-tooltip,
         .card-info-tooltip:hover {
             display: block;
         }
+        /* The card and its title must not clip the tooltip, and the hovered
+           card must sit above its siblings so the tooltip is fully visible
+           even while the section is collapsed. */
+        .card, .commercial-section { overflow: visible; }
+        .card:hover, .commercial-section:hover { z-index: 50; position: relative; }
+        .card-title { overflow: visible; }
 
         /* Source fragment toggle */
         .source-toggle {
@@ -2684,7 +2692,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v13.5{% if username == 'Berna.Strauss' %} &middot; ingresar agudo{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v13.6{% if username == 'Berna.Strauss' %} &middot; fix tooltips info{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
