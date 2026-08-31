@@ -2692,7 +2692,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v14{% if username == 'Berna.Strauss' %} &middot; lineas por vendedor{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v14.1{% if username == 'Berna.Strauss' %} &middot; toggle multi/unica{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5853,6 +5853,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('change', function(e) {
         if (e.target && e.target.tagName === 'SELECT') UISound.click();
     });
+    // Line-chart view toggle (multi-line vs single-line) via delegation.
+    document.addEventListener('click', function(e) {
+        var btn = _closest(e, '.lc-view-btn');
+        if (btn) setLineChartView(btn.getAttribute('data-lc'), btn.getAttribute('data-view'));
+    });
 
     let debounceTimer = null;
     const textarea = document.getElementById('textInput');
@@ -6244,45 +6249,102 @@ async function loadInforme() {
 
         const lcId = 'lc_' + Math.random().toString(36).slice(2, 8);
 
-        // Draw every series: colored polyline + dots + a name balloon at the peak.
-        let seriesSvg = '';
-        let balloonsSvg = '';
-        series.forEach(function(s, si) {
-            let pts = [];
-            for (let i = 0; i < nX; i++) pts.push([xAt(i), yAt(s.values[i])]);
-            const path = pts.map(function(p, i){ return (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
-            seriesSvg += '<path d="' + path + '" fill="none" stroke="' + s.color + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.92"/>';
-            for (let i = 0; i < nX; i++) {
-                if (s.values[i] > 0) {
-                    seriesSvg += '<circle cx="' + pts[i][0].toFixed(1) + '" cy="' + pts[i][1].toFixed(1) + '" r="2.6" fill="' + s.color + '" stroke="#0a0c14" stroke-width="1"/>';
-                }
-            }
-            // Name balloon at the series' highest point.
-            let peakI = 0, peakV = -1;
-            for (let i = 0; i < nX; i++) { if (s.values[i] > peakV) { peakV = s.values[i]; peakI = i; } }
-            const bx = pts[peakI][0], by = pts[peakI][1];
-            const label = s.user;
-            const bw = Math.max(30, label.length * 5.4 + 10);
-            let bxl = bx - bw / 2;
-            if (bxl < 2) bxl = 2;
-            if (bxl + bw > lcW - 2) bxl = lcW - 2 - bw;
-            const byl = Math.max(2, by - 20);
-            balloonsSvg += '<g opacity="0.95">' +
-                '<rect x="' + bxl.toFixed(1) + '" y="' + byl.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="13" rx="6" fill="' + s.color + '" opacity="0.16" stroke="' + s.color + '" stroke-width="0.8"/>' +
-                '<text x="' + (bxl + bw / 2).toFixed(1) + '" y="' + (byl + 9).toFixed(1) + '" text-anchor="middle" font-size="8.5" font-weight="700" fill="' + s.color + '">' + label + '</text>' +
-                '</g>';
-        });
+        // Colors per seller, so both views share the same seller->color map.
+        const colorOf = {};
+        series.forEach(function(s){ colorOf[s.user] = s.color; });
 
-        // X-axis labels (shared)
+        // Shared X-axis labels.
         let xlabelsSvg = '';
         for (let i = 0; i < nX; i++) {
             xlabelsSvg += '<text x="' + xAt(i).toFixed(1) + '" y="' + (lcH - 8) + '" text-anchor="middle" font-size="9" fill="#888">' + lineLabels[i] + '</text>';
         }
 
-        // Header + seller color legend.
-        const lineHead = lineTitle + (!multiMode ? ' · ' + data.filter_seller : '');
+        // ── VIEW A: MULTI-LINE (one colored line per seller + name balloon) ──
+        let multiSvg = '';
+        series.forEach(function(s) {
+            let pts = [];
+            for (let i = 0; i < nX; i++) pts.push([xAt(i), yAt(s.values[i])]);
+            const path = pts.map(function(p, i){ return (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
+            multiSvg += '<path d="' + path + '" fill="none" stroke="' + s.color + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.92"/>';
+            for (let i = 0; i < nX; i++) {
+                if (s.values[i] > 0) multiSvg += '<circle cx="' + pts[i][0].toFixed(1) + '" cy="' + pts[i][1].toFixed(1) + '" r="2.6" fill="' + s.color + '" stroke="#0a0c14" stroke-width="1"/>';
+            }
+            let peakI = 0, peakV = -1;
+            for (let i = 0; i < nX; i++) { if (s.values[i] > peakV) { peakV = s.values[i]; peakI = i; } }
+            const label = s.user;
+            const bw = Math.max(30, label.length * 5.4 + 10);
+            let bxl = pts[peakI][0] - bw / 2;
+            if (bxl < 2) bxl = 2;
+            if (bxl + bw > lcW - 2) bxl = lcW - 2 - bw;
+            const byl = Math.max(2, pts[peakI][1] - 20);
+            multiSvg += '<g opacity="0.95"><rect x="' + bxl.toFixed(1) + '" y="' + byl.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="13" rx="6" fill="' + s.color + '" opacity="0.16" stroke="' + s.color + '" stroke-width="0.8"/>' +
+                '<text x="' + (bxl + bw / 2).toFixed(1) + '" y="' + (byl + 9).toFixed(1) + '" text-anchor="middle" font-size="8.5" font-weight="700" fill="' + s.color + '">' + label + '</text></g>';
+        });
+
+        // ── VIEW B: SINGLE LINE (team total; each segment colored by the
+        //    dominant seller at that point + a name balloon on that segment) ──
+        // Total per X point and the dominant seller at each point.
+        const totalVals = [];
+        const domUser = [];
+        for (let i = 0; i < nX; i++) {
+            let t = 0, best = '', bestV = -1;
+            series.forEach(function(s){
+                const v = s.values[i];
+                t += v;
+                if (v > bestV) { bestV = v; best = s.user; }
+            });
+            totalVals.push(t);
+            domUser.push(best);
+        }
+        let singleMaxV = 1;
+        totalVals.forEach(function(v){ if (v > singleMaxV) singleMaxV = v; });
+        const ySingle = function(v){ return lcPadT + plotH - (v / singleMaxV) * plotH; };
+        let singlePts = [];
+        for (let i = 0; i < nX; i++) singlePts.push([xAt(i), ySingle(totalVals[i])]);
+        let singleSvg = '';
+        // Each segment i-1 -> i painted with the dominant seller's color of point i.
+        for (let i = 1; i < nX; i++) {
+            const a = singlePts[i - 1], b = singlePts[i];
+            const col = colorOf[domUser[i]] || '#4a6cf7';
+            singleSvg += '<path d="M' + a[0].toFixed(1) + ',' + a[1].toFixed(1) + ' L' + b[0].toFixed(1) + ',' + b[1].toFixed(1) + '" fill="none" stroke="' + col + '" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>';
+        }
+        for (let i = 0; i < nX; i++) {
+            if (totalVals[i] > 0) {
+                const col = colorOf[domUser[i]] || '#4a6cf7';
+                singleSvg += '<circle cx="' + singlePts[i][0].toFixed(1) + '" cy="' + singlePts[i][1].toFixed(1) + '" r="3" fill="' + col + '" stroke="#0a0c14" stroke-width="1.2"/>';
+                singleSvg += '<text x="' + singlePts[i][0].toFixed(1) + '" y="' + (singlePts[i][1] - 7).toFixed(1) + '" text-anchor="middle" font-size="9" fill="#e0e0e0" font-weight="600">' + totalVals[i] + '</text>';
+            }
+        }
+        // Name balloons: one per dominant seller at their strongest point.
+        const domSeen = {};
+        for (let i = 0; i < nX; i++) {
+            const u = domUser[i];
+            if (!u || totalVals[i] === 0) continue;
+            if (domSeen[u] === undefined || totalVals[i] > totalVals[domSeen[u]]) domSeen[u] = i;
+        }
+        Object.keys(domSeen).forEach(function(u){
+            const i = domSeen[u];
+            const col = colorOf[u] || '#4a6cf7';
+            const bw = Math.max(30, u.length * 5.4 + 10);
+            let bxl = singlePts[i][0] - bw / 2;
+            if (bxl < 2) bxl = 2;
+            if (bxl + bw > lcW - 2) bxl = lcW - 2 - bw;
+            const byl = Math.max(2, singlePts[i][1] - 20);
+            singleSvg += '<g opacity="0.95"><rect x="' + bxl.toFixed(1) + '" y="' + byl.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="13" rx="6" fill="' + col + '" opacity="0.16" stroke="' + col + '" stroke-width="0.8"/>' +
+                '<text x="' + (bxl + bw / 2).toFixed(1) + '" y="' + (byl + 9).toFixed(1) + '" text-anchor="middle" font-size="8.5" font-weight="700" fill="' + col + '">' + u + '</text></g>';
+        });
+        // Grid for single view uses its own scale.
+        let gridSingle = '';
+        for (let g = 0; g <= 4; g++) {
+            const gy = lcPadT + (plotH / 4) * g;
+            const gv = Math.round(singleMaxV - (singleMaxV / 4) * g);
+            gridSingle += '<line x1="' + lcPadL + '" y1="' + gy + '" x2="' + (lcW - lcPadR) + '" y2="' + gy + '" stroke="#1e2130" stroke-width="1"/>';
+            gridSingle += '<text x="' + (lcPadL - 6) + '" y="' + (gy + 3) + '" text-anchor="end" font-size="9" fill="#666">' + gv + '</text>';
+        }
+
+        // Seller color legend (shared by both views).
         let legendSvg = '';
-        if (multiMode && series.length > 1) {
+        if (series.length > 1) {
             legendSvg = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">';
             series.forEach(function(s){
                 legendSvg += '<span style="display:flex;align-items:center;gap:4px;font-size:0.62rem;color:#aaa;"><span style="width:10px;height:3px;border-radius:2px;background:' + s.color + ';display:inline-block;"></span>' + s.user + '</span>';
@@ -6290,16 +6352,27 @@ async function loadInforme() {
             legendSvg += '</div>';
         }
 
+        const lineHead = lineTitle + (!multiMode ? ' · ' + data.filter_seller : '');
+        // Only offer the toggle when multiple sellers are shown; otherwise a
+        // single seller has just one line and both views look the same.
+        const showToggle = multiMode && series.length > 1;
+
         let lineHtml = '<div class="fade-in-smooth" style="margin-top:14px;padding:12px 10px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
-        lineHtml += '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px;">';
+        // Top-left header row: view toggle (left) + title.
+        lineHtml += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">';
+        if (showToggle) {
+            lineHtml += '<div style="display:inline-flex;border:1px solid #2a2d3a;border-radius:7px;overflow:hidden;">' +
+                '<button type="button" id="' + lcId + '-btnMulti" class="lc-view-btn" data-lc="' + lcId + '" data-view="multi" style="background:#1a2a4a;color:#7b9cff;border:none;padding:4px 10px;font-size:0.62rem;font-weight:700;cursor:pointer;">Multi-linea</button>' +
+                '<button type="button" id="' + lcId + '-btnSingle" class="lc-view-btn" data-lc="' + lcId + '" data-view="single" style="background:transparent;color:#888;border:none;padding:4px 10px;font-size:0.62rem;font-weight:700;cursor:pointer;">Linea unica</button>' +
+                '</div>';
+        }
         lineHtml += '<div style="font-size:0.72rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">' + lineHead + '</div>';
         lineHtml += '</div>';
-        lineHtml += '<div style="width:100%;overflow-x:auto;"><svg id="' + lcId + '" viewBox="0 0 ' + lcW + ' ' + lcH + '" style="width:100%;min-width:460px;height:auto;display:block;touch-action:pan-y;">';
-        lineHtml += gridSvg;
-        lineHtml += seriesSvg;
-        lineHtml += balloonsSvg;
-        lineHtml += xlabelsSvg;
-        lineHtml += '</svg></div>' + legendSvg + '</div>';
+        // Two SVGs; multi visible by default, single hidden. Toggle swaps them.
+        lineHtml += '<div style="width:100%;overflow-x:auto;">';
+        lineHtml += '<svg id="' + lcId + '-multi" viewBox="0 0 ' + lcW + ' ' + lcH + '" style="width:100%;min-width:460px;height:auto;display:block;touch-action:pan-y;">' + gridSvg + multiSvg + xlabelsSvg + '</svg>';
+        lineHtml += '<svg id="' + lcId + '-single" viewBox="0 0 ' + lcW + ' ' + lcH + '" style="width:100%;min-width:460px;height:auto;display:none;touch-action:pan-y;">' + gridSingle + singleSvg + xlabelsSvg + '</svg>';
+        lineHtml += '</div>' + legendSvg + '</div>';
 
         // Compliance summary
         let complianceHtml = '<div style="margin-top:12px;padding:10px;background:#0a0c14;border:1px solid #1e2130;border-radius:8px;font-size:0.72rem;">';
@@ -6650,6 +6723,26 @@ function attachPieInteractivity() {
             row.addEventListener('click', function() { focusRow(row); });
         });
     });
+}
+
+// Toggle the trend line chart between the multi-line view (one line per seller)
+// and the single-line view (team total, segments colored by dominant seller).
+function setLineChartView(lcId, view) {
+    var m = document.getElementById(lcId + '-multi');
+    var s = document.getElementById(lcId + '-single');
+    var bm = document.getElementById(lcId + '-btnMulti');
+    var bs = document.getElementById(lcId + '-btnSingle');
+    if (!m || !s) return;
+    var single = (view === 'single');
+    m.style.display = single ? 'none' : 'block';
+    s.style.display = single ? 'block' : 'none';
+    if (bm && bs) {
+        bm.style.background = single ? 'transparent' : '#1a2a4a';
+        bm.style.color = single ? '#888' : '#7b9cff';
+        bs.style.background = single ? '#1a2a4a' : 'transparent';
+        bs.style.color = single ? '#7b9cff' : '#888';
+    }
+    try { UISound.click(); } catch (e) {}
 }
 
 // Indicator donut: hovering/tapping a % label inside the donut OR a legend row
