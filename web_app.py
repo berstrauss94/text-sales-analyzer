@@ -2692,7 +2692,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v14.3{% if username == 'Berna.Strauss' %} &middot; encabezado estilo informe{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v14.4{% if username == 'Berna.Strauss' %} &middot; resalte fijable linea{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -6751,6 +6751,8 @@ function attachLineChartHover() {
         const balloons = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-sballoon'));
         const hits = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-hit'));
 
+        let pinned = null;  // seller index locked by click (persistent highlight)
+
         function focus(si) {
             lines.forEach(function(l) {
                 const on = (l.getAttribute('data-si') === String(si));
@@ -6765,11 +6767,19 @@ function attachLineChartHover() {
             dots.forEach(function(d) { d.setAttribute('opacity', '1'); });
             balloons.forEach(function(b) { b.setAttribute('opacity', '0.95'); });
         }
+        // Click toggles a persistent highlight: select to pin, click again to
+        // release. Hover only previews while nothing is pinned.
+        function toggle(si) {
+            if (pinned === si) { pinned = null; reset(); }
+            else { pinned = si; focus(si); }
+            try { UISound.click(); } catch (e) {}
+        }
         hits.forEach(function(h) {
             const si = h.getAttribute('data-si');
-            h.addEventListener('mouseenter', function() { focus(si); });
-            h.addEventListener('mouseleave', reset);
-            h.addEventListener('touchstart', function(ev) { ev.preventDefault(); focus(si); }, { passive: false });
+            h.addEventListener('mouseenter', function() { if (pinned === null) focus(si); });
+            h.addEventListener('mouseleave', function() { if (pinned === null) reset(); else focus(pinned); });
+            h.addEventListener('click', function() { toggle(si); });
+            h.addEventListener('touchstart', function(ev) { ev.preventDefault(); toggle(si); }, { passive: false });
         });
     });
 }
