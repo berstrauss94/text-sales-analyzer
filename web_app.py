@@ -2684,7 +2684,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v13.2 &middot; nueva imagen PC</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v13.3 &middot; sonido ingresar</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -7589,8 +7589,8 @@ var UISound = (function() {
                 for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6);
             }
             verb.buffer = b;
-            var vlp = ctx.createBiquadFilter(); vlp.type = 'lowpass'; vlp.frequency.value = 2600;
-            var vg = ctx.createGain(); vg.gain.value = 0.38; verb.connect(vlp); vlp.connect(vg); vg.connect(master);
+            var vlp = ctx.createBiquadFilter(); vlp.type = 'lowpass'; vlp.frequency.value = 3200;
+            var vg = ctx.createGain(); vg.gain.value = 0.5; verb.connect(vlp); vlp.connect(vg); vg.connect(master);
         } catch (e) { ctx = null; }
         return ctx;
     }
@@ -7653,7 +7653,9 @@ var UISound = (function() {
     }
     return {
         tick: function() { tone(520, 560, 0.28, 0.022, 0.55); },
-        click: function() { tone(392, 440, 0.55, 0.045, 0.6); },
+        // "Ingresar": slightly higher pitch + more reverb tail, same duration,
+        // so it feels less boxy and more spacious.
+        click: function() { tone(466, 523, 0.55, 0.045, 0.92); },
         cancel: function() { tone(294, 220, 0.6, 0.04, 0.6); },
         startup: orchestraTuning,
         unlock: function() { var c = ac(); if (c && c.state === 'suspended') { try { c.resume(); } catch (e) {} } }
