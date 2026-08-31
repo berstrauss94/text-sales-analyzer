@@ -2687,12 +2687,12 @@ HTML = """
         }
     </style>
 </head>
-<body>
+<body data-username="{{ username }}">
 <div class="container">
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v13.6{% if username == 'Berna.Strauss' %} &middot; fix tooltips info{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v13.7{% if username == 'Berna.Strauss' %} &middot; encabezado impresion{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -2917,6 +2917,7 @@ HTML = """
 
 <script>
 const INDICADOR_CATEGORIAS = {{ indicador_categorias_json | safe }};
+window.CURRENT_USERNAME = (document.body && document.body.getAttribute('data-username')) || '';
 let _lastCommercialData = null;
 window._currentEntryName = '';
 window._currentEntryId = '';
@@ -5351,7 +5352,11 @@ function imprimirTextoResaltado() {
     w.document.write('* { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }');
     w.document.write('@page { size: A4; margin: 2cm; }');
     w.document.write('body { font-family: "Segoe UI", sans-serif; line-height: 1.8; font-size: 12px; color: #111; white-space: pre-wrap; word-wrap: break-word; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }');
-    w.document.write('h1 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }');
+    w.document.write('.print-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }');
+    w.document.write('h1 { font-size: 16px; font-weight: 600; margin: 0; }');
+    w.document.write('.head-datetime { font-size: 11px; color: #666; white-space: nowrap; }');
+    w.document.write('.meta { font-size: 11px; color: #333; margin-bottom: 12px; line-height: 1.6; }');
+    w.document.write('.meta strong { color: #111; }');
     w.document.write('.sub { font-size: 11px; color: #666; margin-bottom: 12px; }');
     w.document.write('.legend { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 16px; padding:10px; border:1px solid #ccc; border-radius:6px; }');
     w.document.write('.legend span { font-size:10px; padding:2px 8px; border-radius:3px; }');
@@ -5366,9 +5371,19 @@ function imprimirTextoResaltado() {
     w.document.write('.hl-objeciones{background:#f79a9a !important;' + hlCss + '}');
     w.document.write('.hl-indicios_prospeccion{background:#93d9f7 !important;' + hlCss + '}');
     w.document.write('</style></head><body>');
-    w.document.write('<h1>Texto Resaltado — Analisis de Indicadores</h1>');
-    const nowStr = new Date().toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' });
-    w.document.write('<div class="sub">Mi Primer Casa S.A. — ' + nowStr + '</div>');
+    // Title with date/time on the right (same line).
+    const nowDT = new Date().toLocaleString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    w.document.write('<div class="print-head"><h1>Texto Resaltado — Analisis de Indicadores</h1><span class="head-datetime">' + nowDT + '</span></div>');
+    // Header metadata: transcript name, seller, auditor.
+    const transcripcion = (window._currentEntryName && window._currentEntryName.trim()) ? window._currentEntryName.trim() : 'Sin titulo';
+    const userSel = document.getElementById('selectUser');
+    const vendedor = (userSel && userSel.value) ? userSel.value : (window.CURRENT_USERNAME || '');
+    w.document.write('<div class="meta">' +
+        '<div><strong>Transcripcion:</strong> ' + transcripcion + '</div>' +
+        '<div><strong>Vendedor:</strong> ' + vendedor + '</div>' +
+        '<div><strong>Auditor:</strong> Bernardo Sebastian Strauss</div>' +
+        '</div>');
+    w.document.write('<div class="sub">Mi Primer Casa S.A.</div>');
     // Color legend so whoever works on paper knows what each color means
     w.document.write('<div class="legend">');
     w.document.write('<span class="hl-palabras_positivas">Positivas</span>');
