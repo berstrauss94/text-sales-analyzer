@@ -50,7 +50,7 @@ def run(cmd: str) -> tuple[int, str]:
 
 
 # Punto de restauracion actual. Actualizar cuando se cree un nuevo backup estable.
-BACKUP_TAG = "backup-estable-2026-08-29-v12.14"
+BACKUP_TAG = "backup-estable-2026-08-29-v14"
 
 
 def main():
