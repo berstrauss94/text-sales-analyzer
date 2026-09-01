@@ -2692,7 +2692,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v14.7{% if username == 'Berna.Strauss' %} &middot; globo encima del valor{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v14.8{% if username == 'Berna.Strauss' %} &middot; fecha + eliminar solo admin{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -2743,17 +2743,23 @@ HTML = """
                     <option value="12">Diciembre</option>
                 </select>
             </div>
+            {% if username == 'Berna.Strauss' %}
             <div class="date-select-group">
                 <label for="selectFecha">Fecha</label>
                 <input type="date" id="selectFecha" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:7px 10px;font-size:0.82rem;cursor:pointer;outline:none;min-width:120px;max-width:100%;box-sizing:border-box;">
             </div>
+            {% else %}
+            <input type="hidden" id="selectFecha" value="">
+            {% endif %}
             <div class="date-select-group">
                 <label for="selectText">Textos <span id="savedTextsCount" style="color:#555;"></span></label>
                 <div style="display:flex;align-items:center;gap:6px;">
                     <select id="selectText" onchange="onTextSelected(this.value)" style="flex:1;">
                         <option value="">-- Seleccionar texto --</option>
                     </select>
+                    {% if username == 'Berna.Strauss' %}
                     <button id="deleteTextBtn" onclick="deleteSelectedText()" style="display:none;background:transparent;border:1px solid #f55b5b;color:#f55b5b;border-radius:6px;padding:5px 8px;font-size:0.75rem;cursor:pointer;white-space:nowrap;" title="Eliminar texto seleccionado">🗑️</button>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -2780,6 +2786,9 @@ HTML = """
             <button class="btn-secondary" onclick="clearAll()">Limpiar</button>
             {% if username in ['admin', 'Vanesa.Admin', 'Berna.Strauss', 'FedericoCeballos', 'MartinianoSosa'] %}
             <input type="text" id="entryNameInput" class="save-name-input" placeholder="Titulo del texto (obligatorio para guardar)..." style="flex:1; margin-left:8px;">
+            {% if username == 'Berna.Strauss' %}
+            <input type="date" id="selectFechaInline" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:7px 10px;font-size:0.82rem;cursor:pointer;outline:none;box-sizing:border-box;" title="Fecha del texto">
+            {% endif %}
             <button class="btn-save" onclick="saveEntry()">&#128190; Guardar</button>
             {% endif %}
         </div>
@@ -4447,7 +4456,8 @@ function onTextSelected(entryId) {
         window._currentEntryId = '';
         return;
     }
-    document.getElementById('deleteTextBtn').style.display = 'inline-block';
+    var _delbtn = document.getElementById('deleteTextBtn');
+    if (_delbtn) _delbtn.style.display = 'inline-block';
     window._currentEntryId = entryId;  // Track loaded entry ID for UPSERT
     // Capture the full entry name from the selected option
     const select = document.getElementById('selectText');
@@ -4458,6 +4468,8 @@ function onTextSelected(entryId) {
         const ts = selectedOpt.getAttribute('data-timestamp') || '';
         if (ts && ts.length >= 10) {
             document.getElementById('selectFecha').value = ts.substring(0, 10);
+            var inl = document.getElementById('selectFechaInline');
+            if (inl) inl.value = ts.substring(0, 10);
         }
     }
     loadSavedText(entryId);
@@ -5795,8 +5807,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Page entrance is handled by CSS (pageBlockIn) for reliability.
     // animateEntrance() is still used for dynamically rendered results/report.
 
-    // Reflect the saved mute preference on the header sound button.
+    // Reflect the saved animation preference on the toggle button.
     refreshSoundToggleBtn();
+
+    // Sync the inline date picker (next to title/save, Berna.Strauss only) with
+    // the main selectFecha so the save logic always reads the right value.
+    (function() {
+        var inline = document.getElementById('selectFechaInline');
+        var main = document.getElementById('selectFecha');
+        if (inline && main) {
+            inline.addEventListener('change', function() { main.value = inline.value; });
+            main.addEventListener('change', function() { inline.value = main.value; });
+        }
+    })();
 
     // Browsers block audio until the first user gesture. Unlock the AudioContext
     // on the first pointer/keyboard interaction.
