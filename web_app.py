@@ -2692,7 +2692,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v14.6{% if username == 'Berna.Strauss' %} &middot; globos junto al punto{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v14.7{% if username == 'Berna.Strauss' %} &middot; globo encima del valor{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -6352,8 +6352,9 @@ async function loadInforme() {
             if (bxl < 2) bxl = 2;
             if (bxl + bw > lcW - 2) bxl = lcW - 2 - bw;
             const px = singlePts[i][0], py = singlePts[i][1];
-            // Default: balloon just above the point (~3px visual gap + balloon height).
-            let byl = py - bh - 6;
+            // Default: balloon just above the VALUE LABEL (which sits ~7px above
+            // the point), so it never covers the number. Minimum gap of ~3px.
+            let byl = py - bh - 6 - 9;  // point y - value label height - gap - balloon
             // If this balloon horizontally overlaps a placed one at the same level,
             // lift it just enough to clear it (step by one balloon height).
             let guard = 0;
