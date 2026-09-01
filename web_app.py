@@ -2692,7 +2692,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v14.8{% if username == 'Berna.Strauss' %} &middot; fecha + eliminar solo admin{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v14.9{% if username == 'Berna.Strauss' %} &middot; fecha solo inline{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -2744,10 +2744,7 @@ HTML = """
                 </select>
             </div>
             {% if username == 'Berna.Strauss' %}
-            <div class="date-select-group">
-                <label for="selectFecha">Fecha</label>
-                <input type="date" id="selectFecha" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:7px 10px;font-size:0.82rem;cursor:pointer;outline:none;min-width:120px;max-width:100%;box-sizing:border-box;">
-            </div>
+            <input type="hidden" id="selectFecha" value="">
             {% else %}
             <input type="hidden" id="selectFecha" value="">
             {% endif %}
