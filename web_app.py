@@ -2692,7 +2692,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v14.9{% if username == 'Berna.Strauss' %} &middot; fecha solo inline{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v15{% if username == 'Berna.Strauss' %} &middot; tooltip resaltar-definir{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -2769,9 +2769,15 @@ HTML = """
         </div>
         <!-- Resaltar y Definir -->
         <div class="highlight-define-row" id="highlightDefineRow">
-            <button class="btn-highlight-define" id="btnHighlightDefine" type="button">
-                &#9998; Resaltar y definir <span style="font-size:0.6rem;opacity:0.5;">v4</span>
-            </button>
+            <div style="position:relative;display:inline-flex;align-items:center;gap:4px;">
+                <button class="btn-highlight-define" id="btnHighlightDefine" type="button">
+                    &#9998; Resaltar y definir <span style="font-size:0.6rem;opacity:0.5;">v4</span>
+                </button>
+                <span class="card-info-icon" onclick="event.stopPropagation()" style="font-size:0.6rem;width:15px;height:15px;line-height:15px;">!</span>
+                <div class="card-info-tooltip" style="top:22px;left:0;right:auto;min-width:280px;max-width:320px;font-size:0.72rem;">
+                    Para añadir una nueva palabra o frase detectada por un vendedor al diccionario de los filtros, se debe utilizar la herramienta para resaltarla y, a continuación, pulsar nuevamente para incorporarla al filtro correspondiente.
+                </div>
+            </div>
             <span class="highlight-selection-info" id="highlightSelectionInfo"></span>
             <div class="category-popover" id="categoryPopover">
                 <div class="category-popover-title">Selecciona una categoria</div>
