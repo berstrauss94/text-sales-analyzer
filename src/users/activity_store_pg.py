@@ -111,14 +111,22 @@ def log_event(username: str, event_type: str, tool: str = "",
         return False
 
 
-def get_activity_summary(days: int = 90) -> dict:
+def get_activity_summary(days: int = 90, start=None, end=None,
+                         usernames: list | None = None) -> dict:
     """
-    Aggregate per-user activity over the last `days` days.
+    Aggregate per-user activity, filtered by a date range and (optionally) a set
+    of usernames — so the panel can mirror the report's active filters
+    (year / month / week / seller).
+
+    Args:
+      days: fallback look-back window (used only when start/end are not given).
+      start, end: datetime bounds (inclusive start, exclusive end). When given,
+                  they take precedence over `days`.
+      usernames: if given, only these users are included (e.g. a single seller).
 
     Returns:
       {
         "ok": True,
-        "since_days": days,
         "users": {
             username: {
                 "logins": int,              # number of 'login' events
@@ -144,17 +152,28 @@ def get_activity_summary(days: int = 90) -> dict:
     # an explicit logout (the user likely just closed the tab).
     SESSION_CAP_MIN = 45.0
 
+    # Build the WHERE clause: explicit [start, end) range if provided, else the
+    # rolling `days` window. Optionally restrict to a set of usernames.
+    where = []
+    params: list = []
+    if start is not None and end is not None:
+        where.append("ts >= %s AND ts < %s")
+        params.extend([start, end])
+    else:
+        where.append("ts >= now() - (%s || ' days')::interval")
+        params.append(str(int(days)))
+    if usernames:
+        where.append("username = ANY(%s)")
+        params.append(list(usernames))
+    where_sql = " AND ".join(where)
+
     try:
         _ensure_table(conn)
         with conn.cursor() as cur:
             cur.execute(
-                """
-                SELECT username, event_type, tool, ts
-                FROM activity_log
-                WHERE ts >= now() - (%s || ' days')::interval
-                ORDER BY username ASC, ts ASC
-                """,
-                (str(int(days)),),
+                "SELECT username, event_type, tool, ts FROM activity_log "
+                "WHERE " + where_sql + " ORDER BY username ASC, ts ASC",
+                tuple(params),
             )
             rows = cur.fetchall()
         _release(conn)
@@ -212,4 +231,4 @@ def get_activity_summary(days: int = 90) -> dict:
             b["total_minutes"] = round(sum(durations), 1)
             b["avg_session_minutes"] = round(sum(durations) / len(durations), 1)
 
-    return {"ok": True, "since_days": int(days), "users": users}
+    return {"ok": True, "users": users}
