@@ -2692,7 +2692,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v15.1{% if username == 'Berna.Strauss' %} &middot; grafico usa fecha configurada{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v15.3{% if username == 'Berna.Strauss' %} &middot; usuarios persistentes en PG{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -8854,6 +8854,57 @@ def admin_unify_name_variants():
 
     result["applied"] = applied
     result["note"] = "Unificacion aplicada. Verifica con /admin/full-diag."
+    return jsonify(result)
+
+
+@app.route("/admin/sync-users-to-pg", methods=["POST", "GET"])
+def admin_sync_users_to_pg():
+    """
+    Backfill: persist every existing usuarios/*.txt credential file into the
+    PostgreSQL app_users table, so accounts survive Railway redeploys.
+
+    Run this ONCE after deploying the PG-backed user store. It reads each local
+    .txt, extracts the stored password hash, and upserts it into app_users.
+    Idempotent: safe to run multiple times. Admin only.
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    import os as _os
+    from src.users import user_store_pg
+    if not user_store_pg.is_available():
+        return jsonify({"error": "PostgreSQL no disponible"}), 500
+
+    result = {"synced": [], "skipped": [], "errors": []}
+    users_dir = user_manager.users_dir
+    try:
+        fnames = [f for f in _os.listdir(users_dir)
+                  if f.endswith(".txt") and f != "README.txt"]
+    except FileNotFoundError:
+        fnames = []
+
+    for fname in fnames:
+        username = fname[:-4]
+        try:
+            with open(_os.path.join(users_dir, fname), "r", encoding="utf-8") as fh:
+                content = fh.read()
+            # Extract the stored password hash from its dedicated field
+            stored_hash = ""
+            for line in content.splitlines():
+                if line.startswith("Contrasena (hash)"):
+                    parts = line.split(":", 1)
+                    if len(parts) == 2:
+                        stored_hash = parts[1].strip()
+                    break
+            ok = user_store_pg.upsert_user(username, stored_hash, content)
+            if ok:
+                result["synced"].append(username)
+            else:
+                result["skipped"].append(username)
+        except Exception as exc:
+            result["errors"].append({"user": username, "error": str(exc)})
+
+    result["num_synced"] = len(result["synced"])
+    result["note"] = "Cuentas persistidas en app_users. Sobreviven redeploys."
     return jsonify(result)
 
 
