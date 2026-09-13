@@ -2692,7 +2692,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v15.5{% if username == 'Berna.Strauss' %} &middot; limpieza + fix Vanesa.Admin en dropdown{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v15.6{% if username == 'Berna.Strauss' %} &middot; torta de distribucion por vendedor{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -6206,6 +6206,46 @@ async function loadInforme() {
             total: data.total_general
         };
 
+        // ── SECOND PIE (distribution BY SELLER) ──
+        // Each slice = one seller. Legend shows: name, % of the team total, and
+        // (count) of texts uploaded. Colors match the line chart's seller palette.
+        const sellerPalette = ['#4da3ff', '#5bf5a3', '#f5a35b', '#f55b5b', '#b38bff',
+                               '#5bd4f5', '#f5d75b', '#ff8c8c', '#88cc88', '#c78bff',
+                               '#ffb84d', '#4dd2c0'];
+        // Sellers with at least one text in the current filter, sorted desc by total.
+        const pieSellers = Object.keys(data.user_totals || {})
+            .filter(u => (data.user_totals[u] || 0) > 0)
+            .sort((a, b) => data.user_totals[b] - data.user_totals[a]);
+        const totalForPieV = data.total_general || 1;
+        let pieVGradient = [];
+        let pieVLegend = '';
+        let currentDegV = 0;
+        const pieVId = 'piev_' + Math.random().toString(36).slice(2, 8);
+        pieSellers.forEach((u, i) => {
+            const val = data.user_totals[u] || 0;
+            const pct = (val / totalForPieV * 100).toFixed(1);
+            const deg = val / totalForPieV * 360;
+            const col = sellerPalette[i % sellerPalette.length];
+            pieVGradient.push(col + ' ' + currentDegV + 'deg ' + (currentDegV + deg) + 'deg');
+            pieVLegend += '<div class="' + pieVId + '-leg" data-i="' + i + '" data-start="' + currentDegV.toFixed(2) + '" data-end="' + (currentDegV + deg).toFixed(2) + '" data-col="' + col + '" title="' + u + ': ' + val + ' texto(s), ' + pct + '%" style="display:flex;align-items:center;gap:5px;font-size:0.65rem;cursor:pointer;padding:2px 5px;border-radius:5px;transition:background 0.15s;">' +
+                '<div style="width:9px;height:9px;border-radius:2px;background:' + col + ';flex:none;"></div>' +
+                '<span style="color:#aaa;"><strong style="color:#e0e0e0;">' + u + '</strong>: ' + pct + '% (' + val + ')</span></div>';
+            currentDegV += deg;
+        });
+
+        let pieVHtml = '';
+        if (pieSellers.length > 0) {
+            pieVHtml += '<div style="text-align:center;margin-top:22px;font-size:0.72rem;color:#888;font-weight:600;letter-spacing:0.5px;">DISTRIBUCION POR VENDEDOR</div>';
+            pieVHtml += '<div style="display:flex;align-items:center;gap:20px;justify-content:center;margin-top:8px;flex-wrap:wrap;">';
+            pieVHtml += '<div id="' + pieVId + '" class="pie-chart-expand" style="width:140px;height:140px;border-radius:50%;background:conic-gradient(' + pieVGradient.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;transition:transform 0.2s;">';
+            pieVHtml += '<div style="width:60px;height:60px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;pointer-events:none;"><span id="' + pieVId + '-center" style="font-size:0.6rem;color:#aaa;text-align:center;line-height:1.1;">' + data.total_general + '</span></div></div>';
+            pieVHtml += '<div style="display:flex;flex-direction:column;gap:2px;max-height:160px;overflow-y:auto;">' + pieVLegend + '</div></div>';
+        }
+        window._pieInteractive[pieVId] = {
+            base: 'conic-gradient(' + pieVGradient.join(',') + ')',
+            total: data.total_general
+        };
+
         // ── LINE CHART (trend) — rendered ABOVE the pie chart ──
         // Levels of detail, responding to the active filters:
         //   • Month + Week selected  -> DAILY trend for the days of that week
@@ -6639,7 +6679,7 @@ async function loadInforme() {
 
         card2Html += '</div>';
 
-        container.innerHTML = tableHtml + totalsHtml + lineHtml + pieHtml + complianceHtml + synthesisHtml + card2Html;
+        container.innerHTML = tableHtml + totalsHtml + lineHtml + pieHtml + pieVHtml + complianceHtml + synthesisHtml + card2Html;
         // Wire up chart interactivity now that the SVG/pie are in the DOM.
         setTimeout(function() { attachLineChartInteractivity(); attachLineChartHover(); attachPieInteractivity(); attachReportSectionInteractivity(); }, 0);
         // Fluid staggered entrance for the report blocks.
