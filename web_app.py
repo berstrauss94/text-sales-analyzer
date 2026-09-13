@@ -2692,7 +2692,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v15.9{% if username == 'Berna.Strauss' %} &middot; seguimiento respeta filtros del informe{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v16.0{% if username == 'Berna.Strauss' %} &middot; fix impresion multi-linea + tortas centradas{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -6211,8 +6211,8 @@ async function loadInforme() {
         });
 
         let pieHtml = '<div style="text-align:center;font-size:0.72rem;color:#888;font-weight:600;letter-spacing:0.5px;">DISTRIBUCION MENSUAL</div>';
-        pieHtml += '<div style="display:flex;align-items:center;gap:20px;justify-content:center;margin-top:8px;flex-wrap:wrap;">';
-        pieHtml += '<div id="' + pieId + '" class="pie-chart-expand" style="width:140px;height:140px;border-radius:50%;background:conic-gradient(' + pieGradient.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;transition:transform 0.2s;">';
+        pieHtml += '<div style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:8px;">';
+        pieHtml += '<div id="' + pieId + '" class="pie-chart-expand" style="width:140px;height:140px;border-radius:50%;background:conic-gradient(' + pieGradient.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;transition:transform 0.2s;flex:none;">';
         pieHtml += '<div style="width:60px;height:60px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;pointer-events:none;"><span id="' + pieId + '-center" style="font-size:0.6rem;color:#aaa;text-align:center;line-height:1.1;">' + data.total_general + '</span></div></div>';
         pieHtml += '<div style="display:flex;flex-direction:column;gap:2px;">' + pieLegend + '</div></div>';
         // Store base gradient so we can restore it after focusing a slice.
@@ -6252,8 +6252,11 @@ async function loadInforme() {
         let pieVHtml = '';
         if (pieSellers.length > 0) {
             pieVHtml += '<div style="text-align:center;font-size:0.72rem;color:#888;font-weight:600;letter-spacing:0.5px;">DISTRIBUCION POR VENDEDOR</div>';
-            pieVHtml += '<div style="display:flex;align-items:center;gap:20px;justify-content:center;margin-top:8px;flex-wrap:wrap;">';
-            pieVHtml += '<div id="' + pieVId + '" class="pie-chart-expand" style="width:140px;height:140px;border-radius:50%;background:conic-gradient(' + pieVGradient.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;transition:transform 0.2s;">';
+            // Column layout: donut centered on top, legend centered below. This
+            // keeps the donut straight/centered in its column regardless of how
+            // wide the seller legend gets (a side legend pushed it off-center).
+            pieVHtml += '<div style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:8px;">';
+            pieVHtml += '<div id="' + pieVId + '" class="pie-chart-expand" style="width:140px;height:140px;border-radius:50%;background:conic-gradient(' + pieVGradient.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;transition:transform 0.2s;flex:none;">';
             pieVHtml += '<div style="width:60px;height:60px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;pointer-events:none;"><span id="' + pieVId + '-center" style="font-size:0.6rem;color:#aaa;text-align:center;line-height:1.1;">' + data.total_general + '</span></div></div>';
             pieVHtml += '<div style="display:flex;flex-direction:column;gap:2px;max-height:160px;overflow-y:auto;">' + pieVLegend + '</div></div>';
         }
@@ -7310,6 +7313,16 @@ function printInforme() {
         cleanHtml = cleanHtml.split(a).join(accentFix[a]);
     });
     // Blue #4a6cf7, red #f55b5b and violet #b38bff already contrast on white so kept.
+
+    // Step E (PRINT-ONLY). The multi-line chart wraps its colored strokes in a
+    // group with `mix-blend-mode:screen` for the on-screen complementary-cross
+    // effect. On WHITE paper, "screen" blending makes those strokes vanish
+    // (screen over white = white), so the printed sheet showed only dots and
+    // name balloons but NO lines. Neutralize the blend and make the strokes
+    // fully opaque + slightly thicker so they print crisp.
+    cleanHtml = cleanHtml.split('mix-blend-mode:screen;').join('mix-blend-mode:normal;');
+    cleanHtml = cleanHtml.split('stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"')
+                         .join('stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" opacity="1"');
 
     printWindow.document.write(cleanHtml);
     printWindow.document.write('</body></html>');
