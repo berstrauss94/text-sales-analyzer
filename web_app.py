@@ -2692,7 +2692,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v15.7{% if username == 'Berna.Strauss' %} &middot; tortas lado a lado{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v15.8{% if username == 'Berna.Strauss' %} &middot; seguimiento de uso del sistema{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5357,6 +5357,7 @@ function toggleResaltarPalabras() {
 function imprimirTextoResaltado() {
     const overlay = document.getElementById('highlightOverlay');
     if (!overlay || !overlay.innerHTML) return;
+    logTool('imprimir', '', '');  // audit: print tool usage
     const styledHtml = overlay.innerHTML;
     const w = window.open('', '_blank');
     if (!w) return;
@@ -5456,6 +5457,19 @@ function _closest(e, selector) {
     if (t && t.nodeType === 3) t = t.parentElement;  // text node -> parent element
     if (!t || typeof t.closest !== 'function') return null;
     return t.closest(selector);
+}
+
+// Best-effort audit logging of a client-side tool usage. Fire-and-forget:
+// never blocks the UI and silently ignores failures.
+function logTool(tool, entryId, detail) {
+    try {
+        fetch('/log-tool', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tool: tool || '', entry_id: entryId || '', detail: detail || '' }),
+            keepalive: true
+        }).catch(function() {});
+    } catch (e) {}
 }
 
 // Delegated click handler for pie charts (avoids inline onclick quote issues)
@@ -6036,6 +6050,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const txt = window._selectedTextForHighlight;
                 if (!txt || !cat) return;
                 window._manualHighlights.push({ text: txt, category: cat });
+                logTool('resaltar-definir', '', cat);  // audit: tool usage
                 UISound.click();  // color selected
                 hlPopover.classList.remove('active');
                 window._selectedTextForHighlight = '';
@@ -6502,6 +6517,91 @@ async function loadInforme() {
         }
         complianceHtml += '</div>';
 
+        // --- Activity / usage audit box (per-user system usage) ---
+        // Shows how each user uses the system: logins, session time, last seen,
+        // and which tools they used. Fetched from /admin/actividad (best-effort:
+        // if it fails or PG is unavailable, the box simply isn't shown).
+        let actividadHtml = '';
+        try {
+            const actResp = await fetch('/admin/actividad?days=90&_t=' + Date.now(), { cache: 'no-store' });
+            if (actResp.ok) {
+                const act = await actResp.json();
+                const au = (act && act.users) ? act.users : {};
+                // Order users by most recently seen, then by login count.
+                const actUsers = Object.keys(au).sort(function(a, b) {
+                    const la = au[a].last_seen || '', lb = au[b].last_seen || '';
+                    if (la !== lb) return lb < la ? -1 : 1;
+                    return (au[b].logins || 0) - (au[a].logins || 0);
+                });
+
+                // Friendly labels for the tool keys logged by the backend.
+                const toolLabels = {
+                    'analizar': 'Analizar texto',
+                    'subir-audio': 'Subir audio',
+                    'abrir-texto': 'Abrir/ver texto',
+                    'eliminar-texto': 'Eliminar texto',
+                    'resaltar-definir': 'Resaltar y definir',
+                    'imprimir': 'Imprimir'
+                };
+                function fmtMin(m) {
+                    m = m || 0;
+                    if (m < 60) return Math.round(m) + ' min';
+                    const h = Math.floor(m / 60), r = Math.round(m % 60);
+                    return h + 'h ' + (r < 10 ? '0' : '') + r + 'm';
+                }
+                function fmtLastSeen(iso) {
+                    if (!iso) return '—';
+                    try {
+                        const d = new Date(iso);
+                        return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) +
+                               ' ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+                    } catch (e) { return iso.slice(0, 16).replace('T', ' '); }
+                }
+
+                actividadHtml = '<div style="margin-top:14px;padding:16px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;border-left:3px solid #5bd4f5;">';
+                actividadHtml += '<div style="font-size:0.8rem;color:#fff;font-weight:700;letter-spacing:0.02em;margin-bottom:2px;">Seguimiento de Uso del Sistema</div>';
+                actividadHtml += '<div style="font-size:0.66rem;color:#777;margin-bottom:12px;">Actividad de los ultimos ' + (act.since_days || 90) + ' dias &nbsp;·&nbsp; ingresos, tiempo de uso y herramientas por usuario</div>';
+
+                if (actUsers.length === 0) {
+                    actividadHtml += '<div style="font-size:0.72rem;color:#888;">Aun no hay actividad registrada. Los eventos se empiezan a acumular a medida que los usuarios ingresan y usan el sistema.</div>';
+                } else {
+                    actividadHtml += '<div style="overflow-x:auto;border-radius:8px;"><table style="width:100%;border-collapse:collapse;font-size:0.7rem;">';
+                    actividadHtml += '<thead><tr style="background:#111828;">';
+                    ['Usuario', 'Ingresos', 'Tiempo total', 'Sesion prom.', 'Ultima vez', 'Herramientas usadas'].forEach(function(h, i) {
+                        const align = (i === 0 || i === 5) ? 'left' : 'center';
+                        actividadHtml += '<th style="padding:7px 8px;text-align:' + align + ';color:#888;border-bottom:1px solid #2a2d3a;white-space:nowrap;">' + h + '</th>';
+                    });
+                    actividadHtml += '</tr></thead><tbody>';
+
+                    actUsers.forEach(function(u) {
+                        const info = au[u] || {};
+                        // Tools chips, ordered by count desc.
+                        const toolKeys = Object.keys(info.tools || {}).sort(function(a, b) { return info.tools[b] - info.tools[a]; });
+                        let toolsCell = '';
+                        if (toolKeys.length === 0) {
+                            toolsCell = '<span style="color:#555;">—</span>';
+                        } else {
+                            toolKeys.forEach(function(tk) {
+                                const lbl = toolLabels[tk] || tk;
+                                toolsCell += '<span style="display:inline-block;background:#141b2e;border:1px solid #2a3350;border-radius:5px;padding:1px 6px;margin:1px 3px 1px 0;color:#aaccff;white-space:nowrap;">' + lbl + ' <strong style="color:#fff;">' + info.tools[tk] + '</strong></span>';
+                            });
+                        }
+                        actividadHtml += '<tr style="border-bottom:1px solid #1e2130;">';
+                        actividadHtml += '<td style="padding:6px 8px;color:#e0e0e0;font-weight:600;white-space:nowrap;">' + u + '</td>';
+                        actividadHtml += '<td style="padding:6px 8px;text-align:center;color:#5bd4f5;font-weight:700;">' + (info.logins || 0) + '</td>';
+                        actividadHtml += '<td style="padding:6px 8px;text-align:center;color:#5bf5a3;">' + fmtMin(info.total_minutes) + '</td>';
+                        actividadHtml += '<td style="padding:6px 8px;text-align:center;color:#aaa;">' + fmtMin(info.avg_session_minutes) + '</td>';
+                        actividadHtml += '<td style="padding:6px 8px;text-align:center;color:#aaa;white-space:nowrap;">' + fmtLastSeen(info.last_seen) + '</td>';
+                        actividadHtml += '<td style="padding:6px 8px;text-align:left;line-height:1.9;">' + toolsCell + '</td>';
+                        actividadHtml += '</tr>';
+                    });
+                    actividadHtml += '</tbody></table></div>';
+                    actividadHtml += '<div style="font-size:0.6rem;color:#555;margin-top:8px;">El tiempo de sesion es una estimacion (se acota a 45 min por sesion cuando no hay cierre explicito).</div>';
+                }
+                actividadHtml += '</div>';
+            }
+        } catch (e) { actividadHtml = ''; }
+
         // --- Synthesis Text (auto-generated narrative) ---
         const cm = data.current_month;
         const cmName = months[cm] || 'mes actual';
@@ -6687,7 +6787,7 @@ async function loadInforme() {
             (pieVHtml ? '<div style="flex:1 1 320px;min-width:300px;">' + pieVHtml + '</div>' : '') +
             '</div>';
 
-        container.innerHTML = tableHtml + totalsHtml + lineHtml + piesRowHtml + complianceHtml + synthesisHtml + card2Html;
+        container.innerHTML = tableHtml + totalsHtml + lineHtml + piesRowHtml + complianceHtml + actividadHtml + synthesisHtml + card2Html;
         // Wire up chart interactivity now that the SVG/pie are in the DOM.
         setTimeout(function() { attachLineChartInteractivity(); attachLineChartHover(); attachPieInteractivity(); attachReportSectionInteractivity(); }, 0);
         // Fluid staggered entrance for the report blocks.
@@ -8050,6 +8150,7 @@ def login_page():
             result = user_manager.login(username, password)
             if result["ok"]:
                 session["username"] = username
+                _log_activity("login", username=username)
                 return redirect(url_for("index"))
             else:
                 error = result["error"]
@@ -8099,6 +8200,7 @@ def login_page():
 
 @app.route("/logout")
 def logout():
+    _log_activity("logout")
     session.clear()
     return redirect(url_for("login_page"))
 
@@ -8215,6 +8317,10 @@ def analyze():
             from src.users.history_manager import delete_entry
             delete_entry(target_user, existing_entry_id)
 
+    # Record the analysis-tool usage (best-effort). entry_name identifies the text.
+    _log_activity("tool", tool="analizar",
+                  entry_id=(entry_name or existing_entry_id or ""))
+
     return jsonify({
         "error": False,
         "input_text": clean_text,
@@ -8297,6 +8403,7 @@ def saved_text(entry_id):
 
     if entry:
         name = entry.get("entry_name", "") or entry.get("audio_filename", "")
+        _log_activity("tool", tool="abrir-texto", entry_id=entry_id, detail=name)
         return jsonify({"text": entry.get("text_full", entry.get("text", "")), "entry_name": name})
 
     return jsonify({"text": ""}), 404
@@ -8323,6 +8430,7 @@ def delete_entry_route(entry_id):
                 break
 
     if success:
+        _log_activity("tool", tool="eliminar-texto", entry_id=entry_id)
         return jsonify({"success": True})
     return jsonify({"success": False, "error": "Entry not found"}), 404
 
@@ -8455,6 +8563,8 @@ def upload_audio():
         source="audio",
         audio_filename=original_name,
     )
+
+    _log_activity("tool", tool="subir-audio", entry_id=original_name)
 
     return jsonify({
         "error": False,
@@ -8668,6 +8778,37 @@ _ADMIN_USERS = {"admin", "Vanesa.Admin", "Berna.Strauss", "FedericoCeballos", "M
 def _is_admin():
     """Check if current session user is an admin."""
     return session.get("username") in _ADMIN_USERS
+
+
+def _log_activity(event_type, tool="", entry_id="", detail="", username=None):
+    """
+    Best-effort activity logging. Never raises, never blocks the caller's action.
+    Uses the logged-in user unless an explicit username is given (e.g. login).
+    """
+    try:
+        from src.users import activity_store_pg
+        u = username if username is not None else session.get("username")
+        if u:
+            activity_store_pg.log_event(u, event_type, tool=tool,
+                                        entry_id=entry_id, detail=detail)
+    except Exception:
+        pass
+
+
+@app.route("/log-tool", methods=["POST"])
+def log_tool():
+    """
+    Record a client-side tool usage event (e.g. "Resaltar y definir", print).
+    Called from the frontend since those tools have no other backend endpoint.
+    """
+    if not session.get("username"):
+        return jsonify({"ok": False}), 401
+    data = request.get_json(silent=True) or {}
+    tool = str(data.get("tool", ""))[:60]
+    entry_id = str(data.get("entry_id", ""))[:80]
+    detail = str(data.get("detail", ""))[:200]
+    _log_activity("tool", tool=tool, entry_id=entry_id, detail=detail)
+    return jsonify({"ok": True})
 
 
 @app.route("/admin/users-list")
@@ -9651,6 +9792,28 @@ def admin_informe():
         "week_upto": week_upto,
         "filter_seller": filter_seller,
     })
+
+
+@app.route("/admin/actividad")
+def admin_actividad():
+    """
+    Per-user system-usage audit: how many times each user logged in, total and
+    average session time (derived), tools used, and last activity. Admin only.
+    Query param: days (default 90) — look-back window.
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    days = request.args.get("days", type=int) or 90
+    if days < 1:
+        days = 1
+    if days > 730:
+        days = 730
+    try:
+        from src.users import activity_store_pg
+        summary = activity_store_pg.get_activity_summary(days=days)
+    except Exception as exc:
+        return jsonify({"ok": False, "reason": str(exc), "users": {}})
+    return jsonify(summary)
 
 
 if __name__ == "__main__":
