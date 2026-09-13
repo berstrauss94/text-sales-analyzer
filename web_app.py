@@ -8698,6 +8698,165 @@ def admin_full_diag():
     return jsonify(out)
 
 
+def _normalize_username_key(name: str) -> str:
+    """
+    Canonical key used ONLY to detect username variants that should be the same
+    person. Lowercase + collapse any run of non-alphanumeric chars to a single
+    space + strip. So "Dahia_Cerrizuela", "Dahia cerrizuela", "dahia.cerrizuela"
+    all map to "dahia cerrizuela". This is a comparison key, NOT the stored value.
+    """
+    import re as _re
+    if not name:
+        return ""
+    key = _re.sub(r'[^a-zA-Z0-9]+', ' ', str(name)).strip().lower()
+    return key
+
+
+@app.route("/admin/name-variants")
+def admin_name_variants():
+    """
+    Detect username variants across the whole table. Groups all DB usernames by
+    their normalized key and reports any group that has more than one raw spelling
+    (these are the same person split across grafías, causing 'missing' texts).
+    Read-only. Admin only. Open: /admin/name-variants
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users.history_manager import _get_pg_conn, _return_pg_conn
+    out = {"groups_with_variants": {}, "all_counts": {}}
+    conn = _get_pg_conn()
+    if conn is None:
+        return jsonify({"error": "no PG connection"}), 500
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT username, COUNT(*) FROM analysis_history GROUP BY username")
+            rows = cur.fetchall()
+        _return_pg_conn(conn)
+    except Exception as exc:
+        _return_pg_conn(conn, close=True)
+        return jsonify({"error": str(exc)}), 500
+
+    groups: dict[str, dict] = {}
+    for raw_name, cnt in rows:
+        key = _normalize_username_key(raw_name)
+        out["all_counts"][raw_name] = cnt
+        g = groups.setdefault(key, {"variants": {}, "total": 0})
+        g["variants"][raw_name] = cnt
+        g["total"] += cnt
+    # Only report groups where more than one raw spelling exists
+    for key, g in groups.items():
+        if len(g["variants"]) > 1:
+            # Suggest the canonical spelling: the variant with the most entries,
+            # tie-broken by longest (keeps the most complete-looking name).
+            canonical = max(g["variants"].items(),
+                            key=lambda kv: (kv[1], len(kv[0])))[0]
+            out["groups_with_variants"][key] = {
+                "variants": g["variants"],
+                "total_entries": g["total"],
+                "suggested_canonical": canonical,
+            }
+    out["num_variant_groups"] = len(out["groups_with_variants"])
+    return jsonify(out)
+
+
+@app.route("/admin/unify-name-variants", methods=["POST", "GET"])
+def admin_unify_name_variants():
+    """
+    Unify username variants to a single canonical spelling across the whole table.
+    This FIXES the 'texts disappeared / moved' issue caused by the same person
+    being stored under several grafías (case/separator differences), because the
+    read pipeline matches username EXACTLY.
+
+    SAFETY (per steering rule): a fresh backup is taken before any write, and
+    dry_run is the DEFAULT. You must pass ?apply=1 to actually write.
+
+    Usage:
+      /admin/unify-name-variants                 -> dry run, shows planned UPDATEs
+      /admin/unify-name-variants?apply=1          -> takes backup, then applies
+      /admin/unify-name-variants?apply=1&key=dahia%20cerrizuela  -> only that group
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users.history_manager import _get_pg_conn, _return_pg_conn
+    apply = request.args.get("apply", "0") == "1"
+    only_key = request.args.get("key", "").strip().lower()
+
+    conn = _get_pg_conn()
+    if conn is None:
+        return jsonify({"error": "no PG connection"}), 500
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT username, COUNT(*) FROM analysis_history GROUP BY username")
+            rows = cur.fetchall()
+        _return_pg_conn(conn)
+    except Exception as exc:
+        _return_pg_conn(conn, close=True)
+        return jsonify({"error": str(exc)}), 500
+
+    # Build variant groups
+    groups: dict[str, dict[str, int]] = {}
+    for raw_name, cnt in rows:
+        key = _normalize_username_key(raw_name)
+        groups.setdefault(key, {})[raw_name] = cnt
+
+    plan = []
+    for key, variants in groups.items():
+        if len(variants) <= 1:
+            continue
+        if only_key and key != only_key:
+            continue
+        canonical = max(variants.items(), key=lambda kv: (kv[1], len(kv[0])))[0]
+        for raw_name, cnt in variants.items():
+            if raw_name != canonical:
+                plan.append({"from": raw_name, "to": canonical,
+                             "entries_moved": cnt, "group_key": key})
+
+    result = {"dry_run": not apply, "planned_updates": plan,
+              "num_updates": len(plan),
+              "total_entries_affected": sum(p["entries_moved"] for p in plan)}
+
+    if not apply:
+        result["note"] = "Nada fue modificado. Agrega ?apply=1 para ejecutar."
+        return jsonify(result)
+
+    if not plan:
+        result["note"] = "No hay variantes que unificar."
+        return jsonify(result)
+
+    # SAFETY: backup before any write (steering rule)
+    try:
+        from src.users.backup_manager import take_backup
+        result["backup"] = take_backup(reason="pre-unify-name-variants")
+    except Exception as exc:
+        return jsonify({"error": f"backup failed, aborting: {exc}"}), 500
+
+    # Apply UPDATEs
+    conn = _get_pg_conn()
+    if conn is None:
+        return jsonify({"error": "no PG connection for write"}), 500
+    applied = []
+    try:
+        with conn.cursor() as cur:
+            for p in plan:
+                cur.execute(
+                    "UPDATE analysis_history SET username = %s WHERE username = %s",
+                    (p["to"], p["from"]))
+                applied.append({**p, "rows_updated": cur.rowcount})
+        conn.commit()
+        _return_pg_conn(conn)
+    except Exception as exc:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        _return_pg_conn(conn, close=True)
+        return jsonify({"error": str(exc), "applied_before_error": applied}), 500
+
+    result["applied"] = applied
+    result["note"] = "Unificacion aplicada. Verifica con /admin/full-diag."
+    return jsonify(result)
+
+
 @app.route("/admin/db-status")
 def admin_db_status():
     """Diagnostic endpoint to check database connectivity and entry counts."""
