@@ -131,8 +131,37 @@ def _dump_all_entries(conn) -> list[dict]:
     return rows_out
 
 
+def _per_user_drops_vs_latest(conn, current_per_user: dict) -> list[dict]:
+    """
+    Compare the current per-user counts against the most recent backup and
+    return the list of users who LOST entries, even if the global total did not
+    drop (e.g. one seller loses 3 while another gains 3 — total unchanged).
+
+    This is the detection that was missing and that let Dahia's loss go
+    unnoticed: the old check only compared GLOBAL totals.
+    """
+    latest = _latest_backup(conn)
+    if not latest:
+        return []
+    drops = []
+    for u, prev_cnt in latest["per_user"].items():
+        now_cnt = current_per_user.get(u, 0)
+        if now_cnt < prev_cnt:
+            drops.append({"username": u, "before": prev_cnt, "now": now_cnt,
+                          "lost": prev_cnt - now_cnt})
+    drops.sort(key=lambda x: x["lost"], reverse=True)
+    return drops
+
+
 def take_backup(reason: str = "auto") -> dict:
-    """Take a FULL backup now. Returns a summary dict. Best-effort."""
+    """Take a FULL backup now. Returns a summary dict. Best-effort.
+
+    Before snapshotting, it checks for PER-USER drops vs the latest backup. If
+    any user lost entries, it logs a CRITICAL alert and tags the backup reason,
+    so a silent partial loss (total unchanged) is caught and stays visible.
+    The previous backups are always kept (rolling history of _MAX_BACKUPS), so
+    the pre-loss state remains recoverable via auto_fix.
+    """
     global _last_backup_ts, _saves_since_backup
     _avail, _get, _ret = _pg()
     if _get is None:
@@ -143,6 +172,18 @@ def take_backup(reason: str = "auto") -> dict:
         return {"ok": False, "reason": "no_conn"}
     try:
         total, per_user = _current_counts(conn)
+
+        # Detect per-user losses BEFORE writing the new snapshot.
+        drops = _per_user_drops_vs_latest(conn, per_user)
+        if drops:
+            logger.critical(
+                "[backup] CAIDA POR USUARIO detectada antes de backup: %s. "
+                "Los backups previos se conservan para recuperar con auto_fix.",
+                ", ".join(f"{d['username']}:{d['before']}->{d['now']}" for d in drops)
+            )
+            if reason == "auto":
+                reason = "auto-CON-CAIDA-usuario"
+
         # Never store an empty backup over the top of good ones — refuse to
         # snapshot 0 entries unless there genuinely are none historically.
         entries = _dump_all_entries(conn)
@@ -165,7 +206,8 @@ def take_backup(reason: str = "auto") -> dict:
         _last_backup_ts = _t.time()
         _saves_since_backup = 0
         logger.info(f"[backup] snapshot guardado: {total} entradas (reason={reason})")
-        return {"ok": True, "total": total, "reason": reason}
+        return {"ok": True, "total": total, "reason": reason,
+                "per_user_drops": drops}
     except Exception as exc:
         logger.error(f"[backup] error tomando backup: {exc}")
         try:
