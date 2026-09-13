@@ -19,6 +19,13 @@ env/
 # Hypothesis (property-based testing) cache
 .hypothesis/
 
+# Pytest cache
+.pytest_cache/
+
+# Local development history (produccion usa PostgreSQL; estos JSON son basura de dev)
+usuarios/*/history.json
+usuarios/admin_historial.json
+
 # Local code backups (durable backups live as git tags)
 backups_codigo/
 
