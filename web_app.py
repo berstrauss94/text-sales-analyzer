@@ -2692,7 +2692,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v15.3{% if username == 'Berna.Strauss' %} &middot; usuarios persistentes en PG{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v15.4{% if username == 'Berna.Strauss' %} &middot; deteccion de perdida por usuario{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -8855,6 +8855,30 @@ def admin_unify_name_variants():
     result["applied"] = applied
     result["note"] = "Unificacion aplicada. Verifica con /admin/full-diag."
     return jsonify(result)
+
+
+@app.route("/admin/loss-check")
+def admin_loss_check():
+    """
+    Per-user data-loss check: reports any seller whose current entry count is
+    lower than in the latest backup, EVEN IF the global total did not drop.
+    This is the check that catches partial/silent losses. Read-only. Admin only.
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users.backup_manager import get_backup_status
+    status = get_backup_status()
+    drops = status.get("per_user_drops", []) if isinstance(status, dict) else []
+    return jsonify({
+        "any_user_lost_entries": bool(drops),
+        "per_user_drops": drops,
+        "current_total": status.get("current_total") if isinstance(status, dict) else None,
+        "last_backup_total": status.get("last_backup_total") if isinstance(status, dict) else None,
+        "last_backup_time": status.get("last_backup_time") if isinstance(status, dict) else None,
+        "note": ("Hay usuarios con menos textos que en el ultimo backup. "
+                 "Corre /admin/auto-fix para recuperarlos.") if drops else
+                "OK: ningun usuario perdio textos respecto al ultimo backup.",
+    })
 
 
 @app.route("/admin/sync-users-to-pg", methods=["POST", "GET"])
