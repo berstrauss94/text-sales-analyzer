@@ -2692,7 +2692,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v15.4{% if username == 'Berna.Strauss' %} &middot; deteccion de perdida por usuario{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v15.5{% if username == 'Berna.Strauss' %} &middot; limpieza + fix Vanesa.Admin en dropdown{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -8059,7 +8059,7 @@ def logout():
 def index():
     if not session.get("username"):
         return redirect(url_for("login_page"))
-    html = render_template_string(HTML, username=session["username"], indicador_categorias_json=_INDICADOR_CATEGORIAS_JSON, all_users=[u for u in user_manager.list_users() if u not in ('admin', 'Vanesa_Admin', 'FedericoCeballos', 'MartinianoSosa', 'GarciaTania', 'Berna.Strauss')])
+    html = render_template_string(HTML, username=session["username"], indicador_categorias_json=_INDICADOR_CATEGORIAS_JSON, all_users=[u for u in user_manager.list_users() if u not in ('admin', 'Vanesa.Admin', 'Vanesa_Admin', 'FedericoCeballos', 'MartinianoSosa', 'GarciaTania', 'Berna.Strauss')])
     # Prevent the browser from serving a stale cached page after each deploy.
     resp = app.make_response(html)
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
