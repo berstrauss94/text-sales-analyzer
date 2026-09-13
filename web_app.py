@@ -2692,7 +2692,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v15.8{% if username == 'Berna.Strauss' %} &middot; seguimiento de uso del sistema{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v15.9{% if username == 'Berna.Strauss' %} &middot; seguimiento respeta filtros del informe{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -6521,9 +6521,24 @@ async function loadInforme() {
         // Shows how each user uses the system: logins, session time, last seen,
         // and which tools they used. Fetched from /admin/actividad (best-effort:
         // if it fails or PG is unavailable, the box simply isn't shown).
+        // Human-readable label of the active period, computed locally here so the
+        // activity box (which is built BEFORE synthesisHtml's periodLabel) can use it.
+        let actPeriodLabel;
+        {
+            const _mfn = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            const _am = data.filter_month || 0;
+            const _aw = data.filter_week || 0;
+            const _awu = data.week_upto || 0;
+            const _awr = { 1: '1 al 7', 2: '8 al 14', 3: '15 al 21', 4: '22 al 31' };
+            if (_am === 0) actPeriodLabel = 'Enero a la fecha · ' + year;
+            else if (_aw > 0) actPeriodLabel = _mfn[_am] + ' ' + year + ' · Semana ' + _aw + ' (dias ' + (_awr[_aw] || '') + ')';
+            else if (_awu > 0) actPeriodLabel = _mfn[_am] + ' ' + year + ' · Primeras ' + _awu + ' semanas (dias 1 al ' + (_awu * 7) + ')';
+            else actPeriodLabel = _mfn[_am] + ' ' + year + ' · mes completo';
+        }
         let actividadHtml = '';
         try {
-            const actResp = await fetch('/admin/actividad?days=90&_t=' + Date.now(), { cache: 'no-store' });
+            const actResp = await fetch('/admin/actividad?year=' + year + '&month=' + month + '&week=' + week + '&week_upto=' + weekUpto + '&seller=' + seller + '&_t=' + Date.now(), { cache: 'no-store' });
             if (actResp.ok) {
                 const act = await actResp.json();
                 const au = (act && act.users) ? act.users : {};
@@ -6560,7 +6575,7 @@ async function loadInforme() {
 
                 actividadHtml = '<div style="margin-top:14px;padding:16px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;border-left:3px solid #5bd4f5;">';
                 actividadHtml += '<div style="font-size:0.8rem;color:#fff;font-weight:700;letter-spacing:0.02em;margin-bottom:2px;">Seguimiento de Uso del Sistema</div>';
-                actividadHtml += '<div style="font-size:0.66rem;color:#777;margin-bottom:12px;">Actividad de los ultimos ' + (act.since_days || 90) + ' dias &nbsp;·&nbsp; ingresos, tiempo de uso y herramientas por usuario</div>';
+                actividadHtml += '<div style="font-size:0.66rem;color:#777;margin-bottom:12px;">Periodo: ' + actPeriodLabel + ' &nbsp;·&nbsp; ingresos, tiempo de uso y herramientas por usuario</div>';
 
                 if (actUsers.length === 0) {
                     actividadHtml += '<div style="font-size:0.72rem;color:#888;">Aun no hay actividad registrada. Los eventos se empiezan a acumular a medida que los usuarios ingresan y usan el sistema.</div>';
@@ -9799,20 +9814,66 @@ def admin_actividad():
     """
     Per-user system-usage audit: how many times each user logged in, total and
     average session time (derived), tools used, and last activity. Admin only.
-    Query param: days (default 90) — look-back window.
+
+    Mirrors the report filters so the box reflects exactly what is being viewed:
+      year, month (0=all), week (0=all exact week), week_upto (>0 cumulative),
+      seller (_all or a username). The active filter is turned into a concrete
+      [start, end) date range that bounds which activity events are counted.
     """
     if not _is_admin():
         return jsonify({"error": "unauthorized"}), 403
-    days = request.args.get("days", type=int) or 90
-    if days < 1:
-        days = 1
-    if days > 730:
-        days = 730
+
+    from datetime import datetime as _dt, timezone as _tz
+
+    year = request.args.get("year", type=int) or _dt.now().year
+    filter_month = request.args.get("month", type=int) or 0
+    filter_week = request.args.get("week", type=int) or 0
+    week_upto = request.args.get("week_upto", type=int) or 0
+    filter_seller = request.args.get("seller", "") or "_all"
+
+    # Resolve the active filter into a [start, end) datetime range.
+    def _mk(y, mo, d):
+        return _dt(y, mo, d, tzinfo=_tz.utc)
+
+    if filter_month <= 0:
+        # "Enero a la fecha": whole selected year.
+        start = _mk(year, 1, 1)
+        end = _mk(year + 1, 1, 1)
+    else:
+        # A specific month is selected.
+        month_start = _mk(year, filter_month, 1)
+        month_end = _mk(year + 1, 1, 1) if filter_month == 12 else _mk(year, filter_month + 1, 1)
+        if filter_week > 0:
+            # Exact week of the month (weeks are 1-7, 8-14, 15-21, 22-end).
+            sd = (filter_week - 1) * 7 + 1
+            start = _mk(year, filter_month, sd)
+            if filter_week >= 4:
+                end = month_end
+            else:
+                end = _mk(year, filter_month, filter_week * 7 + 1)
+        elif week_upto > 0:
+            # Cumulative: from day 1 up to the end of week `week_upto`.
+            start = month_start
+            if week_upto >= 4:
+                end = month_end
+            else:
+                end = _mk(year, filter_month, week_upto * 7 + 1)
+        else:
+            start = month_start
+            end = month_end
+
+    # Restrict to a single seller when one is filtered.
+    usernames = None
+    if filter_seller and filter_seller != "_all":
+        usernames = [filter_seller]
+
     try:
         from src.users import activity_store_pg
-        summary = activity_store_pg.get_activity_summary(days=days)
+        summary = activity_store_pg.get_activity_summary(
+            start=start, end=end, usernames=usernames)
     except Exception as exc:
         return jsonify({"ok": False, "reason": str(exc), "users": {}})
+    summary["filter_seller"] = filter_seller
     return jsonify(summary)
 
 
