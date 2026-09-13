@@ -320,6 +320,11 @@ def add_entry(
         entry["year"] = year
     if month:
         entry["month"] = month
+    # Persist the user-assigned date as day_label "DD/MM/YYYY" — this is the
+    # HIGHEST-priority field in resolve_entry_date, so the charts/reports use the
+    # date the user configured on save, not the day the audio was uploaded.
+    if year and month:
+        entry["day_label"] = f"{int(use_day):02d}/{int(month):02d}/{int(year):04d}"
     if entry_name:
         entry["entry_name"] = entry_name
 
