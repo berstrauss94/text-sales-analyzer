@@ -2692,7 +2692,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v16.0{% if username == 'Berna.Strauss' %} &middot; fix impresion multi-linea + tortas centradas{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v16.1{% if username == 'Berna.Strauss' %} &middot; leyenda de tortas a la derecha{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -6211,7 +6211,7 @@ async function loadInforme() {
         });
 
         let pieHtml = '<div style="text-align:center;font-size:0.72rem;color:#888;font-weight:600;letter-spacing:0.5px;">DISTRIBUCION MENSUAL</div>';
-        pieHtml += '<div style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:8px;">';
+        pieHtml += '<div style="display:flex;flex-direction:row;align-items:center;justify-content:center;gap:20px;margin-top:8px;flex-wrap:wrap;">';
         pieHtml += '<div id="' + pieId + '" class="pie-chart-expand" style="width:140px;height:140px;border-radius:50%;background:conic-gradient(' + pieGradient.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;transition:transform 0.2s;flex:none;">';
         pieHtml += '<div style="width:60px;height:60px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;pointer-events:none;"><span id="' + pieId + '-center" style="font-size:0.6rem;color:#aaa;text-align:center;line-height:1.1;">' + data.total_general + '</span></div></div>';
         pieHtml += '<div style="display:flex;flex-direction:column;gap:2px;">' + pieLegend + '</div></div>';
@@ -6252,10 +6252,10 @@ async function loadInforme() {
         let pieVHtml = '';
         if (pieSellers.length > 0) {
             pieVHtml += '<div style="text-align:center;font-size:0.72rem;color:#888;font-weight:600;letter-spacing:0.5px;">DISTRIBUCION POR VENDEDOR</div>';
-            // Column layout: donut centered on top, legend centered below. This
-            // keeps the donut straight/centered in its column regardless of how
-            // wide the seller legend gets (a side legend pushed it off-center).
-            pieVHtml += '<div style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:8px;">';
+            // Row layout: donut on the left (fixed), legend to its RIGHT. Centered
+            // as a group; the donut has flex:none so a wide seller legend can't
+            // squash it, and the legend takes its natural width beside it.
+            pieVHtml += '<div style="display:flex;flex-direction:row;align-items:center;justify-content:center;gap:20px;margin-top:8px;flex-wrap:wrap;">';
             pieVHtml += '<div id="' + pieVId + '" class="pie-chart-expand" style="width:140px;height:140px;border-radius:50%;background:conic-gradient(' + pieVGradient.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;transition:transform 0.2s;flex:none;">';
             pieVHtml += '<div style="width:60px;height:60px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;pointer-events:none;"><span id="' + pieVId + '-center" style="font-size:0.6rem;color:#aaa;text-align:center;line-height:1.1;">' + data.total_general + '</span></div></div>';
             pieVHtml += '<div style="display:flex;flex-direction:column;gap:2px;max-height:160px;overflow-y:auto;">' + pieVLegend + '</div></div>';
