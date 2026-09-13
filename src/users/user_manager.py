@@ -136,6 +136,15 @@ class UserManager:
         with open(self._user_file(username), "w", encoding="utf-8") as f:
             f.write(content)
 
+        # Persist the account in PostgreSQL too so it survives Railway redeploys
+        # (the .txt above lives on the ephemeral filesystem). Best-effort: if PG
+        # is unavailable (local dev) we still succeed via the .txt file.
+        try:
+            from src.users import user_store_pg
+            user_store_pg.upsert_user(username, password_hash, content)
+        except Exception:
+            pass
+
         return {"ok": True, "username": username}
 
     def login(self, username: str, password: str) -> dict:
@@ -143,10 +152,26 @@ class UserManager:
         Authenticate a user.
         Returns {"ok": True, "username": ...} or {"ok": False, "error": ...}.
         """
-        if not self.user_exists(username):
-            return {"ok": False, "error": "Usuario o contrasena incorrectos."}
-
         password_hash = self._hash_password(password)
+
+        # Primary source: local .txt credential file (fast, dev-friendly).
+        # Fallback: PostgreSQL app_users, for accounts whose .txt was wiped on a
+        # Railway redeploy. Without this, a persisted user could not log back in.
+        if not self.user_exists(username):
+            try:
+                from src.users import user_store_pg
+                pg_user = user_store_pg.get_user(username)
+            except Exception:
+                pg_user = None
+            if pg_user and pg_user.get("password_hash") == password_hash:
+                # Rehydrate the local .txt cache so subsequent reads work offline.
+                try:
+                    with open(self._user_file(username), "w", encoding="utf-8") as f:
+                        f.write(pg_user.get("ficha", ""))
+                except Exception:
+                    pass
+                return {"ok": True, "username": username}
+            return {"ok": False, "error": "Usuario o contrasena incorrectos."}
 
         with open(self._user_file(username), "r", encoding="utf-8") as f:
             content = f.read()
@@ -169,17 +194,61 @@ class UserManager:
         return {"ok": False, "error": "Usuario o contrasena incorrectos."}
 
     def list_users(self) -> list[str]:
-        """Return list of registered usernames."""
-        users = []
-        for fname in os.listdir(self.users_dir):
-            if fname.endswith(".txt") and fname != "README.txt":
-                users.append(fname[:-4])
+        """
+        Return the list of registered usernames.
+
+        Combines two sources so no seller ever disappears from the list:
+          1. Local usuarios/*.txt credential files (fast, but EPHEMERAL on
+             Railway — wiped on every redeploy).
+          2. Every username that has saved texts in PostgreSQL (PERSISTENT).
+
+        A seller registered after the last deploy keeps only their PG entries;
+        including PG usernames here means they still show up in the list even
+        though their .txt was lost on redeploy.
+        """
+        users: set[str] = set()
+
+        # 1. Local .txt credential files
+        try:
+            for fname in os.listdir(self.users_dir):
+                if fname.endswith(".txt") and fname != "README.txt":
+                    users.add(fname[:-4])
+        except FileNotFoundError:
+            pass
+
+        # 2. Usernames that have entries persisted in PostgreSQL
+        try:
+            from src.users.history_manager import get_all_usernames_with_entries
+            for name in get_all_usernames_with_entries():
+                if name:
+                    users.add(name)
+        except Exception:
+            # PG unavailable (local dev) — fall back to just the .txt files
+            pass
+
+        # 3. Accounts persisted in app_users (may exist without any texts yet)
+        try:
+            from src.users import user_store_pg
+            for name in user_store_pg.list_usernames():
+                if name:
+                    users.add(name)
+        except Exception:
+            pass
+
         return sorted(users)
 
     def get_user_info(self, username: str) -> str | None:
-        """Return the raw text content of a user file."""
+        """Return the raw ficha text of a user (.txt first, PG fallback)."""
         path = self._user_file(username)
-        if not os.path.exists(path):
-            return None
-        with open(path, "r", encoding="utf-8") as f:
-            return f.read()
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return f.read()
+        # Fallback: the ficha persisted in PostgreSQL (survives redeploys).
+        try:
+            from src.users import user_store_pg
+            pg_user = user_store_pg.get_user(username)
+            if pg_user and pg_user.get("ficha"):
+                return pg_user["ficha"]
+        except Exception:
+            pass
+        return None

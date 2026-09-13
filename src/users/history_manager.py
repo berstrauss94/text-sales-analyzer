@@ -414,6 +414,40 @@ def get_all_entries(username: str, users_dir: str = USERS_DIR) -> list[dict]:
     return get_flat_entries(username, limit=UNCAPPED_LIMIT, users_dir=users_dir)
 
 
+def get_all_usernames_with_entries() -> list[str]:
+    """
+    Return every distinct username that has at least one entry in PostgreSQL.
+
+    This is the persistent source of truth for "who exists", independent of the
+    ephemeral usuarios/*.txt files (Railway's filesystem is wiped on redeploy).
+    Used by list_users() so a seller with saved texts never vanishes from the
+    list just because their .txt credential file was lost on a deploy.
+    Returns [] when PG is unavailable (local JSON dev mode).
+    """
+    if not _is_pg_available():
+        return []
+    conn = _get_pg_conn()
+    if conn is None:
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT DISTINCT username FROM analysis_history "
+                "WHERE username IS NOT NULL AND username <> ''"
+            )
+            names = [r[0] for r in cur.fetchall()]
+        _return_pg_conn(conn)
+        return sorted(names)
+    except Exception as exc:
+        logger.error(f"Error listando usernames con entradas en PG: {exc}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        _return_pg_conn(conn, close=True)
+        return []
+
+
 def get_history(username: str, users_dir: str = USERS_DIR) -> dict:
     """Return the full history tree for a user (year→month→week→day→entries)."""
     if _is_pg_available():
