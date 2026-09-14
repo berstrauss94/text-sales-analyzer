@@ -2719,7 +2719,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v16.3{% if username == 'Berna.Strauss' %} &middot; fix desborde de fragmentos por hover-scale{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v16.4{% if username == 'Berna.Strauss' %} &middot; globos de vendedor sin superponerse{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -6343,7 +6343,7 @@ async function loadInforme() {
 
         // Chart geometry. Taller top padding leaves room for the name balloons
         // (two staggered rows) sitting above the plot without touching the line.
-        const lcW = 640, lcH = 205, lcPadL = 34, lcPadR = 14, lcPadT = 38, lcPadB = 26;
+        const lcW = 640, lcH = 230, lcPadL = 34, lcPadR = 14, lcPadT = 62, lcPadB = 26;
         const plotW = lcW - lcPadL - lcPadR;
         const plotH = lcH - lcPadT - lcPadB;
         let maxV = 1;
@@ -6379,6 +6379,9 @@ async function loadInforme() {
         let multiLinesSvg = '';   // the colored strokes (blended)
         let multiDotsSvg = '';    // dots + balloons (drawn on top, no blend)
         let multiHitSvg = '';     // wide transparent hit paths for hover
+        // First pass: draw lines/dots and collect each seller's desired balloon.
+        const balloonPlan = [];   // { si, label, color, anchorX, anchorY, bw, bxl, byl }
+        const BH = 13;            // balloon height
         series.forEach(function(s, si) {
             let pts = [];
             for (let i = 0; i < nX; i++) pts.push([xAt(i), yAt(s.values[i])]);
@@ -6396,9 +6399,57 @@ async function loadInforme() {
             let bxl = pts[peakI][0] - bw / 2;
             if (bxl < 2) bxl = 2;
             if (bxl + bw > lcW - 2) bxl = lcW - 2 - bw;
-            const byl = Math.max(2, pts[peakI][1] - 20);
-            multiDotsSvg += '<g class="' + lcId + '-sballoon" data-si="' + si + '" opacity="0.95"><rect x="' + bxl.toFixed(1) + '" y="' + byl.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="13" rx="6" fill="' + s.color + '" opacity="0.16" stroke="' + s.color + '" stroke-width="0.8"/>' +
-                '<text x="' + (bxl + bw / 2).toFixed(1) + '" y="' + (byl + 9).toFixed(1) + '" text-anchor="middle" font-size="8.5" font-weight="700" fill="' + s.color + '">' + label + '</text></g>';
+            const byl = Math.max(2, pts[peakI][1] - 18);
+            balloonPlan.push({
+                si: si, label: label, color: s.color, bw: bw,
+                anchorX: pts[peakI][0], anchorY: pts[peakI][1],
+                bxl: bxl, byl: byl
+            });
+        });
+
+        // Second pass: ANTI-OVERLAP. Two balloons collide when their x-ranges
+        // overlap AND their y-bands are close. Resolve by pushing colliding
+        // balloons UP into stacked rows so none sit on top of each other, and
+        // draw a thin leader line from each balloon down to its data point so it
+        // stays legible which line it belongs to.
+        balloonPlan.sort(function(a, b) { return a.bxl - b.bxl; });  // left to right
+        const GAP_X = 4;          // min horizontal gap to consider "not overlapping"
+        const ROW_H = BH + 4;     // vertical distance between stacked rows
+        const placedB = [];       // balloons already positioned (multi-line view)
+        balloonPlan.forEach(function(b) {
+            // Start at the desired y, then move up while it collides with any placed one.
+            let y = b.byl;
+            let guard = 0;
+            let collides = true;
+            while (collides && guard < 40) {
+                collides = false;
+                for (let k = 0; k < placedB.length; k++) {
+                    const p = placedB[k];
+                    const xOverlap = (b.bxl < p.bxl + p.bw + GAP_X) && (p.bxl < b.bxl + b.bw + GAP_X);
+                    const yOverlap = Math.abs(y - p.y) < ROW_H;
+                    if (xOverlap && yOverlap) { y = p.y - ROW_H; collides = true; break; }
+                }
+                guard++;
+            }
+            if (y < 2) y = 2;   // never above the SVG top
+            b.y = y;
+            placedB.push(b);
+        });
+
+        // Draw the balloons (+ leader lines when displaced from their anchor).
+        balloonPlan.forEach(function(b) {
+            const cx = b.bxl + b.bw / 2;
+            const balloonBottom = b.y + BH;
+            // Leader line: thin neon line from balloon bottom-center to the data point.
+            // Only drawn when the balloon was pushed noticeably above its anchor.
+            let leader = '';
+            if (b.anchorY - balloonBottom > 3) {
+                leader = '<line class="' + lcId + '-slead" data-si="' + b.si + '" x1="' + cx.toFixed(1) + '" y1="' + balloonBottom.toFixed(1) + '" x2="' + b.anchorX.toFixed(1) + '" y2="' + b.anchorY.toFixed(1) + '" stroke="' + b.color + '" stroke-width="0.7" opacity="0.5"/>';
+            }
+            multiDotsSvg += leader +
+                '<g class="' + lcId + '-sballoon" data-si="' + b.si + '" opacity="0.95">' +
+                '<rect x="' + b.bxl.toFixed(1) + '" y="' + b.y.toFixed(1) + '" width="' + b.bw.toFixed(1) + '" height="' + BH + '" rx="6" fill="' + b.color + '" opacity="0.16" stroke="' + b.color + '" stroke-width="0.8"/>' +
+                '<text x="' + cx.toFixed(1) + '" y="' + (b.y + 9).toFixed(1) + '" text-anchor="middle" font-size="8.5" font-weight="700" fill="' + b.color + '">' + b.label + '</text></g>';
         });
         // Assemble the multi-line body: blended lines group + dots/balloons + hit paths.
         const multiSvg = '<g style="mix-blend-mode:screen;">' + multiLinesSvg + '</g>' + multiDotsSvg + multiHitSvg;
@@ -7006,6 +7057,7 @@ function attachLineChartHover() {
             const lines = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-sline'));
             const dots = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-sdot'));
             const balloons = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-sballoon'));
+            const leaders = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-slead'));
             const hits = Array.prototype.slice.call(svg.querySelectorAll('.' + lcId + '-hit'));
             let pinned = null;
             function focus(si) {
@@ -7016,11 +7068,13 @@ function attachLineChartHover() {
                 });
                 dots.forEach(function(d) { d.setAttribute('opacity', (d.getAttribute('data-si') === String(si)) ? '1' : '0.15'); });
                 balloons.forEach(function(b) { b.setAttribute('opacity', (b.getAttribute('data-si') === String(si)) ? '1' : '0.12'); });
+                leaders.forEach(function(ld) { ld.setAttribute('opacity', (ld.getAttribute('data-si') === String(si)) ? '0.7' : '0.08'); });
             }
             function reset() {
                 lines.forEach(function(l) { l.setAttribute('stroke-width', '2.2'); l.setAttribute('opacity', '0.9'); });
                 dots.forEach(function(d) { d.setAttribute('opacity', '1'); });
                 balloons.forEach(function(b) { b.setAttribute('opacity', '0.95'); });
+                leaders.forEach(function(ld) { ld.setAttribute('opacity', '0.5'); });
             }
             function toggle(si) {
                 if (pinned === si) { pinned = null; reset(); } else { pinned = si; focus(si); }
