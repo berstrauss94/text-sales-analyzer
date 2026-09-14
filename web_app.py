@@ -2719,7 +2719,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v16.4{% if username == 'Berna.Strauss' %} &middot; globos de vendedor sin superponerse{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v16.5{% if username == 'Berna.Strauss' %} &middot; fix impresion (no cortar graficos) + seguimiento mas compacto{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -6566,7 +6566,7 @@ async function loadInforme() {
         // single seller has just one line and both views look the same.
         const showToggle = multiMode && series.length > 1;
 
-        let lineHtml = '<div class="fade-in-smooth" style="margin-top:14px;padding:12px 10px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
+        let lineHtml = '<div class="fade-in-smooth chart-block" style="margin-top:14px;padding:12px 10px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
         // Top-left header row: view toggle (left) + title.
         lineHtml += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">';
         if (showToggle) {
@@ -6630,14 +6630,15 @@ async function loadInforme() {
                     return (au[b].logins || 0) - (au[a].logins || 0);
                 });
 
-                // Friendly labels for the tool keys logged by the backend.
-                const toolLabels = {
-                    'analizar': 'Analizar texto',
-                    'subir-audio': 'Subir audio',
-                    'abrir-texto': 'Abrir/ver texto',
-                    'eliminar-texto': 'Eliminar texto',
-                    'resaltar-definir': 'Resaltar y definir',
-                    'imprimir': 'Imprimir'
+                // Compact tool labels: short icon + full name (in the title attr)
+                // so each tool is a small chip that doesn't inflate the row height.
+                const toolMeta = {
+                    'analizar':        { ic: '🔍', name: 'Analizar texto' },
+                    'subir-audio':     { ic: '🎙️', name: 'Subir audio' },
+                    'abrir-texto':     { ic: '📄', name: 'Abrir/ver texto' },
+                    'eliminar-texto':  { ic: '🗑️', name: 'Eliminar texto' },
+                    'resaltar-definir':{ ic: '🖍️', name: 'Resaltar y definir' },
+                    'imprimir':        { ic: '🖨️', name: 'Imprimir' }
                 };
                 function fmtMin(m) {
                     m = m || 0;
@@ -6654,45 +6655,46 @@ async function loadInforme() {
                     } catch (e) { return iso.slice(0, 16).replace('T', ' '); }
                 }
 
-                actividadHtml = '<div style="margin-top:14px;padding:16px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;border-left:3px solid #5bd4f5;">';
+                actividadHtml = '<div class="chart-block" style="margin-top:14px;padding:14px 16px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;border-left:3px solid #5bd4f5;">';
                 actividadHtml += '<div style="font-size:0.8rem;color:#fff;font-weight:700;letter-spacing:0.02em;margin-bottom:2px;">Seguimiento de Uso del Sistema</div>';
-                actividadHtml += '<div style="font-size:0.66rem;color:#777;margin-bottom:12px;">Periodo: ' + actPeriodLabel + ' &nbsp;·&nbsp; ingresos, tiempo de uso y herramientas por usuario</div>';
+                actividadHtml += '<div style="font-size:0.64rem;color:#777;margin-bottom:10px;">Periodo: ' + actPeriodLabel + '</div>';
 
                 if (actUsers.length === 0) {
                     actividadHtml += '<div style="font-size:0.72rem;color:#888;">Aun no hay actividad registrada. Los eventos se empiezan a acumular a medida que los usuarios ingresan y usan el sistema.</div>';
                 } else {
-                    actividadHtml += '<div style="overflow-x:auto;border-radius:8px;"><table style="width:100%;border-collapse:collapse;font-size:0.7rem;">';
+                    actividadHtml += '<div style="overflow-x:auto;border-radius:8px;"><table style="width:100%;border-collapse:collapse;font-size:0.68rem;">';
                     actividadHtml += '<thead><tr style="background:#111828;">';
-                    ['Usuario', 'Ingresos', 'Tiempo total', 'Sesion prom.', 'Ultima vez', 'Herramientas usadas'].forEach(function(h, i) {
+                    ['Usuario', 'Ingresos', 'Tiempo', 'Prom.', 'Ultima vez', 'Herramientas'].forEach(function(h, i) {
                         const align = (i === 0 || i === 5) ? 'left' : 'center';
-                        actividadHtml += '<th style="padding:7px 8px;text-align:' + align + ';color:#888;border-bottom:1px solid #2a2d3a;white-space:nowrap;">' + h + '</th>';
+                        actividadHtml += '<th style="padding:5px 8px;text-align:' + align + ';color:#8a90a0;font-weight:600;border-bottom:1px solid #2a2d3a;white-space:nowrap;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.03em;">' + h + '</th>';
                     });
                     actividadHtml += '</tr></thead><tbody>';
 
-                    actUsers.forEach(function(u) {
+                    actUsers.forEach(function(u, ri) {
                         const info = au[u] || {};
-                        // Tools chips, ordered by count desc.
+                        // Compact tool chips (icon + count), ordered by count desc.
                         const toolKeys = Object.keys(info.tools || {}).sort(function(a, b) { return info.tools[b] - info.tools[a]; });
                         let toolsCell = '';
                         if (toolKeys.length === 0) {
                             toolsCell = '<span style="color:#555;">—</span>';
                         } else {
                             toolKeys.forEach(function(tk) {
-                                const lbl = toolLabels[tk] || tk;
-                                toolsCell += '<span style="display:inline-block;background:#141b2e;border:1px solid #2a3350;border-radius:5px;padding:1px 6px;margin:1px 3px 1px 0;color:#aaccff;white-space:nowrap;">' + lbl + ' <strong style="color:#fff;">' + info.tools[tk] + '</strong></span>';
+                                const m = toolMeta[tk] || { ic: '•', name: tk };
+                                toolsCell += '<span title="' + m.name + '" style="display:inline-flex;align-items:center;gap:3px;background:#141b2e;border:1px solid #2a3350;border-radius:20px;padding:1px 7px;margin:0 3px 0 0;color:#aaccff;white-space:nowrap;font-size:0.62rem;">' + m.ic + ' ' + m.name + ' <strong style="color:#fff;">' + info.tools[tk] + '</strong></span>';
                             });
                         }
-                        actividadHtml += '<tr style="border-bottom:1px solid #1e2130;">';
-                        actividadHtml += '<td style="padding:6px 8px;color:#e0e0e0;font-weight:600;white-space:nowrap;">' + u + '</td>';
-                        actividadHtml += '<td style="padding:6px 8px;text-align:center;color:#5bd4f5;font-weight:700;">' + (info.logins || 0) + '</td>';
-                        actividadHtml += '<td style="padding:6px 8px;text-align:center;color:#5bf5a3;">' + fmtMin(info.total_minutes) + '</td>';
-                        actividadHtml += '<td style="padding:6px 8px;text-align:center;color:#aaa;">' + fmtMin(info.avg_session_minutes) + '</td>';
-                        actividadHtml += '<td style="padding:6px 8px;text-align:center;color:#aaa;white-space:nowrap;">' + fmtLastSeen(info.last_seen) + '</td>';
-                        actividadHtml += '<td style="padding:6px 8px;text-align:left;line-height:1.9;">' + toolsCell + '</td>';
+                        const zebra = (ri % 2 === 1) ? 'background:#0c0f18;' : '';
+                        actividadHtml += '<tr style="border-bottom:1px solid #171a26;' + zebra + '">';
+                        actividadHtml += '<td style="padding:4px 8px;color:#e0e0e0;font-weight:600;white-space:nowrap;">' + u + '</td>';
+                        actividadHtml += '<td style="padding:4px 8px;text-align:center;color:#5bd4f5;font-weight:700;">' + (info.logins || 0) + '</td>';
+                        actividadHtml += '<td style="padding:4px 8px;text-align:center;color:#5bf5a3;white-space:nowrap;">' + fmtMin(info.total_minutes) + '</td>';
+                        actividadHtml += '<td style="padding:4px 8px;text-align:center;color:#9aa0b0;white-space:nowrap;">' + fmtMin(info.avg_session_minutes) + '</td>';
+                        actividadHtml += '<td style="padding:4px 8px;text-align:center;color:#9aa0b0;white-space:nowrap;">' + fmtLastSeen(info.last_seen) + '</td>';
+                        actividadHtml += '<td style="padding:4px 8px;text-align:left;white-space:nowrap;">' + toolsCell + '</td>';
                         actividadHtml += '</tr>';
                     });
                     actividadHtml += '</tbody></table></div>';
-                    actividadHtml += '<div style="font-size:0.6rem;color:#555;margin-top:8px;">El tiempo de sesion es una estimacion (se acota a 45 min por sesion cuando no hay cierre explicito).</div>';
+                    actividadHtml += '<div style="font-size:0.58rem;color:#555;margin-top:6px;">Tiempo de sesion estimado (acotado a 45 min cuando no hay cierre explicito).</div>';
                 }
                 actividadHtml += '</div>';
             }
@@ -6877,10 +6879,11 @@ async function loadInforme() {
         card2Html += '</div>';
 
         // Both donuts side by side: monthly (left) and by-seller (right).
-        // flex-wrap makes them stack vertically on narrow screens.
+        // flex-wrap makes them stack vertically on narrow screens. Each donut
+        // column is a .pie-block so it prints whole (never split across sheets).
         const piesRowHtml = '<div style="display:flex;gap:30px;justify-content:center;align-items:flex-start;flex-wrap:wrap;margin-top:14px;">' +
-            '<div style="flex:1 1 320px;min-width:300px;">' + pieHtml + '</div>' +
-            (pieVHtml ? '<div style="flex:1 1 320px;min-width:300px;">' + pieVHtml + '</div>' : '') +
+            '<div class="pie-block" style="flex:1 1 320px;min-width:300px;">' + pieHtml + '</div>' +
+            (pieVHtml ? '<div class="pie-block" style="flex:1 1 320px;min-width:300px;">' + pieVHtml + '</div>' : '') +
             '</div>';
 
         container.innerHTML = tableHtml + totalsHtml + lineHtml + piesRowHtml + complianceHtml + actividadHtml + synthesisHtml + card2Html;
@@ -7336,6 +7339,11 @@ function printInforme() {
     // Keep SVG line-chart strokes/fills vivid on paper.
     printWindow.document.write('svg { max-width: 100%; }');
     printWindow.document.write('svg text { fill: #333 !important; }');
+    // Prevent charts/tables/report blocks from being split across page breaks.
+    // Each of these prints whole on one page (or moves to the next one).
+    printWindow.document.write('svg, table, .report-section, .chart-block, .pie-block { break-inside: avoid; page-break-inside: avoid; }');
+    // A section title should not be the last thing on a page (orphan heading).
+    printWindow.document.write('.rep-sec-title { break-after: avoid; page-break-after: avoid; }');
     printWindow.document.write('</style></head><body>');
     printWindow.document.write('<div class="header"><h1>Mi Primer Casa S.A.</h1><span class="date">' + dateStr + '</span></div>');
     printWindow.document.write('<div class="auditor">Auditor: Bernardo Strauss.</div>');
