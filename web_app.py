@@ -1144,6 +1144,16 @@ HTML = """
             transform: scale(1.08);
             box-shadow: 0 0 8px -2px rgba(123, 156, 255, 0.6);
         }
+        /* Full-width fragment rows must NOT scale from the center (that pushed
+           their left edge outside the box). Grow to the right instead, and keep
+           the box highlight without spilling out. */
+        .src-phrase.phrase-chip:hover,
+        .concept-detail-source .phrase-chip:hover {
+            transform: none;
+            transform-origin: left center;
+            box-shadow: none;
+            background: rgba(123, 156, 255, 0.10);
+        }
         .input-preview:hover {
             border-left-color: #7b9cff !important;
             background: rgba(123, 156, 255, 0.04) !important;
@@ -1463,7 +1473,7 @@ HTML = """
         }
         .src-fragment-inline .src-phrase {
             display: block;
-            padding: 3px 0;
+            padding: 3px 8px;
             cursor: pointer;
             border-bottom: 1px solid #1a1d27;
             transition: color 0.15s;
@@ -2709,7 +2719,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v16.2{% if username == 'Berna.Strauss' %} &middot; texto alineado dentro de las casillas{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v16.3{% if username == 'Berna.Strauss' %} &middot; fix desborde de fragmentos por hover-scale{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
