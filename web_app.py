@@ -664,6 +664,22 @@ HTML = """
         .hl-manual-pedidos_referidos { background: rgba(163, 91, 245, 0.35); color: #b38bff; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
         .hl-manual-objeciones { background: rgba(255, 0, 0, 0.35); color: #FF4444; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
         .hl-manual-indicios_prospeccion { background: rgba(0, 191, 255, 0.35); color: #00BFFF; border-radius: 3px; padding: 0 2px; text-decoration: underline dotted; }
+        /* Manual highlight spans must wrap inside their box, never overflow it. */
+        [class^="hl-manual-"], [class*=" hl-manual-"] {
+            display: inline;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        /* Text boxes in the intent/source panels: keep long text (and highlighted
+           fragments) contained and aligned inside the box, never spilling out. */
+        .intent-section-text,
+        .src-fragment-inline,
+        .src-fragment-inline .src-phrase {
+            max-width: 100%;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
 
         /* Date selectors */
         .date-selectors {
@@ -2653,6 +2669,7 @@ HTML = """
             line-height: 1.4;
             max-width: 85%;
             word-wrap: break-word;
+            overflow-wrap: anywhere;
         }
         .sim-msg-client {
             background: rgba(91, 245, 163, 0.12);
@@ -2692,7 +2709,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v16.1{% if username == 'Berna.Strauss' %} &middot; leyenda de tortas a la derecha{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v16.2{% if username == 'Berna.Strauss' %} &middot; texto alineado dentro de las casillas{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
