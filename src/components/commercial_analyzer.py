@@ -1120,11 +1120,27 @@ class CommercialAnalyzer:
         detalle: dict[str, dict[str, list[str]]] = {}
         totales: dict[str, int] = {}
 
-        # User-contributed phrases per category (from "Resaltar y definir"),
-        # loaded best-effort. They are ADDED to the base dictionary as an extra
-        # "agregadas" subcategory and never modify the shipped base phrases.
+        # Effective dictionary source.
+        # The overrides store, once seeded, holds the FULL editable dictionary
+        # (base phrases + user edits: additions, deletions, category moves). So:
+        #   • If overrides exist -> they ARE the dictionary for detection
+        #     (this honors deletions/moves made from "Editar diccionario").
+        #   • If overrides are empty (no PG / not seeded yet) -> use the shipped
+        #     base dictionary unchanged (keeps the base behavior identical).
         overrides = _load_dictionary_overrides()
 
+        if overrides:
+            # Detection driven by the editable store (flat phrases per indicator).
+            for indicador in _INDICADOR_CATEGORIAS.keys():
+                frases = overrides.get(indicador, [])
+                encontradas = [f for f in frases if _count_keyword(normalized, f) > 0]
+                if encontradas:
+                    detalle[indicador] = {"diccionario": encontradas}
+                totales[indicador] = len(frases)
+            totales["indicios_prospeccion"] = len(overrides.get("indicios_prospeccion", []))
+            return detalle, totales
+
+        # ── Base behavior (no overrides) ──
         for indicador, categorias in _INDICADOR_CATEGORIAS.items():
             indicador_detalle: dict[str, list[str]] = {}
             total_frases = 0
@@ -1136,21 +1152,14 @@ class CommercialAnalyzer:
                         encontradas.append(frase)
                 if encontradas:
                     indicador_detalle[categoria] = encontradas
-            # Merge user overrides for this indicator (extra subcategory).
-            extra = overrides.get(indicador, [])
-            if extra:
-                total_frases += len(extra)
-                found_extra = [f for f in extra if _count_keyword(normalized, f) > 0]
-                if found_extra:
-                    indicador_detalle["agregadas"] = found_extra
             if indicador_detalle:
                 detalle[indicador] = indicador_detalle
             totales[indicador] = total_frases
 
-        # Include prospección total (base + user overrides for prospección).
+        # Include prospección total
         totales["indicios_prospeccion"] = sum(
             len(frases) for frases in _PROSPECCION_CATEGORIAS.values()
-        ) + len(overrides.get("indicios_prospeccion", []))
+        )
 
         return detalle, totales
 

@@ -2719,7 +2719,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v16.6{% if username == 'Berna.Strauss' %} &middot; editar diccionario (eliminar/mover frases){% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v16.7{% if username == 'Berna.Strauss' %} &middot; diccionario muestra frases base + buscador{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5562,34 +5562,58 @@ async function loadDictionaryModal() {
             body.innerHTML = '<div style="color:#888;font-size:0.8rem;line-height:1.6;">Todavia no hay palabras o frases agregadas al diccionario.<br>Usa <strong style="color:#aaa;">Resaltar y definir</strong> para incorporar nuevas y apareceran aca para gestionarlas.</div>';
             return;
         }
-        // Group phrases by category.
-        var byCat = {};
-        phrases.forEach(function(p) { (byCat[p.category] = byCat[p.category] || []).push(p); });
-        var html = '';
-        DICT_CATEGORIES.forEach(function(c) {
-            var items = byCat[c.key] || [];
-            if (items.length === 0) return;
-            html += '<div style="margin-bottom:14px;">';
-            html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">' +
-                '<span style="width:10px;height:10px;border-radius:2px;background:' + c.color + ';display:inline-block;"></span>' +
-                '<span style="font-size:0.74rem;font-weight:700;color:#e0e0e0;">' + c.label + '</span>' +
-                '<span style="font-size:0.62rem;color:#666;">(' + items.length + ')</span></div>';
-            items.forEach(function(p) {
-                var optsHtml = DICT_CATEGORIES.map(function(cc) {
-                    return '<option value="' + cc.key + '"' + (cc.key === p.category ? ' selected' : '') + '>' + cc.label + '</option>';
-                }).join('');
-                html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#0a0c14;border:1px solid #1e2130;border-radius:6px;margin-bottom:4px;">' +
-                    '<span style="flex:1;font-size:0.74rem;color:#ccc;overflow-wrap:anywhere;">"' + (p.phrase || '').replace(/</g, '&lt;') + '"</span>' +
-                    '<select data-id="' + p.id + '" onchange="moveDictionaryPhrase(' + p.id + ', this.value)" title="Mover a otro filtro" style="background:#12141c;color:#ccc;border:1px solid #2a2d3e;border-radius:5px;padding:3px 6px;font-size:0.66rem;cursor:pointer;">' + optsHtml + '</select>' +
-                    '<button type="button" onclick="deleteDictionaryPhrase(' + p.id + ')" title="Eliminar" style="background:transparent;border:1px solid #f55b5b;color:#f55b5b;border-radius:5px;padding:3px 7px;font-size:0.7rem;cursor:pointer;">&#128465;</button>' +
-                    '</div>';
-            });
-            html += '</div>';
-        });
-        body.innerHTML = html;
+        // Keep the full list for client-side search/filtering.
+        window._dictAllPhrases = phrases;
+        renderDictionaryList('');
     } catch (e) {
         body.innerHTML = '<div style="color:#f55b5b;font-size:0.8rem;">No se pudo cargar el diccionario.</div>';
     }
+}
+
+// Render the dictionary list, optionally filtered by a search term. There can
+// be hundreds of phrases (base + added), so a search box keeps it manageable.
+function renderDictionaryList(term) {
+    var body = document.getElementById('dictionaryModalBody');
+    if (!body) return;
+    var all = window._dictAllPhrases || [];
+    term = (term || '').trim().toLowerCase();
+    var phrases = term ? all.filter(function(p) { return (p.phrase || '').toLowerCase().indexOf(term) >= 0; }) : all;
+
+    // Search box (kept on top; preserves focus/value via id).
+    var head = '<div style="position:sticky;top:-16px;background:#0f1117;padding-bottom:8px;margin-bottom:4px;z-index:1;">' +
+        '<input id="dictSearchInput" type="text" value="' + term.replace(/"/g, '&quot;') + '" oninput="renderDictionaryList(this.value)" placeholder="Buscar palabra o frase..." ' +
+        'style="width:100%;background:#12141c;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:7px 10px;font-size:0.76rem;outline:none;box-sizing:border-box;">' +
+        '<div style="font-size:0.62rem;color:#666;margin-top:4px;">' + phrases.length + ' de ' + all.length + ' frase(s)</div></div>';
+
+    var byCat = {};
+    phrases.forEach(function(p) { (byCat[p.category] = byCat[p.category] || []).push(p); });
+    var html = '';
+    DICT_CATEGORIES.forEach(function(c) {
+        var items = byCat[c.key] || [];
+        if (items.length === 0) return;
+        html += '<div style="margin-bottom:14px;">';
+        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">' +
+            '<span style="width:10px;height:10px;border-radius:2px;background:' + c.color + ';display:inline-block;"></span>' +
+            '<span style="font-size:0.74rem;font-weight:700;color:#e0e0e0;">' + c.label + '</span>' +
+            '<span style="font-size:0.62rem;color:#666;">(' + items.length + ')</span></div>';
+        items.forEach(function(p) {
+            var optsHtml = DICT_CATEGORIES.map(function(cc) {
+                return '<option value="' + cc.key + '"' + (cc.key === p.category ? ' selected' : '') + '>' + cc.label + '</option>';
+            }).join('');
+            var origin = (p.added_by && p.added_by !== 'sistema') ? ('<span style="font-size:0.58rem;color:#5bd4f5;margin-left:6px;">+ ' + p.added_by + '</span>') : '';
+            html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#0a0c14;border:1px solid #1e2130;border-radius:6px;margin-bottom:4px;">' +
+                '<span style="flex:1;font-size:0.74rem;color:#ccc;overflow-wrap:anywhere;">"' + (p.phrase || '').replace(/</g, '&lt;') + '"' + origin + '</span>' +
+                '<select data-id="' + p.id + '" onchange="moveDictionaryPhrase(' + p.id + ', this.value)" title="Mover a otro filtro" style="background:#12141c;color:#ccc;border:1px solid #2a2d3e;border-radius:5px;padding:3px 6px;font-size:0.66rem;cursor:pointer;">' + optsHtml + '</select>' +
+                '<button type="button" onclick="deleteDictionaryPhrase(' + p.id + ')" title="Eliminar" style="background:transparent;border:1px solid #f55b5b;color:#f55b5b;border-radius:5px;padding:3px 7px;font-size:0.7rem;cursor:pointer;">&#128465;</button>' +
+                '</div>';
+        });
+        html += '</div>';
+    });
+    if (!html) html = '<div style="color:#888;font-size:0.78rem;">Sin resultados para "' + term.replace(/</g, '&lt;') + '".</div>';
+    body.innerHTML = head + html;
+    // Restore focus + caret to the search box after re-render.
+    var si = document.getElementById('dictSearchInput');
+    if (si && term) { si.focus(); si.setSelectionRange(si.value.length, si.value.length); }
 }
 
 async function deleteDictionaryPhrase(id) {
@@ -9070,12 +9094,40 @@ def dictionary_add():
     return jsonify({"ok": ok})
 
 
+def _base_dictionary_by_category() -> dict:
+    """
+    Flatten the base dictionary to { category: [phrase, ...] } for seeding.
+    _INDICADOR_CATEGORIAS is {indicador: {subcat: [frases]}}; prospección is
+    {categoria: [frases]} and maps to the 'indicios_prospeccion' bucket.
+    """
+    flat: dict = {}
+    for indicador, subcats in _INDICADOR_CATEGORIAS.items():
+        acc = []
+        for _sub, frases in subcats.items():
+            acc.extend(frases)
+        flat[indicador] = acc
+    prosp = []
+    for _cat, frases in _PROSPECCION_CATEGORIAS.items():
+        prosp.extend(frases)
+    flat["indicios_prospeccion"] = prosp
+    return flat
+
+
 @app.route("/dictionary/list")
 def dictionary_list():
-    """List all user-contributed phrases, grouped for the editor modal."""
+    """
+    List every dictionary phrase for the editor modal. On first use it SEEDS the
+    store with all base phrases, so the modal shows the full dictionary from the
+    start (not only user-added phrases).
+    """
     if not session.get("username"):
         return jsonify({"ok": False, "error": "unauthorized"}), 401
     from src.users import dictionary_store_pg
+    # One-time seed: fill the (empty) table with the base dictionary.
+    try:
+        dictionary_store_pg.seed_from_base(_base_dictionary_by_category())
+    except Exception:
+        pass
     return jsonify({"ok": True, "phrases": dictionary_store_pg.list_phrases()})
 
 

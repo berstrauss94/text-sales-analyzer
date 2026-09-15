@@ -161,6 +161,81 @@ def phrases_by_category() -> dict:
     return grouped
 
 
+def count_phrases() -> int:
+    """Return how many override rows exist (0 if unavailable)."""
+    if not is_available():
+        return 0
+    conn = _conn()
+    if conn is None:
+        return 0
+    try:
+        _ensure_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM dictionary_overrides")
+            n = cur.fetchone()[0]
+        _release(conn)
+        return int(n or 0)
+    except Exception as exc:
+        logger.error(f"dictionary_overrides count error: {exc}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        _release(conn, close=True)
+        return 0
+
+
+def seed_from_base(base_by_category: dict) -> int:
+    """
+    One-time seed: if the overrides table is EMPTY, populate it with every base
+    phrase so the editor shows the full dictionary and the engine reads
+    everything from a single, editable source ("segunda capa" / effective dict).
+
+    base_by_category: { category: [phrase, ...] }. Categories not in
+    VALID_CATEGORIES are ignored. Returns the number of phrases inserted (0 if
+    the table already had rows, or PG is unavailable).
+    """
+    if not is_available():
+        return 0
+    # Only seed when empty, so we never duplicate or overwrite user edits.
+    if count_phrases() > 0:
+        return 0
+    conn = _conn()
+    if conn is None:
+        return 0
+    inserted = 0
+    try:
+        _ensure_table(conn)
+        with conn.cursor() as cur:
+            for category, phrases in (base_by_category or {}).items():
+                if category not in VALID_CATEGORIES:
+                    continue
+                for phrase in phrases:
+                    p = (phrase or "").strip()
+                    if not p:
+                        continue
+                    cur.execute(
+                        "INSERT INTO dictionary_overrides (phrase, category, added_by) "
+                        "VALUES (%s, %s, %s) "
+                        "ON CONFLICT (lower(phrase), category) DO NOTHING",
+                        (p, category, "sistema"),
+                    )
+                    if cur.rowcount > 0:
+                        inserted += 1
+        conn.commit()
+        _release(conn)
+        logger.info(f"dictionary_overrides seeded with {inserted} base phrases")
+        return inserted
+    except Exception as exc:
+        logger.error(f"dictionary_overrides seed error: {exc}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        _release(conn, close=True)
+        return 0
+
+
 def delete_phrase(override_id: int) -> bool:
     """Delete an override phrase by its id. Returns True if a row was removed."""
     if not is_available():
