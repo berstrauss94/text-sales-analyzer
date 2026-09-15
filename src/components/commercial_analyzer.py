@@ -573,6 +573,21 @@ def _count_keyword(text: str, keyword: str) -> int:
     return len(re.findall(pattern, text))
 
 
+def _load_dictionary_overrides() -> dict:
+    """
+    Load user-contributed phrases grouped by category, best-effort.
+
+    Returns { category: [phrase, ...] } or {} when the store is unavailable
+    (local runs without PostgreSQL, import errors, etc.). NEVER raises — a
+    failure here must not break the analysis of a text.
+    """
+    try:
+        from src.users import dictionary_store_pg
+        return dictionary_store_pg.phrases_by_category() or {}
+    except Exception:
+        return {}
+
+
 def _count_as_response(text: str, keyword: str) -> int:
     """
     Count a keyword only when it appears as an independent response/expression,
@@ -1105,6 +1120,11 @@ class CommercialAnalyzer:
         detalle: dict[str, dict[str, list[str]]] = {}
         totales: dict[str, int] = {}
 
+        # User-contributed phrases per category (from "Resaltar y definir"),
+        # loaded best-effort. They are ADDED to the base dictionary as an extra
+        # "agregadas" subcategory and never modify the shipped base phrases.
+        overrides = _load_dictionary_overrides()
+
         for indicador, categorias in _INDICADOR_CATEGORIAS.items():
             indicador_detalle: dict[str, list[str]] = {}
             total_frases = 0
@@ -1116,14 +1136,21 @@ class CommercialAnalyzer:
                         encontradas.append(frase)
                 if encontradas:
                     indicador_detalle[categoria] = encontradas
+            # Merge user overrides for this indicator (extra subcategory).
+            extra = overrides.get(indicador, [])
+            if extra:
+                total_frases += len(extra)
+                found_extra = [f for f in extra if _count_keyword(normalized, f) > 0]
+                if found_extra:
+                    indicador_detalle["agregadas"] = found_extra
             if indicador_detalle:
                 detalle[indicador] = indicador_detalle
             totales[indicador] = total_frases
 
-        # Include prospección total
+        # Include prospección total (base + user overrides for prospección).
         totales["indicios_prospeccion"] = sum(
             len(frases) for frases in _PROSPECCION_CATEGORIAS.values()
-        )
+        ) + len(overrides.get("indicios_prospeccion", []))
 
         return detalle, totales
 
