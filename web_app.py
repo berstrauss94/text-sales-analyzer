@@ -2719,7 +2719,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v17.4{% if username == 'Berna.Strauss' %} &middot; seguimiento de uso: celdas blancas, marco negro{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v17.5{% if username == 'Berna.Strauss' %} &middot; fix impresion seguimiento (sin excedente negro){% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -6839,7 +6839,7 @@ async function loadInforme() {
 
                 // Outer frame in black, inner data cards in white for a clean,
                 // high-contrast look that reads well on screen AND on paper.
-                actividadHtml = '<div class="chart-block" style="margin-top:14px;padding:14px 16px;background:#000000;border:1px solid #000000;border-radius:10px;">';
+                actividadHtml = '<div class="chart-block activity-block" style="margin-top:14px;padding:14px 16px;background:#000000;border:1px solid #000000;border-radius:10px;">';
                 actividadHtml += '<div style="font-size:0.8rem;color:#fff;font-weight:700;letter-spacing:0.02em;margin-bottom:2px;">Seguimiento de Uso del Sistema</div>';
                 actividadHtml += '<div style="font-size:0.64rem;color:#9aa0b0;margin-bottom:10px;">Periodo: ' + actPeriodLabel + '</div>';
 
@@ -7531,6 +7531,14 @@ function printInforme() {
     printWindow.document.write('svg, table, .report-section, .chart-block, .pie-block { break-inside: avoid; page-break-inside: avoid; }');
     // A section title should not be the last thing on a page (orphan heading).
     printWindow.document.write('.rep-sec-title { break-after: avoid; page-break-after: avoid; }');
+    // Activity ("Seguimiento de Uso") box: on PAPER, drop the black fill/padding
+    // (it printed as a big black block) and make it a clean white card. Its title
+    // text (white on screen) becomes dark so it reads on white.
+    printWindow.document.write('.activity-block { background:#ffffff !important; border:1px solid #000 !important; padding:10px !important; }');
+    printWindow.document.write('.activity-block > div:first-child { color:#111 !important; }');
+    // Uniform hairline borders: outer table edge same thickness as inner cells.
+    printWindow.document.write('.activity-block table { border-collapse: collapse !important; border-spacing: 0 !important; }');
+    printWindow.document.write('.activity-block th, .activity-block td { border: 0.75pt solid #000 !important; border-radius: 0 !important; }');
     printWindow.document.write('</style></head><body>');
     printWindow.document.write('<div class="header"><h1>Mi Primer Casa S.A.</h1><span class="date">' + dateStr + '</span></div>');
     printWindow.document.write('<div class="auditor">Auditor: Bernardo Strauss.</div>');
