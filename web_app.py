@@ -2719,7 +2719,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v16.5{% if username == 'Berna.Strauss' %} &middot; fix impresion (no cortar graficos) + seguimiento mas compacto{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v16.6{% if username == 'Berna.Strauss' %} &middot; editar diccionario (eliminar/mover frases){% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -2805,10 +2805,29 @@ HTML = """
                     Para añadir una nueva palabra o frase detectada por un vendedor al diccionario de los filtros, se debe utilizar la herramienta para resaltarla y, a continuación, pulsar nuevamente para incorporarla al filtro correspondiente.
                 </div>
             </div>
+            <button class="btn-highlight-define" id="btnEditDictionary" type="button" onclick="openDictionaryModal()" style="margin-left:6px;">
+                &#128221; Editar diccionario
+            </button>
             <span class="highlight-selection-info" id="highlightSelectionInfo"></span>
             <div class="category-popover" id="categoryPopover">
                 <div class="category-popover-title">Selecciona una categoria</div>
                 <div class="category-grid" id="categoryGrid"></div>
+            </div>
+        </div>
+
+        <!-- ── MODAL: Editar Diccionario ── -->
+        <div id="dictionaryModalOverlay" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.6);backdrop-filter:blur(2px);align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;">
+            <div style="background:#0f1117;border:1px solid #2a2d3e;border-radius:12px;max-width:640px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,0.6);">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #1e2130;">
+                    <div>
+                        <div style="font-size:0.95rem;font-weight:700;color:#fff;">Editar Diccionario</div>
+                        <div style="font-size:0.68rem;color:#888;margin-top:2px;">Palabras y frases agregadas por el equipo. Podes eliminarlas o moverlas de filtro.</div>
+                    </div>
+                    <button type="button" onclick="closeDictionaryModal()" style="background:transparent;border:none;color:#888;font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
+                </div>
+                <div id="dictionaryModalBody" style="padding:16px 20px;max-height:60vh;overflow-y:auto;">
+                    <div style="color:#888;font-size:0.8rem;">Cargando...</div>
+                </div>
             </div>
         </div>
         <div class="btn-row">
@@ -5499,6 +5518,101 @@ function logTool(tool, entryId, detail) {
     } catch (e) {}
 }
 
+// ── Editar Diccionario (modal) ──────────────────────────────────────────
+// The 7 categories/filters a phrase can belong to (same set as "Resaltar y
+// definir"). Used to render the "move to" selector and the group headers.
+var DICT_CATEGORIES = [
+    { key: 'palabras_positivas', label: 'Positivas', color: '#FFFF00' },
+    { key: 'respuestas_afirmativas', label: 'Induccion al Si', color: '#008000' },
+    { key: 'indicios_cierre', label: 'Cierre', color: '#FFA500' },
+    { key: 'escasez_comercial', label: 'Escasez', color: '#FF00FF' },
+    { key: 'pedidos_referidos', label: 'Referidos', color: '#b38bff' },
+    { key: 'objeciones', label: 'Objeciones', color: '#FF0000' },
+    { key: 'indicios_prospeccion', label: 'Prospeccion', color: '#00BFFF' }
+];
+function dictLabel(key) {
+    for (var i = 0; i < DICT_CATEGORIES.length; i++) if (DICT_CATEGORIES[i].key === key) return DICT_CATEGORIES[i].label;
+    return key;
+}
+function dictColor(key) {
+    for (var i = 0; i < DICT_CATEGORIES.length; i++) if (DICT_CATEGORIES[i].key === key) return DICT_CATEGORIES[i].color;
+    return '#7b9cff';
+}
+
+function openDictionaryModal() {
+    var ov = document.getElementById('dictionaryModalOverlay');
+    if (!ov) return;
+    ov.style.display = 'flex';
+    loadDictionaryModal();
+}
+function closeDictionaryModal() {
+    var ov = document.getElementById('dictionaryModalOverlay');
+    if (ov) ov.style.display = 'none';
+}
+
+async function loadDictionaryModal() {
+    var body = document.getElementById('dictionaryModalBody');
+    if (!body) return;
+    body.innerHTML = '<div style="color:#888;font-size:0.8rem;">Cargando...</div>';
+    try {
+        var resp = await fetch('/dictionary/list?_t=' + Date.now(), { cache: 'no-store' });
+        var data = await resp.json();
+        var phrases = (data && data.phrases) ? data.phrases : [];
+        if (phrases.length === 0) {
+            body.innerHTML = '<div style="color:#888;font-size:0.8rem;line-height:1.6;">Todavia no hay palabras o frases agregadas al diccionario.<br>Usa <strong style="color:#aaa;">Resaltar y definir</strong> para incorporar nuevas y apareceran aca para gestionarlas.</div>';
+            return;
+        }
+        // Group phrases by category.
+        var byCat = {};
+        phrases.forEach(function(p) { (byCat[p.category] = byCat[p.category] || []).push(p); });
+        var html = '';
+        DICT_CATEGORIES.forEach(function(c) {
+            var items = byCat[c.key] || [];
+            if (items.length === 0) return;
+            html += '<div style="margin-bottom:14px;">';
+            html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">' +
+                '<span style="width:10px;height:10px;border-radius:2px;background:' + c.color + ';display:inline-block;"></span>' +
+                '<span style="font-size:0.74rem;font-weight:700;color:#e0e0e0;">' + c.label + '</span>' +
+                '<span style="font-size:0.62rem;color:#666;">(' + items.length + ')</span></div>';
+            items.forEach(function(p) {
+                var optsHtml = DICT_CATEGORIES.map(function(cc) {
+                    return '<option value="' + cc.key + '"' + (cc.key === p.category ? ' selected' : '') + '>' + cc.label + '</option>';
+                }).join('');
+                html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#0a0c14;border:1px solid #1e2130;border-radius:6px;margin-bottom:4px;">' +
+                    '<span style="flex:1;font-size:0.74rem;color:#ccc;overflow-wrap:anywhere;">"' + (p.phrase || '').replace(/</g, '&lt;') + '"</span>' +
+                    '<select data-id="' + p.id + '" onchange="moveDictionaryPhrase(' + p.id + ', this.value)" title="Mover a otro filtro" style="background:#12141c;color:#ccc;border:1px solid #2a2d3e;border-radius:5px;padding:3px 6px;font-size:0.66rem;cursor:pointer;">' + optsHtml + '</select>' +
+                    '<button type="button" onclick="deleteDictionaryPhrase(' + p.id + ')" title="Eliminar" style="background:transparent;border:1px solid #f55b5b;color:#f55b5b;border-radius:5px;padding:3px 7px;font-size:0.7rem;cursor:pointer;">&#128465;</button>' +
+                    '</div>';
+            });
+            html += '</div>';
+        });
+        body.innerHTML = html;
+    } catch (e) {
+        body.innerHTML = '<div style="color:#f55b5b;font-size:0.8rem;">No se pudo cargar el diccionario.</div>';
+    }
+}
+
+async function deleteDictionaryPhrase(id) {
+    if (!confirm('Eliminar esta palabra/frase del diccionario? Dejara de detectarse en los analisis.')) return;
+    try {
+        await fetch('/dictionary/' + id, { method: 'DELETE' });
+        try { UISound.click(); } catch (e) {}
+        loadDictionaryModal();
+    } catch (e) {}
+}
+
+async function moveDictionaryPhrase(id, newCategory) {
+    try {
+        await fetch('/dictionary/' + id + '/move', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ category: newCategory })
+        });
+        try { UISound.tick(); } catch (e) {}
+        loadDictionaryModal();
+    } catch (e) {}
+}
+
 // Delegated click handler for pie charts (avoids inline onclick quote issues)
 document.addEventListener('click', function(e) {
     const pie = _closest(e, '.pie-chart-click');
@@ -6078,6 +6192,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!txt || !cat) return;
                 window._manualHighlights.push({ text: txt, category: cat });
                 logTool('resaltar-definir', '', cat);  // audit: tool usage
+                // Persist the phrase to the GLOBAL dictionary so it is detected
+                // in future analyses and manageable from "Editar diccionario".
+                try {
+                    fetch('/dictionary/add', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ phrase: txt, category: cat })
+                    }).catch(function() {});
+                } catch (e) {}
                 UISound.click();  // color selected
                 hlPopover.classList.remove('active');
                 window._selectedTextForHighlight = '';
@@ -8926,6 +9049,58 @@ def log_tool():
     detail = str(data.get("detail", ""))[:200]
     _log_activity("tool", tool=tool, entry_id=entry_id, detail=detail)
     return jsonify({"ok": True})
+
+
+# ── Dictionary overrides (user-contributed phrases) ────────────────────────
+# Global dictionary of phrases added via "Resaltar y definir". Any logged-in
+# user can add, list, delete or move phrases between categories/filters.
+
+@app.route("/dictionary/add", methods=["POST"])
+def dictionary_add():
+    """Add a phrase to a category. Called when a user uses 'Resaltar y definir'."""
+    if not session.get("username"):
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    phrase = str(data.get("phrase", "")).strip()[:200]
+    category = str(data.get("category", "")).strip()
+    if not phrase or not category:
+        return jsonify({"ok": False, "error": "faltan phrase/category"}), 400
+    from src.users import dictionary_store_pg
+    ok = dictionary_store_pg.add_phrase(phrase, category, added_by=session["username"])
+    return jsonify({"ok": ok})
+
+
+@app.route("/dictionary/list")
+def dictionary_list():
+    """List all user-contributed phrases, grouped for the editor modal."""
+    if not session.get("username"):
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    from src.users import dictionary_store_pg
+    return jsonify({"ok": True, "phrases": dictionary_store_pg.list_phrases()})
+
+
+@app.route("/dictionary/<int:override_id>", methods=["DELETE"])
+def dictionary_delete(override_id):
+    """Delete a user-contributed phrase by id."""
+    if not session.get("username"):
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    from src.users import dictionary_store_pg
+    ok = dictionary_store_pg.delete_phrase(override_id)
+    return jsonify({"ok": ok})
+
+
+@app.route("/dictionary/<int:override_id>/move", methods=["PUT"])
+def dictionary_move(override_id):
+    """Move a user-contributed phrase to another category/filter."""
+    if not session.get("username"):
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    new_category = str(data.get("category", "")).strip()
+    if not new_category:
+        return jsonify({"ok": False, "error": "falta category"}), 400
+    from src.users import dictionary_store_pg
+    ok = dictionary_store_pg.move_phrase(override_id, new_category)
+    return jsonify({"ok": ok})
 
 
 @app.route("/admin/users-list")
