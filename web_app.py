@@ -2719,7 +2719,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v16.9{% if username == 'Berna.Strauss' %} &middot; tooltip en Editar diccionario{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v17.0{% if username == 'Berna.Strauss' %} &middot; tooltip diccionario ajustado{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -2811,7 +2811,7 @@ HTML = """
                 </button>
                 <span class="card-info-icon" onclick="event.stopPropagation()" style="font-size:0.6rem;width:15px;height:15px;line-height:15px;">!</span>
                 <div class="card-info-tooltip" style="top:22px;left:0;right:auto;min-width:280px;max-width:340px;font-size:0.72rem;">
-                    Abre el diccionario completo de palabras y frases que el sistema usa para detectar cada filtro (Positivas, Cierre, Objeciones, etc.). Desde aqui podes eliminar una palabra o frase que ya no corresponda, o moverla a otro filtro si fue clasificada en el equivocado. Los cambios son globales y afectan los proximos analisis de todo el equipo.
+                    Abre el diccionario completo de palabras y frases que el sistema usa para detectar cada filtro (Positivas, Cierre, Objeciones, etc.). Desde aqui podes eliminar una palabra o frase que ya no corresponda, o moverla a otro filtro si fue clasificada en el equivocado.
                 </div>
             </div>
             <span class="highlight-selection-info" id="highlightSelectionInfo"></span>
