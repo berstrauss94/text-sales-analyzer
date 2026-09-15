@@ -2719,7 +2719,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v17.3{% if username == 'Berna.Strauss' %} &middot; optimizacion de rendimiento (cache diccionario){% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v17.4{% if username == 'Berna.Strauss' %} &middot; seguimiento de uso: celdas blancas, marco negro{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -6837,18 +6837,22 @@ async function loadInforme() {
                     } catch (e) { return iso.slice(0, 16).replace('T', ' '); }
                 }
 
-                actividadHtml = '<div class="chart-block" style="margin-top:14px;padding:14px 16px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;border-left:3px solid #5bd4f5;">';
+                // Outer frame in black, inner data cards in white for a clean,
+                // high-contrast look that reads well on screen AND on paper.
+                actividadHtml = '<div class="chart-block" style="margin-top:14px;padding:14px 16px;background:#000000;border:1px solid #000000;border-radius:10px;">';
                 actividadHtml += '<div style="font-size:0.8rem;color:#fff;font-weight:700;letter-spacing:0.02em;margin-bottom:2px;">Seguimiento de Uso del Sistema</div>';
-                actividadHtml += '<div style="font-size:0.64rem;color:#777;margin-bottom:10px;">Periodo: ' + actPeriodLabel + '</div>';
+                actividadHtml += '<div style="font-size:0.64rem;color:#9aa0b0;margin-bottom:10px;">Periodo: ' + actPeriodLabel + '</div>';
 
                 if (actUsers.length === 0) {
-                    actividadHtml += '<div style="font-size:0.72rem;color:#888;">Aun no hay actividad registrada. Los eventos se empiezan a acumular a medida que los usuarios ingresan y usan el sistema.</div>';
+                    actividadHtml += '<div style="font-size:0.72rem;color:#ccc;">Aun no hay actividad registrada. Los eventos se empiezan a acumular a medida que los usuarios ingresan y usan el sistema.</div>';
                 } else {
-                    actividadHtml += '<div style="overflow-x:auto;border-radius:8px;"><table style="width:100%;border-collapse:collapse;font-size:0.68rem;">';
-                    actividadHtml += '<thead><tr style="background:#111828;">';
+                    // border-spacing gives each cell its own separated white card on
+                    // the black frame; border-collapse:separate is required for it.
+                    actividadHtml += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:separate;border-spacing:4px;font-size:0.68rem;">';
+                    actividadHtml += '<thead><tr>';
                     ['Usuario', 'Ingresos', 'Tiempo', 'Prom.', 'Ultima vez', 'Herramientas'].forEach(function(h, i) {
                         const align = (i === 0 || i === 5) ? 'left' : 'center';
-                        actividadHtml += '<th style="padding:5px 8px;text-align:' + align + ';color:#8a90a0;font-weight:600;border-bottom:1px solid #2a2d3a;white-space:nowrap;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.03em;">' + h + '</th>';
+                        actividadHtml += '<th style="padding:6px 8px;text-align:' + align + ';color:#222;background:#e8ebf0;font-weight:700;border:1px solid #000;border-radius:4px;white-space:nowrap;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.03em;">' + h + '</th>';
                     });
                     actividadHtml += '</tr></thead><tbody>';
 
@@ -6858,25 +6862,26 @@ async function loadInforme() {
                         const toolKeys = Object.keys(info.tools || {}).sort(function(a, b) { return info.tools[b] - info.tools[a]; });
                         let toolsCell = '';
                         if (toolKeys.length === 0) {
-                            toolsCell = '<span style="color:#555;">—</span>';
+                            toolsCell = '<span style="color:#999;">—</span>';
                         } else {
                             toolKeys.forEach(function(tk) {
                                 const m = toolMeta[tk] || { ic: '•', name: tk };
-                                toolsCell += '<span title="' + m.name + '" style="display:inline-flex;align-items:center;gap:3px;background:#141b2e;border:1px solid #2a3350;border-radius:20px;padding:1px 7px;margin:0 3px 0 0;color:#aaccff;white-space:nowrap;font-size:0.62rem;">' + m.ic + ' ' + m.name + ' <strong style="color:#fff;">' + info.tools[tk] + '</strong></span>';
+                                toolsCell += '<span title="' + m.name + '" style="display:inline-flex;align-items:center;gap:3px;background:#f2f4f8;border:1px solid #b8c0d0;border-radius:20px;padding:1px 7px;margin:0 3px 2px 0;color:#1a3a6b;white-space:nowrap;font-size:0.62rem;">' + m.ic + ' ' + m.name + ' <strong style="color:#000;">' + info.tools[tk] + '</strong></span>';
                             });
                         }
-                        const zebra = (ri % 2 === 1) ? 'background:#0c0f18;' : '';
-                        actividadHtml += '<tr style="border-bottom:1px solid #171a26;' + zebra + '">';
-                        actividadHtml += '<td style="padding:4px 8px;color:#e0e0e0;font-weight:600;white-space:nowrap;">' + u + '</td>';
-                        actividadHtml += '<td style="padding:4px 8px;text-align:center;color:#5bd4f5;font-weight:700;">' + (info.logins || 0) + '</td>';
-                        actividadHtml += '<td style="padding:4px 8px;text-align:center;color:#5bf5a3;white-space:nowrap;">' + fmtMin(info.total_minutes) + '</td>';
-                        actividadHtml += '<td style="padding:4px 8px;text-align:center;color:#9aa0b0;white-space:nowrap;">' + fmtMin(info.avg_session_minutes) + '</td>';
-                        actividadHtml += '<td style="padding:4px 8px;text-align:center;color:#9aa0b0;white-space:nowrap;">' + fmtLastSeen(info.last_seen) + '</td>';
-                        actividadHtml += '<td style="padding:4px 8px;text-align:left;white-space:nowrap;">' + toolsCell + '</td>';
+                        // Every cell is a white card with a black border.
+                        var cellBase = 'padding:5px 8px;background:#ffffff;border:1px solid #000;border-radius:4px;white-space:nowrap;';
+                        actividadHtml += '<tr>';
+                        actividadHtml += '<td style="' + cellBase + 'color:#111;font-weight:700;">' + u + '</td>';
+                        actividadHtml += '<td style="' + cellBase + 'text-align:center;color:#1668a8;font-weight:700;">' + (info.logins || 0) + '</td>';
+                        actividadHtml += '<td style="' + cellBase + 'text-align:center;color:#1a7a3a;font-weight:600;">' + fmtMin(info.total_minutes) + '</td>';
+                        actividadHtml += '<td style="' + cellBase + 'text-align:center;color:#444;">' + fmtMin(info.avg_session_minutes) + '</td>';
+                        actividadHtml += '<td style="' + cellBase + 'text-align:center;color:#444;">' + fmtLastSeen(info.last_seen) + '</td>';
+                        actividadHtml += '<td style="' + cellBase.replace('white-space:nowrap;', '') + 'text-align:left;">' + toolsCell + '</td>';
                         actividadHtml += '</tr>';
                     });
                     actividadHtml += '</tbody></table></div>';
-                    actividadHtml += '<div style="font-size:0.58rem;color:#555;margin-top:6px;">Tiempo de sesion estimado (acotado a 45 min cuando no hay cierre explicito).</div>';
+                    actividadHtml += '<div style="font-size:0.58rem;color:#9aa0b0;margin-top:6px;">Tiempo de sesion estimado (acotado a 45 min cuando no hay cierre explicito).</div>';
                 }
                 actividadHtml += '</div>';
             }
