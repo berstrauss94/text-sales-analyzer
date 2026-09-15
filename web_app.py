@@ -2719,7 +2719,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v17.1{% if username == 'Berna.Strauss' %} &middot; iconos ! alineados junto a los botones{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v17.2{% if username == 'Berna.Strauss' %} &middot; endpoint admin crear usuario{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -9197,6 +9197,46 @@ def admin_users_list():
         return jsonify({"error": "unauthorized"}), 403
     users = user_manager.list_users()
     return jsonify({"users": users})
+
+
+@app.route("/admin/crear-usuario", methods=["POST", "GET"])
+def admin_crear_usuario():
+    """
+    Create a user account from admin (persists in PostgreSQL so it survives
+    redeploys). Required: user, pass. Optional ficha fields fall back to
+    placeholders so the mandatory validations pass; the person can complete
+    their ficha later. Admin only.
+
+    Usage: /admin/crear-usuario?user=OrtelladoJ&pass=...&nombre=Jonathan&apellido=Ortellado
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+
+    def _p(name, default=""):
+        # Accept both query args and JSON body.
+        val = request.args.get(name)
+        if val is None:
+            data = request.get_json(silent=True) or {}
+            val = data.get(name)
+        return (val if val is not None else default)
+
+    username = str(_p("user", "")).strip()
+    password = str(_p("pass", "")).strip()
+    if not username or not password:
+        return jsonify({"ok": False, "error": "Faltan 'user' y/o 'pass'."}), 400
+
+    result = user_manager.register(
+        username=username,
+        password=password,
+        nombre=str(_p("nombre", "Jonathan")).strip() or "Jonathan",
+        apellido=str(_p("apellido", "Ortellado")).strip() or "Ortellado",
+        email=str(_p("email", "pendiente@mpc.local")).strip() or "pendiente@mpc.local",
+        celular=str(_p("celular", "pendiente")).strip() or "pendiente",
+        direccion=str(_p("direccion", "pendiente")).strip() or "pendiente",
+        empresa=str(_p("empresa", "Mi Primer Casa S.A.")).strip(),
+        cargo=str(_p("cargo", "Vendedor")).strip(),
+    )
+    return jsonify(result)
 
 
 @app.route("/admin/full-diag")
