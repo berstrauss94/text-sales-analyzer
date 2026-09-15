@@ -2719,7 +2719,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v16.7{% if username == 'Berna.Strauss' %} &middot; diccionario muestra frases base + buscador{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v16.8{% if username == 'Berna.Strauss' %} &middot; diccionario colapsado por filtro{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5570,20 +5570,31 @@ async function loadDictionaryModal() {
     }
 }
 
+// Which category groups are expanded. Collapsed by default so the modal opens
+// compact; a group expands on click (or automatically when a search matches it).
+window._dictOpenCats = window._dictOpenCats || {};
+function toggleDictCat(key) {
+    window._dictOpenCats[key] = !window._dictOpenCats[key];
+    var term = (document.getElementById('dictSearchInput') || {}).value || '';
+    renderDictionaryList(term);
+}
+
 // Render the dictionary list, optionally filtered by a search term. There can
-// be hundreds of phrases (base + added), so a search box keeps it manageable.
+// be hundreds of phrases (base + added), so groups start COLLAPSED and a search
+// box keeps it manageable (searching auto-expands the matching groups).
 function renderDictionaryList(term) {
     var body = document.getElementById('dictionaryModalBody');
     if (!body) return;
     var all = window._dictAllPhrases || [];
     term = (term || '').trim().toLowerCase();
-    var phrases = term ? all.filter(function(p) { return (p.phrase || '').toLowerCase().indexOf(term) >= 0; }) : all;
+    var searching = term.length > 0;
+    var phrases = searching ? all.filter(function(p) { return (p.phrase || '').toLowerCase().indexOf(term) >= 0; }) : all;
 
     // Search box (kept on top; preserves focus/value via id).
     var head = '<div style="position:sticky;top:-16px;background:#0f1117;padding-bottom:8px;margin-bottom:4px;z-index:1;">' +
         '<input id="dictSearchInput" type="text" value="' + term.replace(/"/g, '&quot;') + '" oninput="renderDictionaryList(this.value)" placeholder="Buscar palabra o frase..." ' +
         'style="width:100%;background:#12141c;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:7px 10px;font-size:0.76rem;outline:none;box-sizing:border-box;">' +
-        '<div style="font-size:0.62rem;color:#666;margin-top:4px;">' + phrases.length + ' de ' + all.length + ' frase(s)</div></div>';
+        '<div style="font-size:0.62rem;color:#666;margin-top:4px;">' + phrases.length + ' de ' + all.length + ' frase(s) &middot; toca un filtro para ver sus frases</div></div>';
 
     var byCat = {};
     phrases.forEach(function(p) { (byCat[p.category] = byCat[p.category] || []).push(p); });
@@ -5591,22 +5602,30 @@ function renderDictionaryList(term) {
     DICT_CATEGORIES.forEach(function(c) {
         var items = byCat[c.key] || [];
         if (items.length === 0) return;
-        html += '<div style="margin-bottom:14px;">';
-        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">' +
+        // A group is open when the user expanded it OR when searching (to reveal hits).
+        var open = searching || !!window._dictOpenCats[c.key];
+        var arrow = open ? '&#9660;' : '&#9654;';   // ▼ / ▶
+        html += '<div style="margin-bottom:10px;">';
+        html += '<div class="dict-cat-header" data-dictcat="' + c.key + '" style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:#111828;border:1px solid #1e2130;border-radius:6px;cursor:pointer;user-select:none;">' +
+            '<span style="font-size:0.6rem;color:#888;width:10px;">' + arrow + '</span>' +
             '<span style="width:10px;height:10px;border-radius:2px;background:' + c.color + ';display:inline-block;"></span>' +
             '<span style="font-size:0.74rem;font-weight:700;color:#e0e0e0;">' + c.label + '</span>' +
-            '<span style="font-size:0.62rem;color:#666;">(' + items.length + ')</span></div>';
-        items.forEach(function(p) {
-            var optsHtml = DICT_CATEGORIES.map(function(cc) {
-                return '<option value="' + cc.key + '"' + (cc.key === p.category ? ' selected' : '') + '>' + cc.label + '</option>';
-            }).join('');
-            var origin = (p.added_by && p.added_by !== 'sistema') ? ('<span style="font-size:0.58rem;color:#5bd4f5;margin-left:6px;">+ ' + p.added_by + '</span>') : '';
-            html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#0a0c14;border:1px solid #1e2130;border-radius:6px;margin-bottom:4px;">' +
-                '<span style="flex:1;font-size:0.74rem;color:#ccc;overflow-wrap:anywhere;">"' + (p.phrase || '').replace(/</g, '&lt;') + '"' + origin + '</span>' +
-                '<select data-id="' + p.id + '" onchange="moveDictionaryPhrase(' + p.id + ', this.value)" title="Mover a otro filtro" style="background:#12141c;color:#ccc;border:1px solid #2a2d3e;border-radius:5px;padding:3px 6px;font-size:0.66rem;cursor:pointer;">' + optsHtml + '</select>' +
-                '<button type="button" onclick="deleteDictionaryPhrase(' + p.id + ')" title="Eliminar" style="background:transparent;border:1px solid #f55b5b;color:#f55b5b;border-radius:5px;padding:3px 7px;font-size:0.7rem;cursor:pointer;">&#128465;</button>' +
-                '</div>';
-        });
+            '<span style="font-size:0.62rem;color:#666;margin-left:auto;">' + items.length + ' frase(s)</span></div>';
+        if (open) {
+            html += '<div style="padding:6px 2px 0 2px;">';
+            items.forEach(function(p) {
+                var optsHtml = DICT_CATEGORIES.map(function(cc) {
+                    return '<option value="' + cc.key + '"' + (cc.key === p.category ? ' selected' : '') + '>' + cc.label + '</option>';
+                }).join('');
+                var origin = (p.added_by && p.added_by !== 'sistema') ? ('<span style="font-size:0.58rem;color:#5bd4f5;margin-left:6px;">+ ' + p.added_by + '</span>') : '';
+                html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#0a0c14;border:1px solid #1e2130;border-radius:6px;margin-bottom:4px;">' +
+                    '<span style="flex:1;font-size:0.74rem;color:#ccc;overflow-wrap:anywhere;">"' + (p.phrase || '').replace(/</g, '&lt;') + '"' + origin + '</span>' +
+                    '<select data-id="' + p.id + '" onchange="moveDictionaryPhrase(' + p.id + ', this.value)" title="Mover a otro filtro" style="background:#12141c;color:#ccc;border:1px solid #2a2d3e;border-radius:5px;padding:3px 6px;font-size:0.66rem;cursor:pointer;">' + optsHtml + '</select>' +
+                    '<button type="button" onclick="deleteDictionaryPhrase(' + p.id + ')" title="Eliminar" style="background:transparent;border:1px solid #f55b5b;color:#f55b5b;border-radius:5px;padding:3px 7px;font-size:0.7rem;cursor:pointer;">&#128465;</button>' +
+                    '</div>';
+            });
+            html += '</div>';
+        }
         html += '</div>';
     });
     if (!html) html = '<div style="color:#888;font-size:0.78rem;">Sin resultados para "' + term.replace(/</g, '&lt;') + '".</div>';
@@ -5636,6 +5655,16 @@ async function moveDictionaryPhrase(id, newCategory) {
         loadDictionaryModal();
     } catch (e) {}
 }
+
+// Delegated click for the dictionary category headers (expand/collapse). Uses a
+// data attribute instead of inline onclick to avoid escaped-quote issues.
+document.addEventListener('click', function(e) {
+    var hdr = _closest(e, '.dict-cat-header');
+    if (hdr) {
+        var key = hdr.getAttribute('data-dictcat');
+        if (key) toggleDictCat(key);
+    }
+});
 
 // Delegated click handler for pie charts (avoids inline onclick quote issues)
 document.addEventListener('click', function(e) {
