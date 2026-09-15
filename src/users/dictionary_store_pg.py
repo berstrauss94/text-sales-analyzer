@@ -22,6 +22,7 @@ wrapped in try/except so a failure never breaks the caller.
 from __future__ import annotations
 
 import logging
+import time as _time
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,25 @@ VALID_CATEGORIES = {
     "escasez_comercial", "pedidos_referidos", "objeciones",
     "indicios_prospeccion",
 }
+
+# ── Performance ────────────────────────────────────────────────────────────
+# The dictionary is read on EVERY text analysis. Hitting PostgreSQL each time
+# (a SELECT of ~hundreds of phrases) made analysis slow. We cache the grouped
+# phrases in memory with a short TTL and invalidate on any write, so analysis
+# reads from RAM in the common case. Per-process cache (safe across gunicorn
+# workers — each has its own; the TTL bounds staleness anyway).
+_CACHE_TTL_SECONDS = 60.0
+_cache_by_category: dict | None = None
+_cache_ts: float = 0.0
+# _ensure_table runs a DDL round-trip; only needed once per process.
+_table_ready = False
+
+
+def _invalidate_cache() -> None:
+    """Drop the in-memory cache so the next read reflects fresh writes."""
+    global _cache_by_category, _cache_ts
+    _cache_by_category = None
+    _cache_ts = 0.0
 
 
 def _conn():
@@ -58,7 +78,14 @@ def is_available() -> bool:
 
 
 def _ensure_table(conn) -> None:
-    """Create the dictionary_overrides table + index if they don't exist."""
+    """Create the dictionary_overrides table + index if they don't exist.
+
+    Runs the DDL only ONCE per process (guarded by _table_ready) to avoid a
+    round-trip to PostgreSQL on every call.
+    """
+    global _table_ready
+    if _table_ready:
+        return
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -77,6 +104,7 @@ def _ensure_table(conn) -> None:
             "ON dictionary_overrides (lower(phrase), category)"
         )
     conn.commit()
+    _table_ready = True
 
 
 def add_phrase(phrase: str, category: str, added_by: str = "") -> bool:
@@ -100,6 +128,7 @@ def add_phrase(phrase: str, category: str, added_by: str = "") -> bool:
                 (phrase, category, added_by or ""),
             )
         conn.commit()
+        _invalidate_cache()
         _release(conn)
         return True
     except Exception as exc:
@@ -152,12 +181,21 @@ def list_phrases() -> list[dict]:
 
 def phrases_by_category() -> dict:
     """
-    Return { category: [phrase, ...], ... } for the analysis engine to merge
-    into the base dictionary. Only the phrase strings, grouped by category.
+    Return { category: [phrase, ...], ... } for the analysis engine.
+
+    CACHED in memory with a short TTL: this is read on every text analysis, so
+    hitting PostgreSQL each time was a real slowdown. The cache is invalidated
+    on any write (add/delete/move/seed) and expires after _CACHE_TTL_SECONDS.
     """
+    global _cache_by_category, _cache_ts
+    now = _time.time()
+    if _cache_by_category is not None and (now - _cache_ts) < _CACHE_TTL_SECONDS:
+        return _cache_by_category
     grouped: dict = {}
     for row in list_phrases():
         grouped.setdefault(row["category"], []).append(row["phrase"])
+    _cache_by_category = grouped
+    _cache_ts = now
     return grouped
 
 
@@ -223,6 +261,7 @@ def seed_from_base(base_by_category: dict) -> int:
                     if cur.rowcount > 0:
                         inserted += 1
         conn.commit()
+        _invalidate_cache()
         _release(conn)
         logger.info(f"dictionary_overrides seeded with {inserted} base phrases")
         return inserted
@@ -249,6 +288,7 @@ def delete_phrase(override_id: int) -> bool:
             cur.execute("DELETE FROM dictionary_overrides WHERE id = %s", (int(override_id),))
             removed = cur.rowcount > 0
         conn.commit()
+        _invalidate_cache()
         _release(conn)
         return removed
     except Exception as exc:
@@ -277,6 +317,7 @@ def move_phrase(override_id: int, new_category: str) -> bool:
             )
             moved = cur.rowcount > 0
         conn.commit()
+        _invalidate_cache()
         _release(conn)
         return moved
     except Exception as exc:

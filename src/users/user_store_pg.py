@@ -24,6 +24,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# _ensure_table runs a DDL round-trip; only needed once per process.
+_table_ready = False
+
 
 def _conn():
     """Borrow a pooled connection (or None if PG is unavailable)."""
@@ -51,7 +54,10 @@ def is_available() -> bool:
 
 
 def _ensure_table(conn) -> None:
-    """Create the app_users table if it does not exist."""
+    """Create the app_users table if it does not exist (once per process)."""
+    global _table_ready
+    if _table_ready:
+        return
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -64,6 +70,7 @@ def _ensure_table(conn) -> None:
             """
         )
     conn.commit()
+    _table_ready = True
 
 
 def upsert_user(username: str, password_hash: str, ficha: str) -> bool:
