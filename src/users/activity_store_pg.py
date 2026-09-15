@@ -28,6 +28,9 @@ from __future__ import annotations
 
 import logging
 
+# _ensure_table runs a DDL round-trip; only needed once per process.
+_table_ready = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -57,7 +60,14 @@ def is_available() -> bool:
 
 
 def _ensure_table(conn) -> None:
-    """Create the activity_log table + index if they do not exist."""
+    """Create the activity_log table + index if they do not exist.
+
+    Runs the DDL only ONCE per process (guarded by _table_ready) to avoid a
+    round-trip to PostgreSQL on every logged event.
+    """
+    global _table_ready
+    if _table_ready:
+        return
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -77,6 +87,7 @@ def _ensure_table(conn) -> None:
             "ON activity_log (username, ts DESC)"
         )
     conn.commit()
+    _table_ready = True
 
 
 def log_event(username: str, event_type: str, tool: str = "",
