@@ -2719,7 +2719,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v17.6{% if username == 'Berna.Strauss' %} &middot; seguimiento: pantalla oscura original, impresion blanca{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v17.7{% if username == 'Berna.Strauss' %} &middot; impresion seguimiento: tabla ajustada a la hoja{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -7542,6 +7542,13 @@ function printInforme() {
     // Tool chips inside the box: white with a thin dark border on paper.
     printWindow.document.write('.activity-block td span { background:#ffffff !important; border-color:#666 !important; color:#111 !important; }');
     printWindow.document.write('.activity-block td span strong { color:#000 !important; }');
+    // Fit the whole table within the A4 page: no horizontal scroll, and let the
+    // wide "Herramientas" column wrap its chips instead of being cut off at the
+    // right edge.
+    printWindow.document.write('.activity-block > div { overflow: visible !important; }');
+    printWindow.document.write('.activity-block table { width:100% !important; table-layout: fixed !important; font-size: 8pt !important; }');
+    printWindow.document.write('.activity-block th, .activity-block td { white-space: normal !important; overflow-wrap: anywhere !important; word-break: break-word !important; }');
+    printWindow.document.write('.activity-block td span { white-space: normal !important; display: inline-flex !important; margin: 1px 2px 1px 0 !important; }');
     printWindow.document.write('</style></head><body>');
     printWindow.document.write('<div class="header"><h1>Mi Primer Casa S.A.</h1><span class="date">' + dateStr + '</span></div>');
     printWindow.document.write('<div class="auditor">Auditor: Bernardo Strauss.</div>');
