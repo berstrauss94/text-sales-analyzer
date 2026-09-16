@@ -203,7 +203,16 @@ def get_activity_summary(days: int = 90, start=None, end=None,
         return users.setdefault(u, {
             "logins": 0, "last_seen": None, "total_minutes": 0.0,
             "avg_session_minutes": 0.0, "tools": {}, "events": 0,
+            # Per-day detail for the hover popovers:
+            "logins_by_day": {},    # "DD/MM/YYYY" -> number of logins that day
+            "minutes_by_day": {},   # "DD/MM/YYYY" -> minutes used that day
         })
+
+    def _day_key(ts):
+        try:
+            return ts.strftime("%d/%m/%Y")
+        except Exception:
+            return str(ts)[:10]
 
     # Group events by user (rows already ordered by username, ts ASC).
     from itertools import groupby
@@ -213,15 +222,18 @@ def get_activity_summary(days: int = 90, start=None, end=None,
         b["events"] = len(evts)
         b["last_seen"] = evts[-1][3].isoformat() if hasattr(evts[-1][3], "isoformat") else str(evts[-1][3])
 
-        # Tool tally.
+        # Tool tally + logins-per-day tally.
         for (_u, etype, tool, _ts) in evts:
             if etype == "login":
                 b["logins"] += 1
+                dk = _day_key(_ts)
+                b["logins_by_day"][dk] = b["logins_by_day"].get(dk, 0) + 1
             elif etype == "tool" and tool:
                 b["tools"][tool] = b["tools"].get(tool, 0) + 1
 
         # Derive session durations: each login extends until the last event
-        # before the next login (or the last event overall), capped.
+        # before the next login (or the last event overall), capped. Each
+        # session's minutes are also attributed to the DAY of its login.
         login_idx = [i for i, e in enumerate(evts) if e[1] == "login"]
         durations = []
         for k, start_i in enumerate(login_idx):
@@ -238,6 +250,8 @@ def get_activity_summary(days: int = 90, start=None, end=None,
             if mins > SESSION_CAP_MIN:
                 mins = SESSION_CAP_MIN
             durations.append(mins)
+            dk = _day_key(start_ts)
+            b["minutes_by_day"][dk] = round(b["minutes_by_day"].get(dk, 0.0) + mins, 1)
         if durations:
             b["total_minutes"] = round(sum(durations), 1)
             b["avg_session_minutes"] = round(sum(durations) / len(durations), 1)
