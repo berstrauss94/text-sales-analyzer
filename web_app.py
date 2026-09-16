@@ -2750,7 +2750,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v17.9{% if username == 'Berna.Strauss' %} &middot; popover de detalle flotante (sin recorte){% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v18.0{% if username == 'Berna.Strauss' %} &middot; excluir todos los admins del seguimiento{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -6949,8 +6949,12 @@ async function loadInforme() {
                     });
                     actividadHtml += '</tr></thead><tbody>';
 
-                    // Admin accounts are excluded from this metrics table.
-                    var _actAdmins = { 'admin': 1, 'administrator': 1, 'Vanesa.Admin': 1, 'Vanesa_Admin': 1 };
+                    // Admin accounts are excluded from this metrics table (must
+                    // match _ADMIN_USERS on the backend, plus grafia variants).
+                    var _actAdmins = { 'admin': 1, 'administrator': 1,
+                        'Vanesa.Admin': 1, 'Vanesa_Admin': 1,
+                        'Berna.Strauss': 1, 'Berna_Strauss': 1,
+                        'FedericoCeballos': 1, 'MartinianoSosa': 1 };
                     // Build the per-day detail popover HTML from a {day: value} map.
                     function buildDayPopover(title, map, fmt) {
                         var days = Object.keys(map || {});
