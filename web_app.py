@@ -1422,15 +1422,14 @@ HTML = """
         .card-title { overflow: visible; }
 
         /* Popover with per-day detail for activity metrics (Ingresos / Tiempo).
-           Shown on hover or tap of a cell marked with .act-pop-cell. */
-        .act-pop-cell { position: relative; cursor: help; }
-        .act-pop {
+           Shown on hover or tap of a cell marked with .act-pop-cell. The popover
+           itself is a SINGLE floating element (#actPopFloat) positioned with
+           position:fixed by JS, so it is never clipped by the table's overflow. */
+        .act-pop-cell { cursor: help; }
+        .act-pop { display: none; }   /* the per-cell data holder is hidden; JS reads it */
+        #actPopFloat {
             display: none;
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            margin-top: 4px;
+            position: fixed;
             background: #1a1d27;
             border: 1px solid #5bd4f5;
             border-radius: 8px;
@@ -1440,16 +1439,15 @@ HTML = """
             font-weight: 400;
             line-height: 1.6;
             min-width: 150px;
-            max-width: 240px;
-            max-height: 180px;
+            max-width: 260px;
+            max-height: 200px;
             overflow-y: auto;
-            z-index: 9999;
+            z-index: 100000;
             box-shadow: 0 8px 24px rgba(0,0,0,0.6);
             text-align: left;
             white-space: normal;
+            pointer-events: none;
         }
-        .act-pop-cell:hover .act-pop,
-        .act-pop-cell.act-open .act-pop { display: block; }
         .act-pop-title { color: #5bd4f5; font-weight: 700; margin-bottom: 4px; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.03em; }
         .act-pop-row { display: flex; justify-content: space-between; gap: 12px; padding: 1px 0; }
         .act-pop-row span:last-child { color: #fff; font-weight: 600; }
@@ -2752,7 +2750,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v17.8{% if username == 'Berna.Strauss' %} &middot; detalle por dia en Ingresos y Tiempo{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v17.9{% if username == 'Berna.Strauss' %} &middot; popover de detalle flotante (sin recorte){% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5703,16 +5701,69 @@ document.addEventListener('click', function(e) {
         var key = hdr.getAttribute('data-dictcat');
         if (key) toggleDictCat(key);
     }
-    // Activity metric popovers: tap to toggle (hover works via CSS on desktop).
+    // Activity metric popovers: tap to toggle the floating popover.
     var cell = _closest(e, '.act-pop-cell');
     if (cell) {
-        var wasOpen = cell.classList.contains('act-open');
-        document.querySelectorAll('.act-pop-cell.act-open').forEach(function(c) { c.classList.remove('act-open'); });
-        if (!wasOpen) cell.classList.add('act-open');
-    } else {
-        document.querySelectorAll('.act-pop-cell.act-open').forEach(function(c) { c.classList.remove('act-open'); });
+        if (window._actPopCell === cell) { hideActPop(); }
+        else { showActPop(cell); }
+    } else if (!_closest(e, '#actPopFloat')) {
+        hideActPop();
     }
 });
+
+// Floating per-day popover for activity metrics. Positioned with position:fixed
+// so the table's overflow never clips it. One shared element, reused per cell.
+function _actPopEl() {
+    var el = document.getElementById('actPopFloat');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'actPopFloat';
+        document.body.appendChild(el);
+    }
+    return el;
+}
+function showActPop(cell) {
+    var holder = cell.querySelector('.act-pop');
+    if (!holder || !holder.innerHTML.trim()) return;
+    var el = _actPopEl();
+    el.innerHTML = holder.innerHTML;
+    el.style.display = 'block';
+    window._actPopCell = cell;
+    // Position centered below the cell, clamped to the viewport.
+    var r = cell.getBoundingClientRect();
+    var pw = Math.min(el.offsetWidth || 200, 260);
+    var left = r.left + r.width / 2 - pw / 2;
+    if (left < 6) left = 6;
+    if (left + pw > window.innerWidth - 6) left = window.innerWidth - 6 - pw;
+    var top = r.bottom + 4;
+    // If it would overflow the bottom, show it above the cell instead.
+    if (top + (el.offsetHeight || 120) > window.innerHeight - 6) {
+        top = r.top - (el.offsetHeight || 120) - 4;
+        if (top < 6) top = 6;
+    }
+    el.style.left = left + 'px';
+    el.style.top = top + 'px';
+}
+function hideActPop() {
+    var el = document.getElementById('actPopFloat');
+    if (el) el.style.display = 'none';
+    window._actPopCell = null;
+}
+// Desktop hover: show on mouseover of a cell, hide on mouseout.
+document.addEventListener('mouseover', function(e) {
+    var cell = _closest(e, '.act-pop-cell');
+    if (cell && window._actPopCell !== cell) showActPop(cell);
+});
+document.addEventListener('mouseout', function(e) {
+    var cell = _closest(e, '.act-pop-cell');
+    if (cell) {
+        // Hide only when leaving the cell entirely (not moving within it).
+        var to = e.relatedTarget;
+        if (!cell.contains(to)) hideActPop();
+    }
+});
+// Reposition/hide on scroll so the fixed popover doesn't detach from its cell.
+window.addEventListener('scroll', function() { if (window._actPopCell) hideActPop(); }, true);
 
 // Delegated click handler for pie charts (avoids inline onclick quote issues)
 document.addEventListener('click', function(e) {
