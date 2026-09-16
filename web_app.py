@@ -1421,6 +1421,39 @@ HTML = """
         .card:hover, .commercial-section:hover { z-index: 50; position: relative; }
         .card-title { overflow: visible; }
 
+        /* Popover with per-day detail for activity metrics (Ingresos / Tiempo).
+           Shown on hover or tap of a cell marked with .act-pop-cell. */
+        .act-pop-cell { position: relative; cursor: help; }
+        .act-pop {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-top: 4px;
+            background: #1a1d27;
+            border: 1px solid #5bd4f5;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 0.66rem;
+            color: #ccc;
+            font-weight: 400;
+            line-height: 1.6;
+            min-width: 150px;
+            max-width: 240px;
+            max-height: 180px;
+            overflow-y: auto;
+            z-index: 9999;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            text-align: left;
+            white-space: normal;
+        }
+        .act-pop-cell:hover .act-pop,
+        .act-pop-cell.act-open .act-pop { display: block; }
+        .act-pop-title { color: #5bd4f5; font-weight: 700; margin-bottom: 4px; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.03em; }
+        .act-pop-row { display: flex; justify-content: space-between; gap: 12px; padding: 1px 0; }
+        .act-pop-row span:last-child { color: #fff; font-weight: 600; }
+
         /* Source fragment toggle */
         .source-toggle {
             display: flex;
@@ -2719,7 +2752,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v17.7{% if username == 'Berna.Strauss' %} &middot; impresion seguimiento: tabla ajustada a la hoja{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v17.8{% if username == 'Berna.Strauss' %} &middot; detalle por dia en Ingresos y Tiempo{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5670,6 +5703,15 @@ document.addEventListener('click', function(e) {
         var key = hdr.getAttribute('data-dictcat');
         if (key) toggleDictCat(key);
     }
+    // Activity metric popovers: tap to toggle (hover works via CSS on desktop).
+    var cell = _closest(e, '.act-pop-cell');
+    if (cell) {
+        var wasOpen = cell.classList.contains('act-open');
+        document.querySelectorAll('.act-pop-cell.act-open').forEach(function(c) { c.classList.remove('act-open'); });
+        if (!wasOpen) cell.classList.add('act-open');
+    } else {
+        document.querySelectorAll('.act-pop-cell.act-open').forEach(function(c) { c.classList.remove('act-open'); });
+    }
 });
 
 // Delegated click handler for pie charts (avoids inline onclick quote issues)
@@ -6856,7 +6898,26 @@ async function loadInforme() {
                     });
                     actividadHtml += '</tr></thead><tbody>';
 
+                    // Admin accounts are excluded from this metrics table.
+                    var _actAdmins = { 'admin': 1, 'administrator': 1, 'Vanesa.Admin': 1, 'Vanesa_Admin': 1 };
+                    // Build the per-day detail popover HTML from a {day: value} map.
+                    function buildDayPopover(title, map, fmt) {
+                        var days = Object.keys(map || {});
+                        if (days.length === 0) return '';
+                        // Sort by date (DD/MM/YYYY) descending — most recent first.
+                        days.sort(function(a, b) {
+                            var pa = a.split('/'), pb = b.split('/');
+                            var da = new Date(pa[2], pa[1] - 1, pa[0]), db = new Date(pb[2], pb[1] - 1, pb[0]);
+                            return db - da;
+                        });
+                        var rows = days.map(function(d) {
+                            return '<div class="act-pop-row"><span>' + d + '</span><span>' + fmt(map[d]) + '</span></div>';
+                        }).join('');
+                        return '<div class="act-pop"><div class="act-pop-title">' + title + '</div>' + rows + '</div>';
+                    }
+
                     actUsers.forEach(function(u, ri) {
+                        if (_actAdmins[u]) return;  // exclude admins from the metrics grid
                         const info = au[u] || {};
                         // Compact tool chips (icon + count), ordered by count desc.
                         const toolKeys = Object.keys(info.tools || {}).sort(function(a, b) { return info.tools[b] - info.tools[a]; });
@@ -6869,11 +6930,17 @@ async function loadInforme() {
                                 toolsCell += '<span title="' + m.name + '" style="display:inline-flex;align-items:center;gap:3px;background:#141b2e;border:1px solid #2a3350;border-radius:20px;padding:1px 7px;margin:0 3px 0 0;color:#aaccff;white-space:nowrap;font-size:0.62rem;">' + m.ic + ' ' + m.name + ' <strong style="color:#fff;">' + info.tools[tk] + '</strong></span>';
                             });
                         }
+                        // Per-day popovers: Ingresos (logins/day) and Tiempo (minutes/day,
+                        // empty days already excluded because they have no events).
+                        var popIngresos = buildDayPopover('Ingresos por dia', info.logins_by_day, function(v) { return 'x' + v; });
+                        var popTiempo = buildDayPopover('Tiempo por dia', info.minutes_by_day, function(v) { return fmtMin(v); });
                         const zebra = (ri % 2 === 1) ? 'background:#0c0f18;' : '';
                         actividadHtml += '<tr style="border-bottom:1px solid #171a26;' + zebra + '">';
                         actividadHtml += '<td style="padding:4px 8px;color:#e0e0e0;font-weight:600;white-space:nowrap;">' + u + '</td>';
-                        actividadHtml += '<td style="padding:4px 8px;text-align:center;color:#5bd4f5;font-weight:700;">' + (info.logins || 0) + '</td>';
-                        actividadHtml += '<td style="padding:4px 8px;text-align:center;color:#5bf5a3;white-space:nowrap;">' + fmtMin(info.total_minutes) + '</td>';
+                        // Ingresos cell (with day-by-day popover).
+                        actividadHtml += '<td class="act-pop-cell" style="padding:4px 8px;text-align:center;color:#5bd4f5;font-weight:700;">' + (info.logins || 0) + popIngresos + '</td>';
+                        // Tiempo cell (with day-by-day popover).
+                        actividadHtml += '<td class="act-pop-cell" style="padding:4px 8px;text-align:center;color:#5bf5a3;white-space:nowrap;">' + fmtMin(info.total_minutes) + popTiempo + '</td>';
                         actividadHtml += '<td style="padding:4px 8px;text-align:center;color:#9aa0b0;white-space:nowrap;">' + fmtMin(info.avg_session_minutes) + '</td>';
                         actividadHtml += '<td style="padding:4px 8px;text-align:center;color:#9aa0b0;white-space:nowrap;">' + fmtLastSeen(info.last_seen) + '</td>';
                         actividadHtml += '<td style="padding:4px 8px;text-align:left;white-space:nowrap;">' + toolsCell + '</td>';
