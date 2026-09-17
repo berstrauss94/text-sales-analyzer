@@ -576,10 +576,20 @@ _STOPWORDS = {
 # ---------------------------------------------------------------------------
 
 def _normalize(text: str) -> str:
-    """Lowercase and remove accents for robust matching."""
+    """
+    Lowercase and remove accents for robust matching, PRESERVING the letter ñ.
+
+    NFKD descompone la ñ en 'n' + tilde combinante, y al quitar los combinantes
+    la ñ se perdia (se volvia 'n'). Eso rompia la deteccion de palabras con ñ
+    (senor->senor ok, pero "ano" vs "año", "pequeño", "mañana"...). Protegemos
+    la ñ/Ñ con un marcador antes de descomponer y la restauramos despues.
+    """
     text = text.lower()
+    # Marcador que NFKD no altera y que no aparece en texto normal.
+    text = text.replace("ñ", "\x00")
     nfkd = unicodedata.normalize("NFKD", text)
-    return "".join(c for c in nfkd if not unicodedata.combining(c))
+    stripped = "".join(c for c in nfkd if not unicodedata.combining(c))
+    return stripped.replace("\x00", "ñ")
 
 
 def _count_keyword(text: str, keyword: str) -> int:
@@ -617,9 +627,7 @@ def _count_as_response(text: str, keyword: str) -> int:
     This prevents counting "no se puede" as "no se" (objection),
     or "claro que no" as "claro" (affirmative).
     """
-    normalized = text.lower()
-    nfkd = unicodedata.normalize("NFKD", normalized)
-    normalized = "".join(c for c in nfkd if not unicodedata.combining(c))
+    normalized = _normalize(text)
 
     escaped = re.escape(keyword)
 
@@ -655,10 +663,7 @@ def _count_affirmative_si(text: str) -> int:
     - "si vos..." / "si usted..." / "si el..." / "si la..."
     - Any "si" followed by a verb or subject (indicates condition)
     """
-    normalized = text.lower()
-    # Remove accents for matching
-    nfkd = unicodedata.normalize("NFKD", normalized)
-    normalized = "".join(c for c in nfkd if not unicodedata.combining(c))
+    normalized = _normalize(text)  # minusculas + sin acentos, preservando ñ
 
     # Conditional words that follow "si" and indicate it's NOT affirmative
     conditional_followers = (
