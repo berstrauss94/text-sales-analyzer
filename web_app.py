@@ -2807,7 +2807,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v18.5{% if username == 'Berna.Strauss' %} &middot; tutorial guiado{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v18.6{% if username == 'Berna.Strauss' %} &middot; tutorial guiado{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v18.3)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -5687,6 +5687,22 @@ function endTour() {
     if (ov) ov.classList.remove('active');
 }
 
+// Salidas de emergencia: tecla Escape en cualquier momento.
+document.addEventListener('keydown', function(e) {
+    var ov = document.getElementById('tourOverlay');
+    if (ov && ov.classList.contains('active') && (e.key === 'Escape' || e.keyCode === 27)) {
+        endTour();
+    }
+});
+// Clic en el fondo oscuro del overlay (fuera de la tarjeta) cierra el tour, para
+// que nunca quedes "atrapado" si la tarjeta quedara mal ubicada.
+document.addEventListener('click', function(e) {
+    var ov = document.getElementById('tourOverlay');
+    if (!ov || !ov.classList.contains('active')) return;
+    var card = document.getElementById('tourCard');
+    if (e.target === ov && !(card && card.contains(e.target))) endTour();
+});
+
 // Reposicionar el paso actual si cambia el tamano de la ventana durante el tour.
 window.addEventListener('resize', function() {
     var ov = document.getElementById('tourOverlay');
@@ -5714,11 +5730,21 @@ function tourPrev() {
 function _positionTour(el, step) {
     var r = el.getBoundingClientRect();
     var pad = 6;
+    var vh = window.innerHeight;
+    // Si el elemento es MAS ALTO que la pantalla (p.ej. la seccion del
+    // simulador), resaltar solo su franja superior visible, no todo — asi el
+    // marco no cubre la pantalla y siempre queda lugar para la tarjeta.
+    var spotTop = r.top;
+    var spotH = r.height;
+    if (spotH > vh - 160) {
+        spotTop = Math.max(8, r.top);
+        spotH = Math.min(120, Math.max(60, (vh - 160)));
+    }
     var spot = document.getElementById('tourSpotlight');
-    spot.style.top = (r.top - pad) + 'px';
+    spot.style.top = (spotTop - pad) + 'px';
     spot.style.left = (r.left - pad) + 'px';
     spot.style.width = (r.width + pad * 2) + 'px';
-    spot.style.height = (r.height + pad * 2) + 'px';
+    spot.style.height = (spotH + pad * 2) + 'px';
 
     document.getElementById('tourStepLabel').textContent = 'Paso ' + (_tourIdx + 1) + ' de ' + _tourActive.length;
     document.getElementById('tourTitle').textContent = step.title;
@@ -5726,11 +5752,15 @@ function _positionTour(el, step) {
     document.getElementById('tourPrevBtn').style.visibility = (_tourIdx === 0) ? 'hidden' : 'visible';
     document.getElementById('tourNextBtn').textContent = (_tourIdx === _tourActive.length - 1) ? 'Finalizar' : 'Siguiente';
 
-    // Tarjeta: debajo del elemento si hay espacio, si no arriba.
+    // Tarjeta: debajo de la zona resaltada si hay espacio, si no arriba; y SIEMPRE
+    // dentro del viewport (clamp) para que los botones nunca queden fuera de vista.
     var card = document.getElementById('tourCard');
-    var cardH = card.offsetHeight || 150, cardW = card.offsetWidth || 320;
-    var top = r.bottom + 12;
-    if (top + cardH > window.innerHeight - 10) top = Math.max(10, r.top - cardH - 12);
+    var cardH = card.offsetHeight || 160, cardW = card.offsetWidth || 320;
+    var spotBottom = spotTop + spotH;
+    var top = spotBottom + 12;
+    if (top + cardH > vh - 10) top = spotTop - cardH - 12;   // no entra abajo -> arriba
+    if (top < 10) top = 10;                                   // ni arriba -> clamp al tope
+    if (top + cardH > vh - 10) top = Math.max(10, vh - 10 - cardH);
     var left = r.left + r.width / 2 - cardW / 2;
     if (left < 10) left = 10;
     if (left + cardW > window.innerWidth - 10) left = window.innerWidth - 10 - cardW;
@@ -5745,9 +5775,14 @@ function _renderTourStep() {
     // Traer el elemento a la vista. El scroll suave puede tardar, y medir antes
     // de que termine dejaba el marco DESVIADO. Solucion: seguir reposicionando
     // hasta que la posicion del elemento se estabilice (scroll asentado).
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Secciones muy altas: alinear su parte SUPERIOR (start); el resto, centrado.
+    var _tall = el.getBoundingClientRect().height > (window.innerHeight - 160);
+    el.scrollIntoView({ behavior: 'smooth', block: _tall ? 'start' : 'center' });
     var lastTop = null, stable = 0, tries = 0;
     (function settle() {
+        // Salir del bucle si el tour se cerro mientras tanto.
+        var ov = document.getElementById('tourOverlay');
+        if (!ov || !ov.classList.contains('active')) return;
         var r = el.getBoundingClientRect();
         _positionTour(el, step);            // reposiciona en cada frame
         if (lastTop !== null && Math.abs(r.top - lastTop) < 0.5) {
@@ -5757,8 +5792,8 @@ function _renderTourStep() {
         }
         lastTop = r.top;
         tries++;
-        // Cuando llevo ~3 frames sin moverse (o pasaron ~1.2s), ya esta quieto.
-        if (stable < 3 && tries < 40) {
+        // Cuando llevo ~3 frames sin moverse (o pasaron ~0.5s), ya esta quieto.
+        if (stable < 3 && tries < 30) {
             requestAnimationFrame(settle);
         }
     })();
