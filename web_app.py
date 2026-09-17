@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.2{% if username == 'Berna.Strauss' %} &middot; tutorial completo + autoscroll{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.3{% if username == 'Berna.Strauss' %} &middot; tutorial: informe y panel cargados{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v18.3)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -5699,9 +5699,16 @@ function _isVisible(el) {
 }
 
 function startTour() {
-    // Filtrar a los pasos cuyo elemento existe y es visible (p.ej. Guardar solo admin).
-    _tourActive = TOUR_STEPS.filter(function(s) { return _isVisible(document.querySelector(s.sel)); });
-    if (_tourActive.length === 0) return;
+    // Asegurar que los paneles que cargan por fetch (informe y panel admin)
+    // esten poblados ANTES del recorrido, para que sus elementos (grafico,
+    // tortas, seguimiento, torta de indicadores) existan y no se salteen.
+    try { if (typeof loadInforme === 'function') loadInforme(); } catch (e) {}
+    try { if (typeof loadAdminStats === 'function') loadAdminStats(); } catch (e) {}
+
+    // No filtramos destructivamente al inicio: la visibilidad se evalua paso a
+    // paso en _renderTourStep (asi los paneles que terminan de cargar durante el
+    // tour tambien se muestran). Aca solo excluimos lo que claramente no existe.
+    _tourActive = TOUR_STEPS.slice();
     _tourIdx = 0;
     var ov = document.getElementById('tourOverlay');
     // CRITICO: position:fixed se rompe si un ancestro tiene transform/filter
@@ -5710,7 +5717,18 @@ function startTour() {
     // al viewport de verdad.
     if (ov.parentElement !== document.body) document.body.appendChild(ov);
     ov.classList.add('active');
-    _renderTourStep();
+    // Pequeña espera para que el fetch del informe/panel pinte su contenido,
+    // y RECIEN AHI filtramos a los pasos visibles (asi el contador "de N" es
+    // exacto y aparecen el grafico, las tortas, el seguimiento y el informe).
+    setTimeout(function() {
+        _tourActive = TOUR_STEPS.filter(function(s) {
+            return _isVisible(document.querySelector(s.sel));
+        });
+        if (_tourActive.length === 0) { endTour(); return; }
+        _tourIdx = 0;
+        _tourDir = 1;
+        _renderTourStep();
+    }, 450);
 }
 
 function endTour() {
@@ -5744,14 +5762,17 @@ window.addEventListener('resize', function() {
     }
 });
 
+var _tourDir = 1;   // direccion actual: +1 avanzar, -1 retroceder
 function tourNext() {
     if (_tourIdx >= _tourActive.length - 1) { endTour(); return; }
+    _tourDir = 1;
     _tourIdx++;
     _renderTourStep();
     try { UISound.tick(); } catch (e) {}
 }
 function tourPrev() {
     if (_tourIdx <= 0) return;
+    _tourDir = -1;
     _tourIdx--;
     _renderTourStep();
     try { UISound.tick(); } catch (e) {}
@@ -5805,7 +5826,15 @@ function _positionTour(el, step) {
 function _renderTourStep() {
     var step = _tourActive[_tourIdx];
     var el = document.querySelector(step.sel);
-    if (!el) { tourNext(); return; }
+    // Si el elemento no existe o no es visible en este momento, saltar al
+    // siguiente paso valido en la direccion actual (evita marcos vacios).
+    if (!el || !_isVisible(el)) {
+        var nextIdx = _tourIdx + (_tourDir || 1);
+        if (nextIdx < 0 || nextIdx >= _tourActive.length) { endTour(); return; }
+        _tourIdx = nextIdx;
+        _renderTourStep();
+        return;
+    }
     // Traer el elemento a la vista. El scroll suave puede tardar, y medir antes
     // de que termine dejaba el marco DESVIADO. Solucion: seguir reposicionando
     // hasta que la posicion del elemento se estabilice (scroll asentado).
