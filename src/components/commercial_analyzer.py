@@ -13,11 +13,22 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from enum import Enum
 
 
 # ---------------------------------------------------------------------------
 # Data model
 # ---------------------------------------------------------------------------
+
+class RiskLevel(str, Enum):
+    """
+    Riesgo comercial de PERDER la operacion, derivado del analisis.
+    Hereda de str para que serialice directo a JSON como "LOW"/"MEDIUM"/"HIGH".
+    """
+    LOW = "LOW"        # buena probabilidad de cierre, pocas/ninguna objecion
+    MEDIUM = "MEDIUM"  # senales mixtas
+    HIGH = "HIGH"      # baja probabilidad y/o muchas objeciones (accion urgente)
+
 
 @dataclass
 class CommercialAnalysis:
@@ -81,6 +92,10 @@ class CommercialAnalysis:
     requiere_revision_coordinador: bool = False
     # Motivo de revisión si requiere_revision_coordinador es True
     motivo_revision: str = ""
+    # Nivel de riesgo de PERDER la operacion (LOW/MEDIUM/HIGH). Derivado de la
+    # probabilidad de cierre y la cantidad de objeciones. En web_app.py se ajusta
+    # ademas con el sentimiento del texto (que se calcula en el pipeline ML).
+    nivel_riesgo: str = RiskLevel.LOW.value
 
 
 # ---------------------------------------------------------------------------
@@ -895,7 +910,30 @@ class CommercialAnalyzer:
             self._check_revision_coordinador(ca)
         )
 
+        # Nivel de riesgo comercial (probabilidad de cierre + objeciones).
+        ca.nivel_riesgo = self._classify_risk(ca)
+
         return ca
+
+    def _classify_risk(self, ca: "CommercialAnalysis") -> str:
+        """
+        Derivar el riesgo de PERDER la operacion a partir de senales ya calculadas.
+
+        Reglas (deterministas):
+          - HIGH  : probabilidad de cierre baja (<30%) O muchas objeciones (>=3),
+                    o probabilidad media con objeciones (>=2). Requiere accion.
+          - LOW   : probabilidad alta (>=60%) y a lo sumo 1 objecion.
+          - MEDIUM: el resto (senales mixtas).
+        El sentimiento se incorpora despues, en web_app.py, para no acoplar este
+        componente al pipeline ML (mantiene la responsabilidad unica).
+        """
+        prob = ca.probabilidad_cierre or 0.0
+        obj = ca.objeciones or 0
+        if prob < 30 or obj >= 3 or (prob < 50 and obj >= 2):
+            return RiskLevel.HIGH.value
+        if prob >= 60 and obj <= 1:
+            return RiskLevel.LOW.value
+        return RiskLevel.MEDIUM.value
 
     def _extract_objections(self, normalized: str, original: str) -> list[str]:
         """Extract specific objection phrases from the text."""

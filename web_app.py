@@ -202,7 +202,28 @@ def _build_commercial_dict(ca) -> dict:
         "alertas_vendedor": ca.alertas_vendedor,
         "requiere_revision_coordinador": ca.requiere_revision_coordinador,
         "motivo_revision": ca.motivo_revision,
+        "nivel_riesgo": getattr(ca, "nivel_riesgo", "LOW"),
     }
+
+
+def _adjust_risk_with_sentiment(base_risk: str, sentiment: str) -> str:
+    """
+    Elevar el nivel de riesgo cuando el sentimiento del texto es negativo, y
+    suavizarlo (a lo sumo) cuando es claramente positivo. Combina la senal
+    comercial (base_risk, del CommercialAnalyzer) con la senal emocional (del
+    pipeline ML), que viven en componentes separados.
+    """
+    order = ["LOW", "MEDIUM", "HIGH"]
+    try:
+        i = order.index((base_risk or "LOW").upper())
+    except ValueError:
+        i = 0
+    s = (sentiment or "").upper()
+    if s in ("NEGATIVE", "NEGATIVO"):
+        i = min(i + 1, 2)          # sentimiento negativo -> sube un escalon
+    elif s in ("POSITIVE", "POSITIVO") and i > 0:
+        i = i - 1                  # sentimiento positivo -> baja un escalon
+    return order[i]
 
 # Load analyzer once at startup
 print("Loading models...")
@@ -2750,7 +2771,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v18.0{% if username == 'Berna.Strauss' %} &middot; excluir todos los admins del seguimiento{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v18.1{% if username == 'Berna.Strauss' %} &middot; nivel de riesgo comercial{% endif %}</span></p>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -3932,6 +3953,13 @@ function renderCommercial(c) {
                   onclick="toggleLeadDetail('lead-detail-panel')">
                 LEAD ${c.tipo_lead} &nbsp;&#9660;
             </span>
+            ${(function(){
+                var rk = c.nivel_riesgo || 'LOW';
+                var es = { LOW: 'BAJO', MEDIUM: 'MEDIO', HIGH: 'ALTO' };
+                var col = { LOW: '#5bf5a3', MEDIUM: '#f5a35b', HIGH: '#f55b5b' };
+                var cc = col[rk] || '#5bf5a3';
+                return '<span title="Riesgo de perder la operacion, segun probabilidad de cierre, objeciones y sentimiento" style="display:inline-block;margin-left:8px;padding:2px 10px;border-radius:20px;font-size:0.62rem;font-weight:700;letter-spacing:0.04em;color:' + cc + ';background:' + cc + '22;border:1px solid ' + cc + '66;">RIESGO ' + (es[rk] || rk) + '</span>';
+            })()}
         </div>
 
         <div class="lead-detail-panel" id="lead-detail-panel">
@@ -4090,6 +4118,10 @@ function renderTextReport(data) {
     report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid ' + (data.sentiment === 'POSITIVE' ? '#5bf5a3' : data.sentiment === 'NEGATIVE' ? '#f55b5b' : '#f5a35b') + ';"><span style="color:#666;">Sentimiento:</span> <strong style="color:#e0e0e0;">' + sentimentEs + '</strong> (' + Math.round((data.sentiment_confidence || 0) * 100) + '%)</div>';
     report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #f5d75b;"><span style="color:#666;">Lead:</span> <strong style="color:#e0e0e0;">' + (c.tipo_lead || '-') + '</strong></div>';
     report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #5bf5a3;"><span style="color:#666;">Prob. Cierre:</span> <strong style="color:#e0e0e0;">' + (c.probabilidad_cierre || 0).toFixed(1) + '%</strong></div>';
+    var _riskEs = { LOW: 'Bajo', MEDIUM: 'Medio', HIGH: 'Alto' };
+    var _riskCol = { LOW: '#5bf5a3', MEDIUM: '#f5a35b', HIGH: '#f55b5b' };
+    var _rk = (c.nivel_riesgo || 'LOW');
+    report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid ' + (_riskCol[_rk] || '#5bf5a3') + ';"><span style="color:#666;">Nivel de riesgo:</span> <strong style="color:#e0e0e0;">' + (_riskEs[_rk] || _rk) + '</strong></div>';
     report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #b38bff;"><span style="color:#666;">Etapa:</span> <strong style="color:#e0e0e0;">' + (c.etapa_funnel || '-') + '</strong></div>';
     report += '<div style="padding:6px 8px;background:#0d1017;border-radius:6px;border-left:3px solid #f5a35b;"><span style="color:#666;">Urgencia:</span> <strong style="color:#e0e0e0;">' + (c.urgencia || '-') + '</strong></div>';
     report += '</div>';
@@ -4193,6 +4225,7 @@ function copyReport() {
     text += 'Intencion: ' + intentEs + ' (' + Math.round((data.intent_confidence || 0) * 100) + '%)\\n';
     text += 'Sentimiento: ' + sentimentEs + ' (' + Math.round((data.sentiment_confidence || 0) * 100) + '%)\\n';
     text += 'Lead: ' + (c.tipo_lead || '-') + ' | Prob. Cierre: ' + (c.probabilidad_cierre || 0).toFixed(1) + '%\\n';
+    text += 'Nivel de riesgo: ' + ({ LOW: 'Bajo', MEDIUM: 'Medio', HIGH: 'Alto' }[c.nivel_riesgo || 'LOW'] || (c.nivel_riesgo || '-')) + '\\n';
     text += 'Etapa: ' + (c.etapa_funnel || '-') + ' | Urgencia: ' + (c.urgencia || '-') + '\\n';
     text += '---\\n';
     text += 'Positivas: ' + (c.palabras_positivas || 0) + ' | Afirmativas: ' + (c.respuestas_afirmativas || 0) + ' | Cierre: ' + (c.indicios_cierre || 0) + '\\n';
@@ -8716,6 +8749,9 @@ def analyze():
         ],
         "commercial": _build_commercial_dict(ca)
     }
+    # Combine the commercial risk with the ML sentiment for the final risk level.
+    analysis_dict["commercial"]["nivel_riesgo"] = _adjust_risk_with_sentiment(
+        analysis_dict["commercial"].get("nivel_riesgo", "LOW"), result.sentiment)
 
     # Save to history
     year = data.get("year")
@@ -8998,6 +9034,8 @@ def upload_audio():
         ],
         "commercial": _build_commercial_dict(ca)
     }
+    analysis_dict["commercial"]["nivel_riesgo"] = _adjust_risk_with_sentiment(
+        analysis_dict["commercial"].get("nivel_riesgo", "LOW"), result.sentiment)
 
     # Save to history
     add_entry(
