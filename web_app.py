@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.0{% if username == 'Berna.Strauss' %} &middot; tutorial ampliado + animacion de analisis{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.1{% if username == 'Berna.Strauss' %} &middot; tutorial ampliado + animacion de analisis{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v18.3)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -2988,7 +2988,7 @@ HTML = """
     <!-- ── ADMIN STATS PANEL ── -->
     <div class="input-section" id="adminStatsPanel" style="margin-top:20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-            <div style="font-size:0.85rem;font-weight:600;color:#b38bff;">📊 Panel de Seguimiento (Admin)</div>
+            <div id="adminStatsTitulo" style="font-size:0.85rem;font-weight:600;color:#b38bff;">📊 Panel de Seguimiento (Admin)</div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                 <select id="statsVendor" onchange="loadAdminStats()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.8rem;">
                     <option value="_all">General (todos)</option>
@@ -3029,7 +3029,7 @@ HTML = """
     <!-- ── INFORME DE SEGUIMIENTO ── -->
     <div class="input-section" id="informePanel" style="margin-top:20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-            <div style="font-size:0.85rem;font-weight:600;color:#5bf5a3;">&#128202; Informe de Seguimiento</div>
+            <div id="informeTitulo" style="font-size:0.85rem;font-weight:600;color:#5bf5a3;">&#128202; Informe de Seguimiento</div>
             <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
                 <select id="informePreset" onchange="applyInformePreset()" style="background:#101c2a;color:#5bd4f5;border:1px solid #2a3a4a;border-radius:6px;padding:6px 10px;font-size:0.78rem;font-weight:600;">
                     <option value="anual" selected>Enero a la fecha</option>
@@ -3075,7 +3075,7 @@ HTML = """
 
     <!-- ── SALES SIMULATOR ── -->
     <div class="history-section" id="simulatorSection">
-        <div class="history-header" onclick="toggleSimulator()">
+        <div class="history-header" id="simulatorHeader" onclick="toggleSimulator()">
             <div class="history-title">&#129302; Simulador de Ventas IA</div>
             <div class="history-toggle" id="simToggleIcon">&#9660; Abrir simulador</div>
         </div>
@@ -5669,8 +5669,8 @@ var TOUR_STEPS = [
     { sel: '.btn-primary', title: 'Analizar', text: 'Con un clic, el sistema analiza el texto: intencion, sentimiento, conceptos y el nivel de riesgo de perder la venta.' },
     { sel: '#btnClear', title: 'Limpiar', text: 'Borra el texto y los resultados para empezar de cero con una nueva conversacion.' },
     { sel: '.btn-save', title: 'Guardar', text: 'Guarda el texto analizado para poder consultarlo y compararlo mas adelante.' },
-    { sel: '#adminStatsPanel', title: 'Panel de seguimiento', text: 'El panel de administracion: tendencias por vendedor, cumplimiento de metas y el seguimiento de uso del sistema.' },
-    { sel: '#informePanel', title: 'Informe de seguimiento', text: 'El informe completo del equipo. Podes filtrarlo por periodo, mes, semana y vendedor, e imprimirlo.' },
+    { sel: '#adminStatsTitulo', title: 'Panel de seguimiento', text: 'El panel de administracion: tendencias por vendedor, cumplimiento de metas y el seguimiento de uso del sistema.' },
+    { sel: '#informeTitulo', title: 'Informe de seguimiento', text: 'El informe completo del equipo. Podes filtrarlo por periodo, mes, semana y vendedor, e imprimirlo.' },
     { sel: '#informePreset', title: 'Filtro de periodo', text: 'Elegi rapido el periodo a mostrar: Enero a la fecha, el mes en curso, primeras semanas, etc.' },
     { sel: '#informeSeller', title: 'Filtro por vendedor', text: 'Muestra el informe de todo el equipo o de un vendedor puntual.' },
     { sel: '#btnPrintInforme', title: 'Imprimir informe', text: 'Genera el informe formal en hoja blanca, listo para presentar o entregar en fisico.' },
@@ -5678,7 +5678,7 @@ var TOUR_STEPS = [
     { sel: '#piesRow', title: 'Distribucion', text: 'Dos graficos de torta: el reparto de la actividad por mes y por vendedor.' },
     { sel: '.activity-block', title: 'Seguimiento de uso', text: 'Cuanto usa cada vendedor el sistema: ingresos, tiempo, ultima vez y herramientas usadas. Toca Ingresos o Tiempo para ver el detalle por dia.' },
     { sel: '#informeReporte', title: 'Informe redactado', text: 'Un informe de auditoria escrito automaticamente (objeto, metodologia, resultados y desempeno), listo para imprimir.' },
-    { sel: '#simulatorSection', title: 'Simulador de ventas', text: 'Practica una conversacion de venta contra un cliente simulado por IA, con distintos niveles de dificultad.' },
+    { sel: '#simulatorHeader', title: 'Simulador de ventas', text: 'Practica una conversacion de venta contra un cliente simulado por IA, con distintos niveles de dificultad.' },
     { sel: '#versionBadge', title: 'Novedades', text: 'Toca la version para ver, en palabras simples, que trae cada actualizacion del sistema.' },
     { sel: '#tutorialBtn', title: 'Repetir el tutorial', text: 'Podes volver a ver este recorrido cuando quieras desde aca. Listo, ya conoces lo principal!' }
 ];
@@ -5757,14 +5757,16 @@ function _positionTour(el, step) {
     var r = el.getBoundingClientRect();
     var pad = 4;   // margen ajustado para que el marco calce sobre el elemento
     var vh = window.innerHeight;
-    // Si el elemento es MAS ALTO que la pantalla (p.ej. la seccion del
-    // simulador), resaltar solo su franja superior visible, no todo — asi el
-    // marco no cubre la pantalla y siempre queda lugar para la tarjeta.
+    // Si el elemento es MAS ALTO que la pantalla, resaltar solo la franja que
+    // realmente esta VISIBLE (interseccion con el viewport), no una posicion
+    // forzada — asi el marco calza con lo que se ve y no queda dislocado.
     var spotTop = r.top;
     var spotH = r.height;
     if (spotH > vh - 160) {
-        spotTop = Math.max(8, r.top);
-        spotH = Math.min(120, Math.max(60, (vh - 160)));
+        var visTop = Math.max(8, r.top);              // borde superior visible
+        var visBottom = Math.min(vh - 150, r.bottom); // deja lugar abajo p/ la tarjeta
+        spotTop = visTop;
+        spotH = Math.max(60, visBottom - visTop);
     }
     var spot = document.getElementById('tourSpotlight');
     spot.style.top = (spotTop - pad) + 'px';
