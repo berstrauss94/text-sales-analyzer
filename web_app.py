@@ -1509,6 +1509,18 @@ HTML = """
         #tourCard .tour-btn.primary { background: #4a6cf7; border-color: #4a6cf7; color: #fff; font-weight: 700; }
         #tourCard .tour-skip { font-size: 0.68rem; color: #888; cursor: pointer; background: none; border: none; }
 
+        /* Estado "analizando": la casilla de texto pulsa con un borde neon
+           mientras el sistema procesa, para posicionar la atencion en el cuadro
+           que se esta trabajando. Se aplica y se quita desde analyze(). */
+        @keyframes analyzingPulse {
+            0%, 100% { box-shadow: 0 0 0 1px #4a6cf7, 0 0 10px -2px rgba(74,108,247,0.5); }
+            50%      { box-shadow: 0 0 0 2px #7b9cff, 0 0 22px 2px rgba(123,156,255,0.85); }
+        }
+        .analyzing-active {
+            animation: analyzingPulse 1.1s ease-in-out infinite;
+            border-radius: 10px;
+        }
+
         /* Source fragment toggle */
         .source-toggle {
             display: flex;
@@ -2807,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v18.9{% if username == 'Berna.Strauss' %} &middot; lectura de ñ + tutorial sin audio{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.0{% if username == 'Berna.Strauss' %} &middot; tutorial ampliado + animacion de analisis{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v18.3)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -3054,7 +3066,7 @@ HTML = """
                     <option value="{{ u }}">{{ u }}</option>
                     {% endfor %}
                 </select>
-                <button onclick="printInforme()" style="background:#1a2a3a;color:#5bd4f5;border:1px solid #2a3a4a;border-radius:6px;padding:6px 12px;font-size:0.75rem;cursor:pointer;" title="Imprimir informe">&#128424; Imprimir</button>
+                <button id="btnPrintInforme" onclick="printInforme()" style="background:#1a2a3a;color:#5bd4f5;border:1px solid #2a3a4a;border-radius:6px;padding:6px 12px;font-size:0.75rem;cursor:pointer;" title="Imprimir informe">&#128424; Imprimir</button>
             </div>
         </div>
         <div id="informeContent" style="font-size:0.78rem;color:#aaa;">Cargando informe...</div>
@@ -3118,6 +3130,9 @@ async function analyze() {
 
     document.getElementById('loading').style.display = 'block';
     document.getElementById('results').style.display = 'none';
+    // Posicionar la animacion de "analizando" sobre la casilla que se procesa.
+    var _twrap = document.getElementById('textareaWrapper');
+    if (_twrap) _twrap.classList.add('analyzing-active');
 
     try {
         const response = await fetch('/analyze', {
@@ -3139,6 +3154,7 @@ async function analyze() {
     }
 
     document.getElementById('loading').style.display = 'none';
+    if (_twrap) _twrap.classList.remove('analyzing-active');
 }
 
 async function saveEntry() {
@@ -5654,6 +5670,14 @@ var TOUR_STEPS = [
     { sel: '#btnClear', title: 'Limpiar', text: 'Borra el texto y los resultados para empezar de cero con una nueva conversacion.' },
     { sel: '.btn-save', title: 'Guardar', text: 'Guarda el texto analizado para poder consultarlo y compararlo mas adelante.' },
     { sel: '#adminStatsPanel', title: 'Panel de seguimiento', text: 'El panel de administracion: tendencias por vendedor, cumplimiento de metas y el seguimiento de uso del sistema.' },
+    { sel: '#informePanel', title: 'Informe de seguimiento', text: 'El informe completo del equipo. Podes filtrarlo por periodo, mes, semana y vendedor, e imprimirlo.' },
+    { sel: '#informePreset', title: 'Filtro de periodo', text: 'Elegi rapido el periodo a mostrar: Enero a la fecha, el mes en curso, primeras semanas, etc.' },
+    { sel: '#informeSeller', title: 'Filtro por vendedor', text: 'Muestra el informe de todo el equipo o de un vendedor puntual.' },
+    { sel: '#btnPrintInforme', title: 'Imprimir informe', text: 'Genera el informe formal en hoja blanca, listo para presentar o entregar en fisico.' },
+    { sel: '#trendChartBlock', title: 'Grafico de tendencia', text: 'La evolucion de las cargas en el tiempo. Alterna entre una linea por vendedor (multi-linea) o el total del equipo (linea unica).' },
+    { sel: '#piesRow', title: 'Distribucion', text: 'Dos graficos de torta: el reparto de la actividad por mes y por vendedor.' },
+    { sel: '.activity-block', title: 'Seguimiento de uso', text: 'Cuanto usa cada vendedor el sistema: ingresos, tiempo, ultima vez y herramientas usadas. Toca Ingresos o Tiempo para ver el detalle por dia.' },
+    { sel: '#informeReporte', title: 'Informe redactado', text: 'Un informe de auditoria escrito automaticamente (objeto, metodologia, resultados y desempeno), listo para imprimir.' },
     { sel: '#simulatorSection', title: 'Simulador de ventas', text: 'Practica una conversacion de venta contra un cliente simulado por IA, con distintos niveles de dificultad.' },
     { sel: '#versionBadge', title: 'Novedades', text: 'Toca la version para ver, en palabras simples, que trae cada actualizacion del sistema.' },
     { sel: '#tutorialBtn', title: 'Repetir el tutorial', text: 'Podes volver a ver este recorrido cuando quieras desde aca. Listo, ya conoces lo principal!' }
@@ -7115,7 +7139,7 @@ async function loadInforme() {
         // single seller has just one line and both views look the same.
         const showToggle = multiMode && series.length > 1;
 
-        let lineHtml = '<div class="fade-in-smooth chart-block" style="margin-top:14px;padding:12px 10px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
+        let lineHtml = '<div id="trendChartBlock" class="fade-in-smooth chart-block" style="margin-top:14px;padding:12px 10px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
         // Top-left header row: view toggle (left) + title.
         lineHtml += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">';
         if (showToggle) {
@@ -7326,7 +7350,7 @@ async function loadInforme() {
         const zeroPerformers = users.filter(u => (data.matrix[u][cm] || 0) === 0);
 
         const _todayStr = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
-        let synthesisHtml = '<div style="margin-top:14px;padding:22px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;border-left:3px solid #4a6cf7;">';
+        let synthesisHtml = '<div id="informeReporte" style="margin-top:14px;padding:22px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;border-left:3px solid #4a6cf7;">';
         synthesisHtml += '<div style="font-size:0.95rem;color:#fff;font-weight:700;letter-spacing:0.02em;margin-bottom:4px;">Mi Primer Casa S.A.</div>';
         synthesisHtml += '<div style="font-size:0.72rem;color:#aaa;margin-bottom:2px;">Informe de Auditoria de Grabaciones y Transcripciones Comerciales</div>';
         synthesisHtml += '<div style="font-size:0.7rem;color:#5bd4f5;margin-bottom:2px;font-weight:600;">Periodo analizado: ' + periodLabel + '</div>';
@@ -7463,7 +7487,7 @@ async function loadInforme() {
         // Both donuts side by side: monthly (left) and by-seller (right).
         // flex-wrap makes them stack vertically on narrow screens. Each donut
         // column is a .pie-block so it prints whole (never split across sheets).
-        const piesRowHtml = '<div style="display:flex;gap:30px;justify-content:center;align-items:flex-start;flex-wrap:wrap;margin-top:14px;">' +
+        const piesRowHtml = '<div id="piesRow" style="display:flex;gap:30px;justify-content:center;align-items:flex-start;flex-wrap:wrap;margin-top:14px;">' +
             '<div class="pie-block" style="flex:1 1 320px;min-width:300px;">' + pieHtml + '</div>' +
             (pieVHtml ? '<div class="pie-block" style="flex:1 1 320px;min-width:300px;">' + pieVHtml + '</div>' : '') +
             '</div>';
