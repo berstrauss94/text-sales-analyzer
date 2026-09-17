@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.3{% if username == 'Berna.Strauss' %} &middot; tutorial: informe y panel cargados{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.4{% if username == 'Berna.Strauss' %} &middot; tutorial con timer de carga{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v18.3)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -2836,7 +2836,7 @@ HTML = """
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
-            <button id="tutorialBtn" type="button" onclick="startTour()" title="Ver un recorrido guiado del sistema" aria-label="Iniciar tutorial guiado" style="font-size:0.75rem;padding:4px 10px;margin-right:6px;background:#2a2d3a;color:#888;border:1px solid #3a3d4a;border-radius:6px;cursor:pointer;">&#127891; Tutorial</button>
+            <button id="tutorialBtn" type="button" onclick="startTour()" disabled title="El tutorial se habilita cuando el sistema termina de cargar" aria-label="Iniciar tutorial guiado" style="font-size:0.75rem;padding:4px 10px;margin-right:6px;background:#22242e;color:#666;border:1px solid #3a3d4a;border-radius:6px;cursor:not-allowed;opacity:0.7;">&#127891; Cargando...</button>
             <button id="soundToggleBtn" type="button" onclick="toggleUISound()" title="Activar/silenciar sonidos de interfaz" aria-label="Activar o silenciar sonidos de interfaz" style="font-size:0.75rem;padding:4px 10px;margin-right:6px;background:#2a2d3a;color:#888;border:1px solid #3a3d4a;border-radius:6px;cursor:pointer;">&#128266; Sonido</button>
             <a href="/logout" class="btn-logout">Cerrar sesion</a>
         </div>
@@ -5698,16 +5698,60 @@ function _isVisible(el) {
     return st.display !== 'none' && st.visibility !== 'hidden';
 }
 
+// El boton Tutorial arranca DESHABILITADO y muestra un contador; se habilita
+// recien cuando el sistema termino de cargar al 100% (window load + fetch del
+// informe/panel pintados). Asi el recorrido nunca arranca con paneles vacios.
+window._tourReady = false;
+function _enableTutorialBtn() {
+    if (window._tourReady) return;
+    window._tourReady = true;
+    var btn = document.getElementById('tutorialBtn');
+    if (!btn) return;
+    btn.disabled = false;
+    btn.innerHTML = '&#127891; Tutorial';
+    btn.style.background = '#2a2d3a';
+    btn.style.color = '#888';
+    btn.style.cursor = 'pointer';
+    btn.style.opacity = '1';
+    btn.title = 'Ver un recorrido guiado del sistema';
+    try { UISound.tick(); } catch (e) {}
+}
+function _initTutorialTimer() {
+    var btn = document.getElementById('tutorialBtn');
+    if (!btn) return;
+    // Cuenta regresiva visible mientras el sistema termina de cargar.
+    var secs = 5;
+    btn.innerHTML = '&#127891; Cargando ' + secs + 's';
+    var iv = setInterval(function() {
+        secs--;
+        if (window._tourReady) { clearInterval(iv); return; }
+        if (secs <= 0) { clearInterval(iv); _enableTutorialBtn(); return; }
+        btn.innerHTML = '&#127891; Cargando ' + secs + 's';
+    }, 1000);
+    // Habilitar antes si la pagina ya cargo del todo y paso un margen para los fetch.
+    if (document.readyState === 'complete') {
+        setTimeout(function() { clearInterval(iv); _enableTutorialBtn(); }, 1500);
+    } else {
+        window.addEventListener('load', function() {
+            setTimeout(function() { clearInterval(iv); _enableTutorialBtn(); }, 1500);
+        });
+    }
+}
+// Arrancar el timer del boton apenas se pueda.
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _initTutorialTimer);
+} else {
+    _initTutorialTimer();
+}
+
 function startTour() {
+    if (!window._tourReady) return;   // aun cargando: no hacer nada
     // Asegurar que los paneles que cargan por fetch (informe y panel admin)
     // esten poblados ANTES del recorrido, para que sus elementos (grafico,
     // tortas, seguimiento, torta de indicadores) existan y no se salteen.
     try { if (typeof loadInforme === 'function') loadInforme(); } catch (e) {}
     try { if (typeof loadAdminStats === 'function') loadAdminStats(); } catch (e) {}
 
-    // No filtramos destructivamente al inicio: la visibilidad se evalua paso a
-    // paso en _renderTourStep (asi los paneles que terminan de cargar durante el
-    // tour tambien se muestran). Aca solo excluimos lo que claramente no existe.
     _tourActive = TOUR_STEPS.slice();
     _tourIdx = 0;
     var ov = document.getElementById('tourOverlay');
