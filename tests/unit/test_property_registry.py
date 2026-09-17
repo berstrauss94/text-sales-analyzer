@@ -30,7 +30,7 @@ metadata_strategy = st.builds(
 # ---------------------------------------------------------------------------
 
 @given(metas=st.lists(metadata_strategy, min_size=1, max_size=10))
-@settings(max_examples=100)
+@settings(max_examples=100, deadline=None)  # deadline=None: evita fallos flaky por timing de la maquina
 def test_property_registry_metadata_fields_complete(metas):
     """Req 10.6: list_models() returns entries with all required non-null fields."""
     registry = ModelRegistry()
@@ -53,7 +53,7 @@ def test_property_registry_metadata_fields_complete(metas):
 
 
 @given(metas=st.lists(metadata_strategy, min_size=1, max_size=5))
-@settings(max_examples=50)
+@settings(max_examples=50, deadline=None)  # deadline=None: evita fallos flaky por timing de la maquina
 def test_property_registry_register_then_activate(metas):
     """Registered models can be activated and retrieved."""
     registry = ModelRegistry()
