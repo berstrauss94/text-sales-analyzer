@@ -2807,7 +2807,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v18.8{% if username == 'Berna.Strauss' %} &middot; tutorial guiado{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v18.9{% if username == 'Berna.Strauss' %} &middot; lectura de ñ + tutorial sin audio{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v18.3)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -5646,7 +5646,7 @@ function _closest(e, selector) {
 // ── Tutorial guiado (recorrido animado que ilumina cada funcionalidad) ──
 var TOUR_STEPS = [
     { sel: '.date-selectors', title: 'Elegir el texto', text: 'Aca seleccionas el ano, el mes y el texto guardado que queres ver o volver a analizar.' },
-    { sel: '#textareaWrapper', title: 'Cargar la conversacion', text: 'Escribi o pega aca la conversacion de venta. Tambien podes subir un audio y el sistema lo transcribe solo.' },
+    { sel: '#textareaWrapper', title: 'Cargar la conversacion', text: 'Escribi o pega aca la conversacion de venta que queres analizar. Luego podes filtrar y seleccionar el texto guardado desde los selectores de arriba.' },
     { sel: '#btnHighlightDefine', title: 'Resaltar y definir', text: 'Selecciona una palabra o frase y agregala al diccionario de filtros, eligiendo a que categoria pertenece.' },
     { sel: '#btnEditDictionary', title: 'Editar diccionario', text: 'Revisa todas las palabras del diccionario: podes eliminar las que ya no sirven o moverlas al filtro correcto.' },
     { sel: '#infoIconHelp', title: 'Ayuda rapida (!)', text: 'En distintas partes del sistema vas a ver este icono. Al pasar el cursor te muestra una explicacion breve de que hace cada funcion.' },
