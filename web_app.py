@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.1{% if username == 'Berna.Strauss' %} &middot; tutorial ampliado + animacion de analisis{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.2{% if username == 'Berna.Strauss' %} &middot; tutorial completo + autoscroll{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v18.3)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -2989,7 +2989,7 @@ HTML = """
     <div class="input-section" id="adminStatsPanel" style="margin-top:20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
             <div id="adminStatsTitulo" style="font-size:0.85rem;font-weight:600;color:#b38bff;">📊 Panel de Seguimiento (Admin)</div>
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <div id="statsFilters" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                 <select id="statsVendor" onchange="loadAdminStats()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.8rem;">
                     <option value="_all">General (todos)</option>
                     {% for u in all_users %}
@@ -5670,8 +5670,13 @@ var TOUR_STEPS = [
     { sel: '#btnClear', title: 'Limpiar', text: 'Borra el texto y los resultados para empezar de cero con una nueva conversacion.' },
     { sel: '.btn-save', title: 'Guardar', text: 'Guarda el texto analizado para poder consultarlo y compararlo mas adelante.' },
     { sel: '#adminStatsTitulo', title: 'Panel de seguimiento', text: 'El panel de administracion: tendencias por vendedor, cumplimiento de metas y el seguimiento de uso del sistema.' },
-    { sel: '#informeTitulo', title: 'Informe de seguimiento', text: 'El informe completo del equipo. Podes filtrarlo por periodo, mes, semana y vendedor, e imprimirlo.' },
+    { sel: '#statsFilters', title: 'Filtros del panel', text: 'Filtra el panel por vendedor, mes y periodo (mensual, trimestral, anual...) para ver justo lo que necesitas.' },
+    { sel: '#statsPieChart', title: 'Distribucion de indicadores', text: 'La torta muestra el peso de cada indicador comercial (positivas, cierre, objeciones, etc.) en el periodo elegido.' },
+    { sel: '#informeTitulo', title: 'Informe de seguimiento', text: 'El informe completo del equipo. Podes filtrarlo por periodo, ano, mes, semana y vendedor, e imprimirlo.' },
     { sel: '#informePreset', title: 'Filtro de periodo', text: 'Elegi rapido el periodo a mostrar: Enero a la fecha, el mes en curso, primeras semanas, etc.' },
+    { sel: '#informeYear', title: 'Filtro de ano', text: 'Selecciona el ano del informe.' },
+    { sel: '#informeMonth', title: 'Filtro de mes', text: 'Muestra todos los meses o acota el informe a un mes puntual.' },
+    { sel: '#informeWeek', title: 'Filtro de semana', text: 'Acota el informe a una semana especifica del mes seleccionado.' },
     { sel: '#informeSeller', title: 'Filtro por vendedor', text: 'Muestra el informe de todo el equipo o de un vendedor puntual.' },
     { sel: '#btnPrintInforme', title: 'Imprimir informe', text: 'Genera el informe formal en hoja blanca, listo para presentar o entregar en fisico.' },
     { sel: '#trendChartBlock', title: 'Grafico de tendencia', text: 'La evolucion de las cargas en el tiempo. Alterna entre una linea por vendedor (multi-linea) o el total del equipo (linea unica).' },
@@ -5757,14 +5762,15 @@ function _positionTour(el, step) {
     var r = el.getBoundingClientRect();
     var pad = 4;   // margen ajustado para que el marco calce sobre el elemento
     var vh = window.innerHeight;
-    // Si el elemento es MAS ALTO que la pantalla, resaltar solo la franja que
-    // realmente esta VISIBLE (interseccion con el viewport), no una posicion
-    // forzada — asi el marco calza con lo que se ve y no queda dislocado.
+    // Si el elemento ocupa buena parte de la pantalla (o mas), resaltar solo la
+    // franja VISIBLE de arriba (interseccion con el viewport) y dejar lugar
+    // abajo para la tarjeta — asi el marco calza y la tarjeta no queda separada.
     var spotTop = r.top;
     var spotH = r.height;
-    if (spotH > vh - 160) {
-        var visTop = Math.max(8, r.top);              // borde superior visible
-        var visBottom = Math.min(vh - 150, r.bottom); // deja lugar abajo p/ la tarjeta
+    var tallThreshold = vh * 0.6;   // >60% de la altura = tratarlo como "alto"
+    if (spotH > tallThreshold) {
+        var visTop = Math.max(8, r.top);               // borde superior visible
+        var visBottom = Math.min(vh * 0.55, r.bottom); // franja superior; deja ~45% abajo
         spotTop = visTop;
         spotH = Math.max(60, visBottom - visTop);
     }
@@ -5803,8 +5809,10 @@ function _renderTourStep() {
     // Traer el elemento a la vista. El scroll suave puede tardar, y medir antes
     // de que termine dejaba el marco DESVIADO. Solucion: seguir reposicionando
     // hasta que la posicion del elemento se estabilice (scroll asentado).
-    // Secciones muy altas: alinear su parte SUPERIOR (start); el resto, centrado.
-    var _tall = el.getBoundingClientRect().height > (window.innerHeight - 160);
+    // Secciones altas (>60% de la altura): alinear su parte SUPERIOR (start),
+    // dejando margen arriba para que la franja resaltada quede completa; el
+    // resto, centrado. Mismo umbral que _positionTour para que coincidan.
+    var _tall = el.getBoundingClientRect().height > (window.innerHeight * 0.6);
     el.scrollIntoView({ behavior: 'smooth', block: _tall ? 'start' : 'center' });
     var lastTop = null, stable = 0, tries = 0;
     (function settle() {
