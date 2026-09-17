@@ -2771,7 +2771,19 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;">v18.1{% if username == 'Berna.Strauss' %} &middot; nivel de riesgo comercial{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v18.2{% if username == 'Berna.Strauss' %} &middot; nivel de riesgo comercial{% endif %}</span></p>
+            <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v18.2)</div>
+                <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
+                    Ahora cada conversacion muestra un <strong style="color:#5bd4f5;">Nivel de Riesgo</strong>: te avisa, de un vistazo, que tan probable es que se pierda esa venta.
+                    <div style="margin-top:8px;">
+                        <span style="color:#5bf5a3;font-weight:700;">Bajo</span>: la charla va bien, hay buenas senales de cierre.<br>
+                        <span style="color:#f5a35b;font-weight:700;">Medio</span>: hay senales mezcladas, conviene prestar atencion.<br>
+                        <span style="color:#f55b5b;font-weight:700;">Alto</span>: aparecen muchas dudas u objeciones; hay que actuar rapido.
+                    </div>
+                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Se calcula solo, mirando cuantas objeciones hay, la probabilidad de cierre y si el tono del cliente es positivo o negativo.</div>
+                </div>
+            </div>
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
@@ -5574,6 +5586,21 @@ function _closest(e, selector) {
     if (!t || typeof t.closest !== 'function') return null;
     return t.closest(selector);
 }
+
+// Version badge popover: shows, in plain words, what this update brings.
+function toggleVersionInfo(e) {
+    if (e) e.stopPropagation();
+    var pop = document.getElementById('versionInfoPopover');
+    if (!pop) return;
+    pop.style.display = (pop.style.display === 'none' || !pop.style.display) ? 'block' : 'none';
+}
+// Close the version popover when clicking anywhere else.
+document.addEventListener('click', function(e) {
+    var pop = document.getElementById('versionInfoPopover');
+    if (!pop || pop.style.display !== 'block') return;
+    if (_closest(e, '#versionInfoPopover') || _closest(e, '#versionBadge')) return;
+    pop.style.display = 'none';
+});
 
 // Best-effort audit logging of a client-side tool usage. Fire-and-forget:
 // never blocks the UI and silently ignores failures.
