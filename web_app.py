@@ -1473,6 +1473,42 @@ HTML = """
         .act-pop-row { display: flex; justify-content: space-between; gap: 12px; padding: 1px 0; }
         .act-pop-row span:last-child { color: #fff; font-weight: 600; }
 
+        /* ── Guided tour (tutorial) ── */
+        /* Dark backdrop with a "hole" over the highlighted element, done with a
+           huge box-shadow on the spotlight ring so everything else is dimmed. */
+        #tourOverlay { position: fixed; inset: 0; z-index: 100000; display: none; }
+        #tourOverlay.active { display: block; }
+        #tourSpotlight {
+            position: fixed;
+            border-radius: 10px;
+            box-shadow: 0 0 0 4px rgba(123,156,255,0.9), 0 0 0 9999px rgba(3,5,12,0.72);
+            transition: all 0.35s cubic-bezier(0.22,0.61,0.36,1);
+            pointer-events: none;
+            animation: tourPulse 1.6s ease-in-out infinite;
+        }
+        @keyframes tourPulse {
+            0%,100% { box-shadow: 0 0 0 4px rgba(123,156,255,0.9), 0 0 0 9999px rgba(3,5,12,0.72); }
+            50%     { box-shadow: 0 0 0 7px rgba(123,156,255,0.55), 0 0 0 9999px rgba(3,5,12,0.72); }
+        }
+        #tourCard {
+            position: fixed;
+            z-index: 100001;
+            max-width: 320px;
+            background: #12141c;
+            border: 1px solid #4a6cf7;
+            border-radius: 12px;
+            padding: 16px 18px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+            transition: top 0.35s ease, left 0.35s ease;
+        }
+        #tourCard .tour-step { font-size: 0.62rem; color: #7b9cff; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 4px; }
+        #tourCard .tour-title { font-size: 0.9rem; color: #fff; font-weight: 700; margin-bottom: 6px; }
+        #tourCard .tour-text { font-size: 0.76rem; color: #cfd3dc; line-height: 1.6; margin-bottom: 14px; }
+        #tourCard .tour-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        #tourCard .tour-btn { font-size: 0.72rem; padding: 6px 14px; border-radius: 7px; cursor: pointer; border: 1px solid #3a3d4a; background: #1e2235; color: #cfd3dc; }
+        #tourCard .tour-btn.primary { background: #4a6cf7; border-color: #4a6cf7; color: #fff; font-weight: 700; }
+        #tourCard .tour-skip { font-size: 0.68rem; color: #888; cursor: pointer; background: none; border: none; }
+
         /* Source fragment toggle */
         .source-toggle {
             display: flex;
@@ -2771,11 +2807,12 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v18.2{% if username == 'Berna.Strauss' %} &middot; nivel de riesgo comercial{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v18.3{% if username == 'Berna.Strauss' %} &middot; tutorial guiado{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v18.2)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v18.3)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    Ahora cada conversacion muestra un <strong style="color:#5bd4f5;">Nivel de Riesgo</strong>: te avisa, de un vistazo, que tan probable es que se pierda esa venta.
+                    Nuevo boton <strong style="color:#5bd4f5;">Tutorial</strong> (arriba, junto a Sonido): un recorrido guiado que ilumina cada funcion y te la explica paso a paso.
+                    <div style="margin-top:8px;">Ademas, cada conversacion muestra un <strong style="color:#5bd4f5;">Nivel de Riesgo</strong>: te avisa, de un vistazo, que tan probable es que se pierda esa venta.</div>
                     <div style="margin-top:8px;">
                         <span style="color:#5bf5a3;font-weight:700;">Bajo</span>: la charla va bien, hay buenas senales de cierre.<br>
                         <span style="color:#f5a35b;font-weight:700;">Medio</span>: hay senales mezcladas, conviene prestar atencion.<br>
@@ -2787,6 +2824,7 @@ HTML = """
         </div>
         <div style="text-align:right;">
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
+            <button id="tutorialBtn" type="button" onclick="startTour()" title="Ver un recorrido guiado del sistema" aria-label="Iniciar tutorial guiado" style="font-size:0.75rem;padding:4px 10px;margin-right:6px;background:#2a2d3a;color:#888;border:1px solid #3a3d4a;border-radius:6px;cursor:pointer;">&#127891; Tutorial</button>
             <button id="soundToggleBtn" type="button" onclick="toggleUISound()" title="Activar/silenciar sonidos de interfaz" aria-label="Activar o silenciar sonidos de interfaz" style="font-size:0.75rem;padding:4px 10px;margin-right:6px;background:#2a2d3a;color:#888;border:1px solid #3a3d4a;border-radius:6px;cursor:pointer;">&#128266; Sonido</button>
             <a href="/logout" class="btn-logout">Cerrar sesion</a>
         </div>
@@ -2900,6 +2938,24 @@ HTML = """
                 </div>
             </div>
         </div>
+
+        <!-- ── Overlay del Tutorial guiado ── -->
+        <div id="tourOverlay">
+            <div id="tourSpotlight"></div>
+            <div id="tourCard">
+                <div class="tour-step" id="tourStepLabel"></div>
+                <div class="tour-title" id="tourTitle"></div>
+                <div class="tour-text" id="tourText"></div>
+                <div class="tour-actions">
+                    <button type="button" class="tour-skip" onclick="endTour()">Saltar</button>
+                    <div style="display:flex;gap:8px;">
+                        <button type="button" class="tour-btn" id="tourPrevBtn" onclick="tourPrev()">Anterior</button>
+                        <button type="button" class="tour-btn primary" id="tourNextBtn" onclick="tourNext()">Siguiente</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="btn-row">
             <button class="btn-primary" onclick="analyze()">&#128269; Analizar</button>
             <button class="btn-secondary" onclick="clearAll()">Limpiar</button>
@@ -5585,6 +5641,91 @@ function _closest(e, selector) {
     if (t && t.nodeType === 3) t = t.parentElement;  // text node -> parent element
     if (!t || typeof t.closest !== 'function') return null;
     return t.closest(selector);
+}
+
+// ── Tutorial guiado (recorrido animado que ilumina cada funcionalidad) ──
+var TOUR_STEPS = [
+    { sel: '.date-selectors', title: 'Elegir el texto', text: 'Aca seleccionas el ano, el mes y el texto guardado que queres ver o volver a analizar.' },
+    { sel: '#textareaWrapper', title: 'Cargar la conversacion', text: 'Escribi o pega aca la conversacion de venta. Tambien podes subir un audio y el sistema lo transcribe solo.' },
+    { sel: '#btnHighlightDefine', title: 'Resaltar y definir', text: 'Selecciona una palabra o frase y agregala al diccionario de filtros, eligiendo a que categoria pertenece.' },
+    { sel: '#btnEditDictionary', title: 'Editar diccionario', text: 'Revisa todas las palabras del diccionario: podes eliminar las que ya no sirven o moverlas al filtro correcto.' },
+    { sel: '.btn-primary', title: 'Analizar', text: 'Con un clic, el sistema analiza el texto: intencion, sentimiento, conceptos y el nivel de riesgo de perder la venta.' },
+    { sel: '.btn-save', title: 'Guardar', text: 'Guarda el texto analizado para poder consultarlo y compararlo mas adelante.' },
+    { sel: '#adminStatsPanel', title: 'Panel de seguimiento', text: 'El panel de administracion: tendencias por vendedor, cumplimiento de metas y el seguimiento de uso del sistema.' },
+    { sel: '#simulatorSection', title: 'Simulador de ventas', text: 'Practica una conversacion de venta contra un cliente simulado por IA, con distintos niveles de dificultad.' },
+    { sel: '#versionBadge', title: 'Novedades', text: 'Toca la version para ver, en palabras simples, que trae cada actualizacion del sistema.' },
+    { sel: '#tutorialBtn', title: 'Repetir el tutorial', text: 'Podes volver a ver este recorrido cuando quieras desde aca. Listo, ya conoces lo principal!' }
+];
+var _tourIdx = 0;
+var _tourActive = [];  // pasos filtrados a los elementos realmente visibles
+
+function _isVisible(el) {
+    if (!el) return false;
+    var r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return false;
+    var st = window.getComputedStyle(el);
+    return st.display !== 'none' && st.visibility !== 'hidden';
+}
+
+function startTour() {
+    // Filtrar a los pasos cuyo elemento existe y es visible (p.ej. Guardar solo admin).
+    _tourActive = TOUR_STEPS.filter(function(s) { return _isVisible(document.querySelector(s.sel)); });
+    if (_tourActive.length === 0) return;
+    _tourIdx = 0;
+    document.getElementById('tourOverlay').classList.add('active');
+    _renderTourStep();
+}
+
+function endTour() {
+    var ov = document.getElementById('tourOverlay');
+    if (ov) ov.classList.remove('active');
+}
+
+function tourNext() {
+    if (_tourIdx >= _tourActive.length - 1) { endTour(); return; }
+    _tourIdx++;
+    _renderTourStep();
+    try { UISound.tick(); } catch (e) {}
+}
+function tourPrev() {
+    if (_tourIdx <= 0) return;
+    _tourIdx--;
+    _renderTourStep();
+    try { UISound.tick(); } catch (e) {}
+}
+
+function _renderTourStep() {
+    var step = _tourActive[_tourIdx];
+    var el = document.querySelector(step.sel);
+    if (!el) { tourNext(); return; }
+    // Traer el elemento a la vista, luego posicionar spotlight + tarjeta.
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(function() {
+        var r = el.getBoundingClientRect();
+        var pad = 6;
+        var spot = document.getElementById('tourSpotlight');
+        spot.style.top = (r.top - pad) + 'px';
+        spot.style.left = (r.left - pad) + 'px';
+        spot.style.width = (r.width + pad * 2) + 'px';
+        spot.style.height = (r.height + pad * 2) + 'px';
+
+        document.getElementById('tourStepLabel').textContent = 'Paso ' + (_tourIdx + 1) + ' de ' + _tourActive.length;
+        document.getElementById('tourTitle').textContent = step.title;
+        document.getElementById('tourText').textContent = step.text;
+        document.getElementById('tourPrevBtn').style.visibility = (_tourIdx === 0) ? 'hidden' : 'visible';
+        document.getElementById('tourNextBtn').textContent = (_tourIdx === _tourActive.length - 1) ? 'Finalizar' : 'Siguiente';
+
+        // Colocar la tarjeta: debajo del elemento si hay espacio, si no arriba.
+        var card = document.getElementById('tourCard');
+        var cardH = card.offsetHeight || 150, cardW = card.offsetWidth || 320;
+        var top = r.bottom + 12;
+        if (top + cardH > window.innerHeight - 10) top = Math.max(10, r.top - cardH - 12);
+        var left = r.left + r.width / 2 - cardW / 2;
+        if (left < 10) left = 10;
+        if (left + cardW > window.innerWidth - 10) left = window.innerWidth - 10 - cardW;
+        card.style.top = top + 'px';
+        card.style.left = left + 'px';
+    }, 320);
 }
 
 // Version badge popover: shows, in plain words, what this update brings.
