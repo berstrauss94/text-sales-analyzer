@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.6{% if username == 'Berna.Strauss' %} &middot; tutorial espera al informe + tabla{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.7{% if username == 'Berna.Strauss' %} &middot; boton tutorial espera carga real{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v18.3)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -5717,26 +5717,32 @@ function _enableTutorialBtn() {
     btn.title = 'Ver un recorrido guiado del sistema';
     try { UISound.tick(); } catch (e) {}
 }
+// El sistema esta "listo" cuando: la pagina cargo (readyState complete) Y, si
+// hay panel de informe, su contenido ya se pinto (existe #trendChartBlock).
+// Asi el boton NO se habilita mientras la informacion sigue cargando.
+function _systemFullyLoaded() {
+    if (document.readyState !== 'complete') return false;
+    var hayPanelInforme = !!document.getElementById('informePanel');
+    if (hayPanelInforme && !document.getElementById('trendChartBlock')) return false;
+    return true;
+}
 function _initTutorialTimer() {
     var btn = document.getElementById('tutorialBtn');
     if (!btn) return;
-    // Cuenta regresiva visible mientras el sistema termina de cargar.
-    var secs = 5;
-    btn.innerHTML = '&#127891; Cargando ' + secs + 's';
-    var iv = setInterval(function() {
-        secs--;
-        if (window._tourReady) { clearInterval(iv); return; }
-        if (secs <= 0) { clearInterval(iv); _enableTutorialBtn(); return; }
-        btn.innerHTML = '&#127891; Cargando ' + secs + 's';
-    }, 1000);
-    // Habilitar antes si la pagina ya cargo del todo y paso un margen para los fetch.
-    if (document.readyState === 'complete') {
-        setTimeout(function() { clearInterval(iv); _enableTutorialBtn(); }, 1500);
-    } else {
-        window.addEventListener('load', function() {
-            setTimeout(function() { clearInterval(iv); _enableTutorialBtn(); }, 1500);
-        });
-    }
+    var waited = 0;
+    var MAX_WAIT = 15000;   // tope de seguridad: nunca quedar bloqueado > 15s
+    btn.innerHTML = '&#127891; Cargando...';
+    (function poll() {
+        if (window._tourReady) return;
+        if (_systemFullyLoaded() || waited >= MAX_WAIT) {
+            _enableTutorialBtn();
+            return;
+        }
+        waited += 250;
+        // Mostrar los segundos transcurridos para que se vea que sigue cargando.
+        btn.innerHTML = '&#127891; Cargando ' + Math.ceil(waited / 1000) + 's';
+        setTimeout(poll, 250);
+    })();
 }
 // Arrancar el timer del boton apenas se pueda.
 if (document.readyState === 'loading') {
