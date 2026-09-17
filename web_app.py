@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.5{% if username == 'Berna.Strauss' %} &middot; tutorial scroll determinista{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.6{% if username == 'Berna.Strauss' %} &middot; tutorial espera al informe + tabla{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v18.3)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -5679,6 +5679,7 @@ var TOUR_STEPS = [
     { sel: '#informeWeek', title: 'Filtro de semana', text: 'Acota el informe a una semana especifica del mes seleccionado.' },
     { sel: '#informeSeller', title: 'Filtro por vendedor', text: 'Muestra el informe de todo el equipo o de un vendedor puntual.' },
     { sel: '#btnPrintInforme', title: 'Imprimir informe', text: 'Genera el informe formal en hoja blanca, listo para presentar o entregar en fisico.' },
+    { sel: '.seller-table-frame', title: 'Tabla por vendedor', text: 'Los textos cargados por cada vendedor, mes a mes, con su total. Los colores indican el nivel de cumplimiento de la meta.' },
     { sel: '#trendChartBlock', title: 'Grafico de tendencia', text: 'La evolucion de las cargas en el tiempo. Alterna entre una linea por vendedor (multi-linea) o el total del equipo (linea unica).' },
     { sel: '#piesRow', title: 'Distribucion', text: 'Dos graficos de torta: el reparto de la actividad por mes y por vendedor.' },
     { sel: '.activity-block', title: 'Seguimiento de uso', text: 'Cuanto usa cada vendedor el sistema: ingresos, tiempo, ultima vez y herramientas usadas. Toca Ingresos o Tiempo para ver el detalle por dia.' },
@@ -5761,10 +5762,19 @@ function startTour() {
     // al viewport de verdad.
     if (ov.parentElement !== document.body) document.body.appendChild(ov);
     ov.classList.add('active');
-    // Pequeña espera para que el fetch del informe/panel pinte su contenido,
-    // y RECIEN AHI filtramos a los pasos visibles (asi el contador "de N" es
-    // exacto y aparecen el grafico, las tortas, el seguimiento y el informe).
-    setTimeout(function() {
+    // Esperar ACTIVAMENTE a que el fetch del informe pinte su contenido (el
+    // grafico de tendencia aparece al final del render de loadInforme). No usar
+    // un tiempo fijo: si el informe tarda mas, los pasos del cuerpo (tabla,
+    // graficos, seguimiento, informe) se salteaban. Poll con maximo de seguridad.
+    var _hayPanelInforme = !!document.getElementById('informePanel');
+    var waited = 0;
+    (function waitContent() {
+        var informeListo = !_hayPanelInforme || document.getElementById('trendChartBlock') || waited >= 4000;
+        if (!informeListo) {
+            waited += 120;
+            setTimeout(waitContent, 120);
+            return;
+        }
         _tourActive = TOUR_STEPS.filter(function(s) {
             return _isVisible(document.querySelector(s.sel));
         });
@@ -5772,7 +5782,7 @@ function startTour() {
         _tourIdx = 0;
         _tourDir = 1;
         _renderTourStep();
-    }, 450);
+    })();
 }
 
 function endTour() {
