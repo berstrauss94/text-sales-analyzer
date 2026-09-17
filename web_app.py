@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.4{% if username == 'Berna.Strauss' %} &middot; tutorial con timer de carga{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.5{% if username == 'Berna.Strauss' %} &middot; tutorial scroll determinista{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v18.3)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -5827,18 +5827,14 @@ function _positionTour(el, step) {
     var r = el.getBoundingClientRect();
     var pad = 4;   // margen ajustado para que el marco calce sobre el elemento
     var vh = window.innerHeight;
-    // Si el elemento ocupa buena parte de la pantalla (o mas), resaltar solo la
-    // franja VISIBLE de arriba (interseccion con el viewport) y dejar lugar
-    // abajo para la tarjeta — asi el marco calza y la tarjeta no queda separada.
-    var spotTop = r.top;
-    var spotH = r.height;
-    var tallThreshold = vh * 0.6;   // >60% de la altura = tratarlo como "alto"
-    if (spotH > tallThreshold) {
-        var visTop = Math.max(8, r.top);               // borde superior visible
-        var visBottom = Math.min(vh * 0.55, r.bottom); // franja superior; deja ~45% abajo
-        spotTop = visTop;
-        spotH = Math.max(60, visBottom - visTop);
-    }
+    // El marco cubre el elemento tal como esta en pantalla, recortado al
+    // viewport visible (nunca fuera de pantalla). El scroll (en _renderTourStep)
+    // ya se encarga de dejar el elemento visible; aca solo dibujamos el marco
+    // sobre lo que realmente se ve, para que SIEMPRE calce con el elemento.
+    var elTop = r.top, elBottom = r.bottom;
+    var spotTop = Math.max(6, elTop);
+    var spotBottomClamped = Math.min(vh - 6, elBottom);
+    var spotH = Math.max(30, spotBottomClamped - spotTop);
     var spot = document.getElementById('tourSpotlight');
     spot.style.top = (spotTop - pad) + 'px';
     spot.style.left = (r.left - pad) + 'px';
@@ -5882,27 +5878,34 @@ function _renderTourStep() {
     // Traer el elemento a la vista. El scroll suave puede tardar, y medir antes
     // de que termine dejaba el marco DESVIADO. Solucion: seguir reposicionando
     // hasta que la posicion del elemento se estabilice (scroll asentado).
-    // Secciones altas (>60% de la altura): alinear su parte SUPERIOR (start),
-    // dejando margen arriba para que la franja resaltada quede completa; el
-    // resto, centrado. Mismo umbral que _positionTour para que coincidan.
-    var _tall = el.getBoundingClientRect().height > (window.innerHeight * 0.6);
-    el.scrollIntoView({ behavior: 'smooth', block: _tall ? 'start' : 'center' });
-    var lastTop = null, stable = 0, tries = 0;
+    // Scroll DETERMINISTA: calculamos a que posicion de la pagina llevar el
+    // elemento, en vez de depender del resultado impredecible de scrollIntoView.
+    // - Elemento mas alto que ~el 70% del viewport: llevar su tope cerca de
+    //   arriba (offset fijo), dejando lugar abajo para la tarjeta.
+    // - Elemento normal: centrarlo verticalmente.
+    var vh = window.innerHeight;
+    var r0 = el.getBoundingClientRect();
+    var absTop = window.pageYOffset + r0.top;   // posicion absoluta del elemento
+    var targetY;
+    if (r0.height > vh * 0.7) {
+        targetY = absTop - 90;                  // alto: tope cerca de arriba
+    } else {
+        targetY = absTop - (vh - r0.height) / 2; // normal: centrado
+    }
+    if (targetY < 0) targetY = 0;
+    window.scrollTo({ top: targetY, behavior: 'smooth' });
+
+    // Reposicionar el marco/tarjeta en cada frame hasta que el scroll se asiente.
+    var lastY = null, stable = 0, tries = 0;
     (function settle() {
-        // Salir del bucle si el tour se cerro mientras tanto.
         var ov = document.getElementById('tourOverlay');
         if (!ov || !ov.classList.contains('active')) return;
-        var r = el.getBoundingClientRect();
-        _positionTour(el, step);            // reposiciona en cada frame
-        if (lastTop !== null && Math.abs(r.top - lastTop) < 0.5) {
-            stable++;
-        } else {
-            stable = 0;
-        }
-        lastTop = r.top;
+        _positionTour(el, step);            // dibuja marco+tarjeta sobre posicion actual
+        var y = window.pageYOffset;
+        if (lastY !== null && Math.abs(y - lastY) < 0.5) { stable++; } else { stable = 0; }
+        lastY = y;
         tries++;
-        // Cuando llevo ~3 frames sin moverse (o pasaron ~0.5s), ya esta quieto.
-        if (stable < 3 && tries < 30) {
+        if (stable < 3 && tries < 40) {
             requestAnimationFrame(settle);
         }
     })();
