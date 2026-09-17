@@ -2,8 +2,17 @@
 """
 restore_backup.py - Restaurar el CODIGO al ultimo estado estable conocido.
 
-Punto de restauracion actual: backup-estable-2026-08-29-v11.7
-Ese backup incluye:
+Punto de restauracion actual: backup-estable-2026-08-25-v18.0
+Este es el sistema COMPLETO y estable JUSTO ANTES de agregar la metrica de
+nivel de riesgo (risk_level). Incluye todo lo previo:
+- Analizador ML (intencion/sentimiento/conceptos) + analisis comercial por diccionario
+- Diccionario editable (Resaltar y definir + Editar diccionario) persistido en PG
+- Usuarios persistentes en PostgreSQL (sobreviven redeploys)
+- Informe imprimible "Mi Primer Casa S.A." + graficos (tendencia + 2 tortas)
+- Seguimiento de uso del sistema con detalle por dia (popover flotante)
+- Backups automaticos de datos + deteccion de perdida por usuario
+- 103 tests en verde
+Historico previo (resumen):
 - Motion design completo: animaciones de entrada uniformes (--anim-duration),
   Inline Text Replacement (text-swap al cargar textos guardados), despliegue
   animado de triangulos/sub-info, clases de streaming por rol listas
@@ -50,7 +59,7 @@ def run(cmd: str) -> tuple[int, str]:
 
 
 # Punto de restauracion actual. Actualizar cuando se cree un nuevo backup estable.
-BACKUP_TAG = "backup-estable-2026-08-29-v14"
+BACKUP_TAG = "backup-estable-2026-08-25-v18.0"
 
 
 def main():
