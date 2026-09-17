@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.7{% if username == 'Berna.Strauss' %} &middot; boton tutorial espera carga real{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.8{% if username == 'Berna.Strauss' %} &middot; tutorial interactivo del analisis{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v18.3)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -2980,6 +2980,11 @@ HTML = """
             {% endif %}
         </div>
         <div class="loading" id="loading" style="margin-top:10px;">Analizando texto...</div>
+    </div>
+
+    <!-- Tutorial interactivo del ANALISIS (aparece recien cuando hay un texto analizado) -->
+    <div id="textTourRow" style="display:none;margin-top:10px;">
+        <button id="btnTextTour" type="button" onclick="startTextTour()" style="font-size:0.78rem;padding:6px 14px;background:#1a2440;color:#7b9cff;border:1px solid #4a6cf7;border-radius:7px;cursor:pointer;font-weight:600;">&#127891; Tutorial interactivo del analisis</button>
     </div>
 
     <div class="results" id="results"></div>
@@ -3826,10 +3831,10 @@ function renderResults(data, inputText) {
     el.innerHTML = `
         <div class="input-preview">"${displayTitle}"</div>
         <div class="result-grid">
-            <div class="card">
+            <div class="card" id="cardIntencion">
                 <div class="card-title card-title-collapsible" onclick="toggleCardContent('intencion-content')">
                     Intencion del Texto &nbsp;<span class="card-arrow" id="intencion-arrow">&#9660;</span>
-                    <span class="card-info-icon" onclick="event.stopPropagation()">!</span>
+                    <span class="card-info-icon" id="iconIntencionInfo" onclick="event.stopPropagation()">!</span>
                     <div class="card-info-tooltip">Clasifica la intencion principal del texto: si es una oferta, consulta, negociacion, cierre o descripcion. Ayuda a entender en que etapa de la venta esta la conversacion.</div>
                 </div>
                 <div class="card-collapsible-content closed" id="intencion-content">
@@ -3920,6 +3925,9 @@ function renderResults(data, inputText) {
         ${renderSaveConfirmation(data)}
     `;
     el.style.display = 'block';
+    // Ya hay un texto analizado: mostrar el boton del tutorial interactivo del analisis.
+    var _ttRow = document.getElementById('textTourRow');
+    if (_ttRow) _ttRow.style.display = 'block';
     // Focus-a-slice interactivity for the indicator distribution donut.
     setTimeout(function() { attachIndicatorPieInteractivity(); }, 0);
     // Fluid staggered entrance for the freshly rendered analysis blocks.
@@ -4147,7 +4155,7 @@ function renderTextProgressChart(c) {
             '</button>' +
         '</div>';
 
-    return '<div class="analysis-block" style="margin-top:16px;padding:14px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">' +
+    return '<div class="analysis-block" id="blockDistribucionTexto" style="margin-top:16px;padding:14px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">' +
         '<div style="font-size:0.75rem;color:#888;font-weight:600;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em;">Distribucion de Indicadores — Este Texto</div>' +
         '<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center;">' +
             '<div id="' + indPieId + '" class="pie-chart-expand" style="position:relative;width:140px;height:140px;border-radius:50%;background:conic-gradient(' + gradientParts.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:transform 0.2s ease, box-shadow 0.2s ease;">' +
@@ -4194,7 +4202,7 @@ function renderTextReport(data) {
     const indSummary = Object.entries(indLabels).map(([k, label]) => label + ': ' + (c[k] || 0)).join(' | ');
 
     // Build report
-    let report = '<div class="analysis-block" style="margin-top:16px;padding:16px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
+    let report = '<div class="analysis-block" id="blockInformeTexto" style="margin-top:16px;padding:16px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;">';
     report += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-size:0.75rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">📋 Informe del Texto</div><button onclick="copyReport()" style="background:#1a1d27;border:1px solid #2a2d3e;color:#aaa;padding:4px 10px;border-radius:6px;font-size:0.6rem;cursor:pointer;">📋 Copiar</button></div>';
 
     report += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.65rem;">';
@@ -4226,7 +4234,7 @@ function renderTextReport(data) {
     }
 
     // --- Expanded Narrative Summary ---
-    report += '<div class="analysis-block" style="margin-top:14px;padding:14px;background:#080a10;border:1px solid #1e2130;border-radius:8px;border-left:3px solid #4a6cf7;">';
+    report += '<div class="analysis-block" id="blockNarrativo" style="margin-top:14px;padding:14px;background:#080a10;border:1px solid #1e2130;border-radius:8px;border-left:3px solid #4a6cf7;">';
     report += '<div style="font-size:0.7rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px;">Analisis Narrativo del Texto</div>';
 
     // Intent analysis
@@ -5749,6 +5757,29 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', _initTutorialTimer);
 } else {
     _initTutorialTimer();
+}
+
+// Pasos del tutorial INTERACTIVO DEL ANALISIS (recorre los resultados de un
+// texto ya analizado). Usa el mismo motor de tour (overlay, spotlight, tarjeta).
+var TEXT_TOUR_STEPS = [
+    { sel: '#cardIntencion', title: 'Intencion del texto', text: 'Que busca la conversacion: oferta, consulta, negociacion, cierre o descripcion. Indica en que etapa de la venta esta.' },
+    { sel: '#iconIntencionInfo', title: 'Indicador de ayuda (!)', text: 'Este icono aparece junto a cada seccion. Al pasar el cursor muestra una explicacion breve de que significa.' },
+    { sel: '#blockDistribucionTexto', title: 'Distribucion de indicadores', text: 'Como se reparten los indicadores comerciales detectados en ESTE texto (positivas, cierre, objeciones, etc.).' },
+    { sel: '#btnResaltarPalabras', title: 'Resaltar palabras', text: 'Resalta en el texto todas las palabras detectadas por categoria. Ademas desbloquea el boton para imprimir el texto resaltado.' },
+    { sel: '#blockInformeTexto', title: 'Informe del texto', text: 'El resumen tecnico: intencion, sentimiento, lead, probabilidad de cierre, nivel de riesgo, etapa, conceptos y datos extraidos.' },
+    { sel: '#blockNarrativo', title: 'Analisis narrativo', text: 'La lectura en palabras del analisis: explica el resultado y recomienda el proximo paso comercial.' }
+];
+
+function startTextTour() {
+    // Filtrar a los pasos cuyo elemento exista y sea visible en este momento.
+    _tourActive = TEXT_TOUR_STEPS.filter(function(s) { return _isVisible(document.querySelector(s.sel)); });
+    if (_tourActive.length === 0) return;
+    _tourIdx = 0;
+    _tourDir = 1;
+    var ov = document.getElementById('tourOverlay');
+    if (ov.parentElement !== document.body) document.body.appendChild(ov);
+    ov.classList.add('active');
+    _renderTourStep();
 }
 
 function startTour() {
