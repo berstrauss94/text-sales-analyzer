@@ -2807,7 +2807,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v18.3{% if username == 'Berna.Strauss' %} &middot; tutorial guiado{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v18.4{% if username == 'Berna.Strauss' %} &middot; tutorial guiado{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v18.3)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -5681,6 +5681,16 @@ function endTour() {
     if (ov) ov.classList.remove('active');
 }
 
+// Reposicionar el paso actual si cambia el tamano de la ventana durante el tour.
+window.addEventListener('resize', function() {
+    var ov = document.getElementById('tourOverlay');
+    if (ov && ov.classList.contains('active') && _tourActive[_tourIdx]) {
+        var step = _tourActive[_tourIdx];
+        var el = document.querySelector(step.sel);
+        if (el) _positionTour(el, step);
+    }
+});
+
 function tourNext() {
     if (_tourIdx >= _tourActive.length - 1) { endTour(); return; }
     _tourIdx++;
@@ -5694,38 +5704,58 @@ function tourPrev() {
     try { UISound.tick(); } catch (e) {}
 }
 
+// Coloca el spotlight y la tarjeta sobre el elemento usando su posicion ACTUAL.
+function _positionTour(el, step) {
+    var r = el.getBoundingClientRect();
+    var pad = 6;
+    var spot = document.getElementById('tourSpotlight');
+    spot.style.top = (r.top - pad) + 'px';
+    spot.style.left = (r.left - pad) + 'px';
+    spot.style.width = (r.width + pad * 2) + 'px';
+    spot.style.height = (r.height + pad * 2) + 'px';
+
+    document.getElementById('tourStepLabel').textContent = 'Paso ' + (_tourIdx + 1) + ' de ' + _tourActive.length;
+    document.getElementById('tourTitle').textContent = step.title;
+    document.getElementById('tourText').textContent = step.text;
+    document.getElementById('tourPrevBtn').style.visibility = (_tourIdx === 0) ? 'hidden' : 'visible';
+    document.getElementById('tourNextBtn').textContent = (_tourIdx === _tourActive.length - 1) ? 'Finalizar' : 'Siguiente';
+
+    // Tarjeta: debajo del elemento si hay espacio, si no arriba.
+    var card = document.getElementById('tourCard');
+    var cardH = card.offsetHeight || 150, cardW = card.offsetWidth || 320;
+    var top = r.bottom + 12;
+    if (top + cardH > window.innerHeight - 10) top = Math.max(10, r.top - cardH - 12);
+    var left = r.left + r.width / 2 - cardW / 2;
+    if (left < 10) left = 10;
+    if (left + cardW > window.innerWidth - 10) left = window.innerWidth - 10 - cardW;
+    card.style.top = top + 'px';
+    card.style.left = left + 'px';
+}
+
 function _renderTourStep() {
     var step = _tourActive[_tourIdx];
     var el = document.querySelector(step.sel);
     if (!el) { tourNext(); return; }
-    // Traer el elemento a la vista, luego posicionar spotlight + tarjeta.
+    // Traer el elemento a la vista. El scroll suave puede tardar, y medir antes
+    // de que termine dejaba el marco DESVIADO. Solucion: seguir reposicionando
+    // hasta que la posicion del elemento se estabilice (scroll asentado).
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    setTimeout(function() {
+    var lastTop = null, stable = 0, tries = 0;
+    (function settle() {
         var r = el.getBoundingClientRect();
-        var pad = 6;
-        var spot = document.getElementById('tourSpotlight');
-        spot.style.top = (r.top - pad) + 'px';
-        spot.style.left = (r.left - pad) + 'px';
-        spot.style.width = (r.width + pad * 2) + 'px';
-        spot.style.height = (r.height + pad * 2) + 'px';
-
-        document.getElementById('tourStepLabel').textContent = 'Paso ' + (_tourIdx + 1) + ' de ' + _tourActive.length;
-        document.getElementById('tourTitle').textContent = step.title;
-        document.getElementById('tourText').textContent = step.text;
-        document.getElementById('tourPrevBtn').style.visibility = (_tourIdx === 0) ? 'hidden' : 'visible';
-        document.getElementById('tourNextBtn').textContent = (_tourIdx === _tourActive.length - 1) ? 'Finalizar' : 'Siguiente';
-
-        // Colocar la tarjeta: debajo del elemento si hay espacio, si no arriba.
-        var card = document.getElementById('tourCard');
-        var cardH = card.offsetHeight || 150, cardW = card.offsetWidth || 320;
-        var top = r.bottom + 12;
-        if (top + cardH > window.innerHeight - 10) top = Math.max(10, r.top - cardH - 12);
-        var left = r.left + r.width / 2 - cardW / 2;
-        if (left < 10) left = 10;
-        if (left + cardW > window.innerWidth - 10) left = window.innerWidth - 10 - cardW;
-        card.style.top = top + 'px';
-        card.style.left = left + 'px';
-    }, 320);
+        _positionTour(el, step);            // reposiciona en cada frame
+        if (lastTop !== null && Math.abs(r.top - lastTop) < 0.5) {
+            stable++;
+        } else {
+            stable = 0;
+        }
+        lastTop = r.top;
+        tries++;
+        // Cuando llevo ~3 frames sin moverse (o pasaron ~1.2s), ya esta quieto.
+        if (stable < 3 && tries < 40) {
+            requestAnimationFrame(settle);
+        }
+    })();
 }
 
 // Version badge popover: shows, in plain words, what this update brings.
