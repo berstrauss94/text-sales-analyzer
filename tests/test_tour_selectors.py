@@ -22,13 +22,13 @@ def _read(path):
 
 
 def _extract_tour_selectors(src):
-    """Devuelve la lista de valores `sel:` dentro del array TOUR_STEPS."""
-    # Aislar el bloque del array TOUR_STEPS = [ ... ];
-    m = re.search(r"TOUR_STEPS\s*=\s*\[(.*?)\];", src, re.DOTALL)
-    assert m, "No se encontro el array TOUR_STEPS en web_app.py"
-    block = m.group(1)
-    # Extraer cada sel: '...'
-    return re.findall(r"sel:\s*'([^']+)'", block)
+    """Devuelve la lista de valores `sel:` de TOUR_STEPS y TEXT_TOUR_STEPS."""
+    sels = []
+    for arr in ("TOUR_STEPS", "TEXT_TOUR_STEPS"):
+        m = re.search(arr + r"\s*=\s*\[(.*?)\];", src, re.DOTALL)
+        assert m, f"No se encontro el array {arr} en web_app.py"
+        sels += re.findall(r"sel:\s*'([^']+)'", m.group(1))
+    return sels
 
 
 def _selector_exists(src, sel):
