@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v20.0{% if username == 'Berna.Strauss' %} &middot; tutorial no saltea informe{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v20.1{% if username == 'Berna.Strauss' %} &middot; primer paso del tour no se disloca{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v20.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -5822,7 +5822,12 @@ function startTour() {
         _tourActive = TOUR_STEPS.slice();
         _tourIdx = 0;
         _tourDir = 1;
-        _renderTourStep();
+        // Llevar la pagina al tope y esperar un instante a que las animaciones de
+        // entrada (transform) empiecen a asentarse ANTES de medir el primer paso.
+        // Sin esto, el primer marco se dibujaba sobre un rect a medio animar y
+        // quedaba dislocado en la esquina superior izquierda.
+        window.scrollTo({ top: 0, behavior: 'auto' });
+        setTimeout(function() { _renderTourStep(); }, 260);
     })();
 }
 
@@ -5946,17 +5951,33 @@ function _renderTourStep() {
     if (targetY < 0) targetY = 0;
     window.scrollTo({ top: targetY, behavior: 'smooth' });
 
-    // Reposicionar el marco/tarjeta en cada frame hasta que el scroll se asiente.
-    var lastY = null, stable = 0, tries = 0;
+    // Reposicionar el marco/tarjeta en cada frame hasta que TODO se asiente: no
+    // solo el scroll, tambien la POSICION del elemento. Las animaciones de
+    // entrada (fade-in con transform: translateY del .results / paneles) mueven
+    // el elemento durante ~0.4s; si medimos antes, el marco queda DESVIADO
+    // (aparecia dislocado arriba-izquierda en el primer paso). Trackeamos el
+    // rect completo y solo damos por asentado cuando ni el scroll ni el rect
+    // cambian por varios frames seguidos.
+    var lastY = null, lastRect = null, stable = 0, tries = 0;
     (function settle() {
         var ov = document.getElementById('tourOverlay');
         if (!ov || !ov.classList.contains('active')) return;
         _positionTour(el, step);            // dibuja marco+tarjeta sobre posicion actual
         var y = window.pageYOffset;
-        if (lastY !== null && Math.abs(y - lastY) < 0.5) { stable++; } else { stable = 0; }
+        var r = el.getBoundingClientRect();
+        var scrollQuieto = (lastY !== null && Math.abs(y - lastY) < 0.5);
+        var rectQuieto = (lastRect !== null &&
+            Math.abs(r.top - lastRect.top) < 0.5 &&
+            Math.abs(r.left - lastRect.left) < 0.5 &&
+            Math.abs(r.width - lastRect.width) < 0.5 &&
+            Math.abs(r.height - lastRect.height) < 0.5);
+        if (scrollQuieto && rectQuieto) { stable++; } else { stable = 0; }
         lastY = y;
+        lastRect = r;
         tries++;
-        if (stable < 3 && tries < 40) {
+        // Mas margen de intentos (60 ~= 1s) para dar tiempo a que la animacion
+        // de entrada del elemento termine antes de fijar el marco.
+        if (stable < 3 && tries < 60) {
             requestAnimationFrame(settle);
         }
     })();
