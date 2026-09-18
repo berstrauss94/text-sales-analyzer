@@ -2819,18 +2819,13 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.9{% if username == 'Berna.Strauss' %} &middot; texto de tutoriales mas grande{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v20.0{% if username == 'Berna.Strauss' %} &middot; tutorial no saltea informe{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v18.3)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v20.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    Nuevo boton <strong style="color:#5bd4f5;">Tutorial</strong> (arriba, junto a Sonido): un recorrido guiado que ilumina cada funcion y te la explica paso a paso.
-                    <div style="margin-top:8px;">Ademas, cada conversacion muestra un <strong style="color:#5bd4f5;">Nivel de Riesgo</strong>: te avisa, de un vistazo, que tan probable es que se pierda esa venta.</div>
-                    <div style="margin-top:8px;">
-                        <span style="color:#5bf5a3;font-weight:700;">Bajo</span>: la charla va bien, hay buenas senales de cierre.<br>
-                        <span style="color:#f5a35b;font-weight:700;">Medio</span>: hay senales mezcladas, conviene prestar atencion.<br>
-                        <span style="color:#f55b5b;font-weight:700;">Alto</span>: aparecen muchas dudas u objeciones; hay que actuar rapido.
-                    </div>
-                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Se calcula solo, mirando cuantas objeciones hay, la probabilidad de cierre y si el tono del cliente es positivo o negativo.</div>
+                    Arreglamos el <strong style="color:#5bd4f5;">Tutorial</strong>: ahora recorre TODO el Informe de Seguimiento sin saltearse nada.
+                    <div style="margin-top:8px;">Antes, si la tabla por vendedor, el grafico, las tortas o el seguimiento de uso todavia estaban cargando, el recorrido los pasaba de largo. Ahora el tutorial <strong style="color:#5bf5a3;">espera a que todo termine de cargar</strong> antes de arrancar, asi ves cada seccion iluminada y explicada.</div>
+                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Incluye la tabla por vendedor, el grafico de tendencia, las tortas de distribucion, la torta del panel de seguimiento, el seguimiento de uso y el informe redactado.</div>
                 </div>
             </div>
         </div>
@@ -5804,18 +5799,27 @@ function startTour() {
     // un tiempo fijo: si el informe tarda mas, los pasos del cuerpo (tabla,
     // graficos, seguimiento, informe) se salteaban. Poll con maximo de seguridad.
     var _hayPanelInforme = !!document.getElementById('informePanel');
+    // Selectores del cuerpo del informe que cargan por fetch SEPARADO y mas
+    // lento que #trendChartBlock: la torta del panel admin (loadAdminStats), el
+    // seguimiento de uso (/admin/actividad) y el informe redactado (final del
+    // render de loadInforme). Esperamos a que TODOS existan antes de arrancar,
+    // para que ningun paso del recorrido se saltee por no haber cargado aun.
+    var _selCuerpo = ['#trendChartBlock', '#statsPieChart', '.activity-block', '#informeReporte'];
     var waited = 0;
+    var MAX_CONTENT_WAIT = 8000;   // margen amplio para fetch lentos
     (function waitContent() {
-        var informeListo = !_hayPanelInforme || document.getElementById('trendChartBlock') || waited >= 4000;
-        if (!informeListo) {
+        var faltan = _hayPanelInforme && _selCuerpo.some(function(sel) {
+            return !document.querySelector(sel);
+        });
+        if (faltan && waited < MAX_CONTENT_WAIT) {
             waited += 120;
             setTimeout(waitContent, 120);
             return;
         }
-        _tourActive = TOUR_STEPS.filter(function(s) {
-            return _isVisible(document.querySelector(s.sel));
-        });
-        if (_tourActive.length === 0) { endTour(); return; }
+        // NO filtrar destructivamente aca: si un panel aun no cargo lo perderiamos
+        // para siempre. Mantenemos la lista completa; _renderTourStep saltea en
+        // vivo (por visibilidad al momento) los pasos que realmente no existan.
+        _tourActive = TOUR_STEPS.slice();
         _tourIdx = 0;
         _tourDir = 1;
         _renderTourStep();
