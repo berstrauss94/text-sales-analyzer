@@ -1503,7 +1503,7 @@ HTML = """
         }
         #tourCard .tour-step { font-size: 0.62rem; color: #7b9cff; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 4px; }
         #tourCard .tour-title { font-size: 0.9rem; color: #fff; font-weight: 700; margin-bottom: 6px; }
-        #tourCard .tour-text { font-size: 0.76rem; color: #cfd3dc; line-height: 1.6; margin-bottom: 14px; }
+        #tourCard .tour-text { font-size: 0.885rem; color: #cfd3dc; line-height: 1.6; margin-bottom: 14px; }
         #tourCard .tour-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
         #tourCard .tour-btn { font-size: 0.72rem; padding: 6px 14px; border-radius: 7px; cursor: pointer; border: 1px solid #3a3d4a; background: #1e2235; color: #cfd3dc; }
         #tourCard .tour-btn.primary { background: #4a6cf7; border-color: #4a6cf7; color: #fff; font-weight: 700; }
@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.8{% if username == 'Berna.Strauss' %} &middot; tutorial interactivo del analisis{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v19.9{% if username == 'Berna.Strauss' %} &middot; texto de tutoriales mas grande{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v18.3)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
