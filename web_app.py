@@ -2819,13 +2819,13 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v20.5{% if username == 'Berna.Strauss' %} &middot; tutorial con acentos y eñe correctos{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v20.6{% if username == 'Berna.Strauss' %} &middot; seguimiento de uso estimado desde textos{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v20.4)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v20.6)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    Ahora el analisis <strong style="color:#5bd4f5;">detecta bien las palabras con eñe</strong>: "seña", "año", "pequeño", "compañia" y similares.
-                    <div style="margin-top:8px;">Antes, esas palabras se perdian al buscar conceptos y a veces generaban conteos incorrectos (por ejemplo, "compa" se contaba dentro de "compañeros"). Ahora la eñe <strong style="color:#5bf5a3;">cuenta como una letra mas</strong> y las palabras se detectan completas y exactas.</div>
-                    <div style="margin-top:8px;">Ademas, el <strong style="color:#5bd4f5;">Tutorial</strong> ahora abre al instante cuando el sistema ya esta cargado (sin esa espera al apretarlo).</div>
+                    El <strong style="color:#5bd4f5;">Seguimiento de Uso</strong> ahora acompaña el mes que elegís en el informe.
+                    <div style="margin-top:8px;">Si un mes no tiene registro de ingresos ni tiempo (porque esa medición empezó hace poco), el sistema <strong style="color:#5bf5a3;">completa la tabla a partir de los textos cargados</strong> ese mes: cuántos analizó cada vendedor y su última carga. Esas filas se marcan como <span style="color:#e0b46a;">estimado</span>, para distinguirlas de la actividad medida de verdad.</div>
+                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Aplica a los meses que ya pasaron y a los que vienen, siempre que haya textos cargados. No inventa ingresos ni tiempo: esos quedan en blanco cuando no hay medición real.</div>
                     <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Ademas, el Tutorial recorre todo el Informe de Seguimiento sin saltearse secciones y el primer paso ya no aparece descolocado.</div>
                 </div>
             </div>
@@ -7486,19 +7486,30 @@ async function loadInforme() {
                         var popIngresos = buildDayPopover('Ingresos por dia', info.logins_by_day, function(v) { return 'x' + v; });
                         var popTiempo = buildDayPopover('Tiempo por dia', info.minutes_by_day, function(v) { return fmtMin(v); });
                         const zebra = (ri % 2 === 1) ? 'background:#0c0f18;' : '';
+                        // Fila ESTIMADA: la actividad se derivo del historial de
+                        // textos (no hay eventos medidos ese periodo). Ingresos y
+                        // tiempo no existen como dato, se muestran como "—" y el
+                        // usuario lleva una etiqueta "estimado".
+                        const _est = !!info.estimated;
+                        const _nameTag = _est
+                            ? ' <span title="Actividad estimada a partir de los textos cargados (sin registro de ingresos/tiempo medido)" style="display:inline-block;font-size:0.55rem;color:#e0b46a;border:1px solid #6a5a2a;border-radius:10px;padding:0 6px;margin-left:6px;vertical-align:middle;text-transform:uppercase;letter-spacing:0.03em;">estimado</span>'
+                            : '';
+                        const _ingresosCell = _est ? '<span style="color:#555;">—</span>' : ((info.logins || 0) + popIngresos);
+                        const _tiempoCell = _est ? '<span style="color:#555;">—</span>' : (fmtMin(info.total_minutes) + popTiempo);
+                        const _promCell = _est ? '<span style="color:#555;">—</span>' : fmtMin(info.avg_session_minutes);
                         actividadHtml += '<tr style="border-bottom:1px solid #171a26;' + zebra + '">';
-                        actividadHtml += '<td style="padding:4px 8px;color:#e0e0e0;font-weight:600;white-space:nowrap;">' + u + '</td>';
+                        actividadHtml += '<td style="padding:4px 8px;color:#e0e0e0;font-weight:600;white-space:nowrap;">' + u + _nameTag + '</td>';
                         // Ingresos cell (with day-by-day popover).
-                        actividadHtml += '<td class="act-pop-cell" style="padding:4px 8px;text-align:center;color:#5bd4f5;font-weight:700;">' + (info.logins || 0) + popIngresos + '</td>';
+                        actividadHtml += '<td class="act-pop-cell" style="padding:4px 8px;text-align:center;color:#5bd4f5;font-weight:700;">' + _ingresosCell + '</td>';
                         // Tiempo cell (with day-by-day popover).
-                        actividadHtml += '<td class="act-pop-cell" style="padding:4px 8px;text-align:center;color:#5bf5a3;white-space:nowrap;">' + fmtMin(info.total_minutes) + popTiempo + '</td>';
-                        actividadHtml += '<td style="padding:4px 8px;text-align:center;color:#9aa0b0;white-space:nowrap;">' + fmtMin(info.avg_session_minutes) + '</td>';
+                        actividadHtml += '<td class="act-pop-cell" style="padding:4px 8px;text-align:center;color:#5bf5a3;white-space:nowrap;">' + _tiempoCell + '</td>';
+                        actividadHtml += '<td style="padding:4px 8px;text-align:center;color:#9aa0b0;white-space:nowrap;">' + _promCell + '</td>';
                         actividadHtml += '<td style="padding:4px 8px;text-align:center;color:#9aa0b0;white-space:nowrap;">' + fmtLastSeen(info.last_seen) + '</td>';
                         actividadHtml += '<td style="padding:4px 8px;text-align:left;white-space:nowrap;">' + toolsCell + '</td>';
                         actividadHtml += '</tr>';
                     });
                     actividadHtml += '</tbody></table></div>';
-                    actividadHtml += '<div style="font-size:0.58rem;color:#555;margin-top:6px;">Tiempo de sesion estimado (acotado a 45 min cuando no hay cierre explicito).</div>';
+                    actividadHtml += '<div style="font-size:0.58rem;color:#555;margin-top:6px;">Tiempo de sesion estimado (acotado a 45 min cuando no hay cierre explicito). Las filas marcadas <span style="color:#e0b46a;">estimado</span> derivan de los textos cargados ese periodo (sin registro de ingresos/tiempo medido).</div>';
                 }
                 actividadHtml += '</div>';
             }
@@ -10922,7 +10933,77 @@ def admin_actividad():
         summary = activity_store_pg.get_activity_summary(
             start=start, end=end, usernames=usernames)
     except Exception as exc:
-        return jsonify({"ok": False, "reason": str(exc), "users": {}})
+        summary = {"ok": False, "reason": str(exc), "users": {}}
+
+    if not isinstance(summary, dict):
+        summary = {"ok": False, "users": {}}
+    summary.setdefault("users", {})
+
+    # ----------------------------------------------------------------------
+    # Fallback ESTIMADO desde el historial de textos.
+    #
+    # activity_log solo tiene eventos desde que se activo el registro, asi que
+    # meses sin eventos medidos aparecerian vacios aunque el vendedor SI haya
+    # cargado textos ese mes. Para esos usuarios derivamos una actividad
+    # ESTIMADA a partir del historial (misma resolucion de fecha que el
+    # informe): cantidad de textos como "Analizar texto" y la fecha del ultimo
+    # texto como "Ultima vez". Se marca estimated=True. NO inventamos ingresos
+    # ni tiempo de sesion (eso no queda registrado en los textos): quedan en 0.
+    #
+    # Solo LECTURA del historial: no toca resolve_entry_date, add_entry ni el
+    # guardado; no reasigna fechas. Solo completa usuarios que NO tengan ya
+    # actividad medida en el periodo, para no pisar datos reales.
+    # ----------------------------------------------------------------------
+    try:
+        from src.users.history_manager import get_all_entries, resolve_entry_date
+        medidos = set(summary["users"].keys())
+        cand_users = usernames if usernames else user_manager.list_users()
+        for u in cand_users:
+            if u in medidos:
+                continue  # ya tiene actividad real medida: no la pisamos
+            textos = 0
+            last_iso = None
+            last_day = 0
+            for e in get_all_entries(u):
+                e_year, e_month, e_day = resolve_entry_date(e)
+                if e_year != year:
+                    continue
+                # Respetar el mismo filtro de mes/semana del periodo activo.
+                if filter_month > 0 and e_month != filter_month:
+                    continue
+                if filter_month > 0 and e_day:
+                    w = min(4, (e_day - 1) // 7 + 1)
+                    if filter_week > 0 and w != filter_week:
+                        continue
+                    if week_upto > 0 and w > week_upto:
+                        continue
+                textos += 1
+                # Guardar el dia mas reciente para "Ultima vez" (aprox).
+                d = e_day or 1
+                mo = e_month if (e_month and 1 <= e_month <= 12) else 1
+                if d >= last_day:
+                    last_day = d
+                    try:
+                        last_iso = _mk(year, mo, d).isoformat()
+                    except Exception:
+                        last_iso = None
+            if textos > 0:
+                summary["users"][u] = {
+                    "logins": 0,
+                    "last_seen": last_iso,
+                    "total_minutes": 0.0,
+                    "avg_session_minutes": 0.0,
+                    "tools": {"analizar": textos},
+                    "events": textos,
+                    "logins_by_day": {},
+                    "minutes_by_day": {},
+                    "estimated": True,   # actividad derivada de textos, no medida
+                }
+        summary["ok"] = True
+    except Exception as exc:
+        # El fallback es best-effort: si algo falla, devolvemos lo que haya.
+        summary.setdefault("estimate_error", str(exc))
+
     summary["filter_seller"] = filter_seller
     return jsonify(summary)
 
