@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v20.4{% if username == 'Berna.Strauss' %} &middot; deteccion real de palabras con eñe{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v20.5{% if username == 'Berna.Strauss' %} &middot; tutorial con acentos y eñe correctos{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v20.4)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -5665,32 +5665,32 @@ function _closest(e, selector) {
 
 // ── Tutorial guiado (recorrido animado que ilumina cada funcionalidad) ──
 var TOUR_STEPS = [
-    { sel: '.date-selectors', title: 'Elegir el texto', text: 'Aca seleccionas el ano, el mes y el texto guardado que queres ver o volver a analizar.' },
-    { sel: '#textareaWrapper', title: 'Cargar la conversacion', text: 'Escribi o pega aca la conversacion de venta que queres analizar. Luego podes filtrar y seleccionar el texto guardado desde los selectores de arriba.' },
-    { sel: '#btnHighlightDefine', title: 'Resaltar y definir', text: 'Selecciona una palabra o frase y agregala al diccionario de filtros, eligiendo a que categoria pertenece.' },
-    { sel: '#btnEditDictionary', title: 'Editar diccionario', text: 'Revisa todas las palabras del diccionario: podes eliminar las que ya no sirven o moverlas al filtro correcto.' },
-    { sel: '#infoIconHelp', title: 'Ayuda rapida (!)', text: 'En distintas partes del sistema vas a ver este icono. Al pasar el cursor te muestra una explicacion breve de que hace cada funcion.' },
-    { sel: '.btn-primary', title: 'Analizar', text: 'Con un clic, el sistema analiza el texto: intencion, sentimiento, conceptos y el nivel de riesgo de perder la venta.' },
-    { sel: '#btnClear', title: 'Limpiar', text: 'Borra el texto y los resultados para empezar de cero con una nueva conversacion.' },
-    { sel: '.btn-save', title: 'Guardar', text: 'Guarda el texto analizado para poder consultarlo y compararlo mas adelante.' },
-    { sel: '#adminStatsTitulo', title: 'Panel de seguimiento', text: 'El panel de administracion: tendencias por vendedor, cumplimiento de metas y el seguimiento de uso del sistema.' },
-    { sel: '#statsFilters', title: 'Filtros del panel', text: 'Filtra el panel por vendedor, mes y periodo (mensual, trimestral, anual...) para ver justo lo que necesitas.' },
-    { sel: '#statsPieChart', title: 'Distribucion de indicadores', text: 'La torta muestra el peso de cada indicador comercial (positivas, cierre, objeciones, etc.) en el periodo elegido.' },
-    { sel: '#informeTitulo', title: 'Informe de seguimiento', text: 'El informe completo del equipo. Podes filtrarlo por periodo, ano, mes, semana y vendedor, e imprimirlo.' },
-    { sel: '#informePreset', title: 'Filtro de periodo', text: 'Elegi rapido el periodo a mostrar: Enero a la fecha, el mes en curso, primeras semanas, etc.' },
-    { sel: '#informeYear', title: 'Filtro de ano', text: 'Selecciona el ano del informe.' },
+    { sel: '.date-selectors', title: 'Elegir el texto', text: 'Acá seleccionás el año, el mes y el texto guardado que querés ver o volver a analizar.' },
+    { sel: '#textareaWrapper', title: 'Cargar la conversación', text: 'Escribí o pegá acá la conversación de venta que querés analizar. Luego podés filtrar y seleccionar el texto guardado desde los selectores de arriba.' },
+    { sel: '#btnHighlightDefine', title: 'Resaltar y definir', text: 'Seleccioná una palabra o frase y agregala al diccionario de filtros, eligiendo a qué categoría pertenece.' },
+    { sel: '#btnEditDictionary', title: 'Editar diccionario', text: 'Revisá todas las palabras del diccionario: podés eliminar las que ya no sirven o moverlas al filtro correcto.' },
+    { sel: '#infoIconHelp', title: 'Ayuda rápida (!)', text: 'En distintas partes del sistema vas a ver este ícono. Al pasar el cursor te muestra una explicación breve de qué hace cada función.' },
+    { sel: '.btn-primary', title: 'Analizar', text: 'Con un clic, el sistema analiza el texto: intención, sentimiento, conceptos y el nivel de riesgo de perder la venta.' },
+    { sel: '#btnClear', title: 'Limpiar', text: 'Borra el texto y los resultados para empezar de cero con una nueva conversación.' },
+    { sel: '.btn-save', title: 'Guardar', text: 'Guarda el texto analizado para poder consultarlo y compararlo más adelante.' },
+    { sel: '#adminStatsTitulo', title: 'Panel de seguimiento', text: 'El panel de administración: tendencias por vendedor, cumplimiento de metas y el seguimiento de uso del sistema.' },
+    { sel: '#statsFilters', title: 'Filtros del panel', text: 'Filtrá el panel por vendedor, mes y período (mensual, trimestral, anual...) para ver justo lo que necesitás.' },
+    { sel: '#statsPieChart', title: 'Distribución de indicadores', text: 'La torta muestra el peso de cada indicador comercial (positivas, cierre, objeciones, etc.) en el período elegido.' },
+    { sel: '#informeTitulo', title: 'Informe de seguimiento', text: 'El informe completo del equipo. Podés filtrarlo por período, año, mes, semana y vendedor, e imprimirlo.' },
+    { sel: '#informePreset', title: 'Filtro de período', text: 'Elegí rápido el período a mostrar: Enero a la fecha, el mes en curso, primeras semanas, etc.' },
+    { sel: '#informeYear', title: 'Filtro de año', text: 'Seleccioná el año del informe.' },
     { sel: '#informeMonth', title: 'Filtro de mes', text: 'Muestra todos los meses o acota el informe a un mes puntual.' },
-    { sel: '#informeWeek', title: 'Filtro de semana', text: 'Acota el informe a una semana especifica del mes seleccionado.' },
+    { sel: '#informeWeek', title: 'Filtro de semana', text: 'Acota el informe a una semana específica del mes seleccionado.' },
     { sel: '#informeSeller', title: 'Filtro por vendedor', text: 'Muestra el informe de todo el equipo o de un vendedor puntual.' },
-    { sel: '#btnPrintInforme', title: 'Imprimir informe', text: 'Genera el informe formal en hoja blanca, listo para presentar o entregar en fisico.' },
+    { sel: '#btnPrintInforme', title: 'Imprimir informe', text: 'Genera el informe formal en hoja blanca, listo para presentar o entregar en físico.' },
     { sel: '.seller-table-frame', title: 'Tabla por vendedor', text: 'Los textos cargados por cada vendedor, mes a mes, con su total. Los colores indican el nivel de cumplimiento de la meta.' },
-    { sel: '#trendChartBlock', title: 'Grafico de tendencia', text: 'La evolucion de las cargas en el tiempo. Alterna entre una linea por vendedor (multi-linea) o el total del equipo (linea unica).' },
-    { sel: '#piesRow', title: 'Distribucion', text: 'Dos graficos de torta: el reparto de la actividad por mes y por vendedor.' },
-    { sel: '.activity-block', title: 'Seguimiento de uso', text: 'Cuanto usa cada vendedor el sistema: ingresos, tiempo, ultima vez y herramientas usadas. Toca Ingresos o Tiempo para ver el detalle por dia.' },
-    { sel: '#informeReporte', title: 'Informe redactado', text: 'Un informe de auditoria escrito automaticamente (objeto, metodologia, resultados y desempeno), listo para imprimir.' },
-    { sel: '#simulatorHeader', title: 'Simulador de ventas', text: 'Practica una conversacion de venta contra un cliente simulado por IA, con distintos niveles de dificultad.' },
-    { sel: '#versionBadge', title: 'Novedades', text: 'Toca la version para ver, en palabras simples, que trae cada actualizacion del sistema.' },
-    { sel: '#tutorialBtn', title: 'Repetir el tutorial', text: 'Podes volver a ver este recorrido cuando quieras desde aca. Listo, ya conoces lo principal!' }
+    { sel: '#trendChartBlock', title: 'Gráfico de tendencia', text: 'La evolución de las cargas en el tiempo. Alterna entre una línea por vendedor (multi-línea) o el total del equipo (línea única).' },
+    { sel: '#piesRow', title: 'Distribución', text: 'Dos gráficos de torta: el reparto de la actividad por mes y por vendedor.' },
+    { sel: '.activity-block', title: 'Seguimiento de uso', text: 'Cuánto usa cada vendedor el sistema: ingresos, tiempo, última vez y herramientas usadas. Tocá Ingresos o Tiempo para ver el detalle por día.' },
+    { sel: '#informeReporte', title: 'Informe redactado', text: 'Un informe de auditoría escrito automáticamente (objeto, metodología, resultados y desempeño), listo para imprimir.' },
+    { sel: '#simulatorHeader', title: 'Simulador de ventas', text: 'Practicá una conversación de venta contra un cliente simulado por IA, con distintos niveles de dificultad.' },
+    { sel: '#versionBadge', title: 'Novedades', text: 'Tocá la versión para ver, en palabras simples, qué trae cada actualización del sistema.' },
+    { sel: '#tutorialBtn', title: 'Repetir el tutorial', text: 'Podés volver a ver este recorrido cuando quieras desde acá. Listo, ya conocés lo principal!' }
 ];
 var _tourIdx = 0;
 var _tourActive = [];  // pasos filtrados a los elementos realmente visibles
@@ -5758,12 +5758,12 @@ if (document.readyState === 'loading') {
 // Pasos del tutorial INTERACTIVO DEL ANALISIS (recorre los resultados de un
 // texto ya analizado). Usa el mismo motor de tour (overlay, spotlight, tarjeta).
 var TEXT_TOUR_STEPS = [
-    { sel: '#cardIntencion', title: 'Intencion del texto', text: 'Que busca la conversacion: oferta, consulta, negociacion, cierre o descripcion. Indica en que etapa de la venta esta.' },
-    { sel: '#iconIntencionInfo', title: 'Indicador de ayuda (!)', text: 'Este icono aparece junto a cada seccion. Al pasar el cursor muestra una explicacion breve de que significa.' },
-    { sel: '#blockDistribucionTexto', title: 'Distribucion de indicadores', text: 'Como se reparten los indicadores comerciales detectados en ESTE texto (positivas, cierre, objeciones, etc.).' },
-    { sel: '#btnResaltarPalabras', title: 'Resaltar palabras', text: 'Resalta en el texto todas las palabras detectadas por categoria. Ademas desbloquea el boton para imprimir el texto resaltado.' },
-    { sel: '#blockInformeTexto', title: 'Informe del texto', text: 'El resumen tecnico: intencion, sentimiento, lead, probabilidad de cierre, nivel de riesgo, etapa, conceptos y datos extraidos.' },
-    { sel: '#blockNarrativo', title: 'Analisis narrativo', text: 'La lectura en palabras del analisis: explica el resultado y recomienda el proximo paso comercial.' }
+    { sel: '#cardIntencion', title: 'Intención del texto', text: 'Qué busca la conversación: oferta, consulta, negociación, cierre o descripción. Indica en qué etapa de la venta está.' },
+    { sel: '#iconIntencionInfo', title: 'Indicador de ayuda (!)', text: 'Este ícono aparece junto a cada sección. Al pasar el cursor muestra una explicación breve de qué significa.' },
+    { sel: '#blockDistribucionTexto', title: 'Distribución de indicadores', text: 'Cómo se reparten los indicadores comerciales detectados en ESTE texto (positivas, cierre, objeciones, etc.).' },
+    { sel: '#btnResaltarPalabras', title: 'Resaltar palabras', text: 'Resalta en el texto todas las palabras detectadas por categoría. Además desbloquea el botón para imprimir el texto resaltado.' },
+    { sel: '#blockInformeTexto', title: 'Informe del texto', text: 'El resumen técnico: intención, sentimiento, lead, probabilidad de cierre, nivel de riesgo, etapa, conceptos y datos extraídos.' },
+    { sel: '#blockNarrativo', title: 'Análisis narrativo', text: 'La lectura en palabras del análisis: explica el resultado y recomienda el próximo paso comercial.' }
 ];
 
 function startTextTour() {
