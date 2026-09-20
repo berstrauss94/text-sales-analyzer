@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v20.1{% if username == 'Berna.Strauss' %} &middot; primer paso del tour no se disloca{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v20.2{% if username == 'Berna.Strauss' %} &middot; primer paso del tour ya no aparece vacio{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v20.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -5773,6 +5773,12 @@ function startTextTour() {
     _tourDir = 1;
     var ov = document.getElementById('tourOverlay');
     if (ov.parentElement !== document.body) document.body.appendChild(ov);
+    // Mismo criterio que startTour: ocultar tarjeta/marco hasta que _positionTour
+    // pueble y ubique el primer paso, para que no aparezca vacia en la esquina.
+    var _c = document.getElementById('tourCard');
+    var _s = document.getElementById('tourSpotlight');
+    if (_c) _c.style.visibility = 'hidden';
+    if (_s) _s.style.visibility = 'hidden';
     ov.classList.add('active');
     _renderTourStep();
 }
@@ -5793,6 +5799,13 @@ function startTour() {
     // DESVIADO. Movemos el overlay directo al <body> para que fixed sea relativo
     // al viewport de verdad.
     if (ov.parentElement !== document.body) document.body.appendChild(ov);
+    // Ocultar tarjeta y marco hasta que el PRIMER paso este poblado y ubicado
+    // (los revela _positionTour). Asi el fondo oscuro aparece de inmediato pero
+    // la tarjeta no se ve vacia ni descolocada en la esquina mientras esperamos.
+    var _card0 = document.getElementById('tourCard');
+    var _spot0 = document.getElementById('tourSpotlight');
+    if (_card0) _card0.style.visibility = 'hidden';
+    if (_spot0) _spot0.style.visibility = 'hidden';
     ov.classList.add('active');
     // Esperar ACTIVAMENTE a que el fetch del informe pinte su contenido (el
     // grafico de tendencia aparece al final del render de loadInforme). No usar
@@ -5834,6 +5847,12 @@ function startTour() {
 function endTour() {
     var ov = document.getElementById('tourOverlay');
     if (ov) ov.classList.remove('active');
+    // Resetear visibilidad para el proximo arranque (se vuelven a ocultar en
+    // startTour y se revelan al posicionar el primer paso).
+    var c = document.getElementById('tourCard');
+    var s = document.getElementById('tourSpotlight');
+    if (c) c.style.visibility = '';
+    if (s) s.style.visibility = '';
 }
 
 // Salidas de emergencia: tecla Escape en cualquier momento.
@@ -5917,6 +5936,12 @@ function _positionTour(el, step) {
     if (left + cardW > window.innerWidth - 10) left = window.innerWidth - 10 - cardW;
     card.style.top = top + 'px';
     card.style.left = left + 'px';
+    // Recien ahora que la tarjeta esta POBLADA (titulo/texto/paso) y UBICADA, y
+    // que el marco esta sobre el elemento, los hacemos visibles. Evita el
+    // parpadeo del primer paso: antes la tarjeta se mostraba vacia y en la
+    // esquina superior izquierda mientras esperabamos el primer posicionamiento.
+    spot.style.visibility = 'visible';
+    card.style.visibility = 'visible';
 }
 
 function _renderTourStep() {
