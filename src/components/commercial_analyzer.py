@@ -594,7 +594,10 @@ def _normalize(text: str) -> str:
 
 def _count_keyword(text: str, keyword: str) -> int:
     """Count exact word/phrase occurrences in normalized text."""
-    pattern = r'(?<![a-z])' + re.escape(keyword) + r'(?![a-z])'
+    # La ñ debe contar como letra de palabra en los limites. Con [a-z] a secas,
+    # la ñ actuaba como separador: "compa" hacia match dentro de "compañeros"
+    # (falso positivo) y una keyword con ñ podia cortarse mal. Incluimos ñ.
+    pattern = r'(?<![a-zñ])' + re.escape(keyword) + r'(?![a-zñ])'
     return len(re.findall(pattern, text))
 
 
@@ -735,7 +738,9 @@ def _extract_questions(text: str) -> list[str]:
 def _extract_keywords(text: str, top_n: int = 10) -> list[str]:
     """Extract top keywords from text, excluding stopwords."""
     normalized = _normalize(text)
-    words = re.findall(r'\b[a-z]{3,}\b', normalized)
+    # Incluir ñ: con [a-z] a secas, palabras como "año", "pequeño", "compañia"
+    # o "seña" se descartaban de los conceptos/keywords extraidos.
+    words = re.findall(r'[a-zñ]{3,}', normalized)
     freq: dict[str, int] = {}
     for w in words:
         if w not in _STOPWORDS and len(w) > 3:

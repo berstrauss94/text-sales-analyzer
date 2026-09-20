@@ -2819,13 +2819,13 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v20.2{% if username == 'Berna.Strauss' %} &middot; primer paso del tour ya no aparece vacio{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v20.3{% if username == 'Berna.Strauss' %} &middot; deteccion real de palabras con enie{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v20.0)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v20.3)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    Arreglamos el <strong style="color:#5bd4f5;">Tutorial</strong>: ahora recorre TODO el Informe de Seguimiento sin saltearse nada.
-                    <div style="margin-top:8px;">Antes, si la tabla por vendedor, el grafico, las tortas o el seguimiento de uso todavia estaban cargando, el recorrido los pasaba de largo. Ahora el tutorial <strong style="color:#5bf5a3;">espera a que todo termine de cargar</strong> antes de arrancar, asi ves cada seccion iluminada y explicada.</div>
-                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Incluye la tabla por vendedor, el grafico de tendencia, las tortas de distribucion, la torta del panel de seguimiento, el seguimiento de uso y el informe redactado.</div>
+                    Ahora el analisis <strong style="color:#5bd4f5;">detecta bien las palabras con enie</strong>: "seña", "año", "pequeño", "compañia" y similares.
+                    <div style="margin-top:8px;">Antes, esas palabras se perdian al buscar conceptos y a veces generaban conteos incorrectos (por ejemplo, "compa" se contaba dentro de "compañeros"). Ahora la enie <strong style="color:#5bf5a3;">cuenta como una letra mas</strong> y las palabras se detectan completas y exactas.</div>
+                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Ademas, el Tutorial recorre todo el Informe de Seguimiento sin saltearse secciones y el primer paso ya no aparece descolocado.</div>
                 </div>
             </div>
         </div>
