@@ -2819,12 +2819,12 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v20.9{% if username == 'Berna.Strauss' %} &middot; filtro de quincena en el informe{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v21.0{% if username == 'Berna.Strauss' %} &middot; linea unica muestra a todos los vendedores{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v20.9)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v21.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    El filtro de período del <strong style="color:#5bd4f5;">Informe</strong> ahora incluye <strong style="color:#5bf5a3;">Primera quincena (días 1 al 15)</strong> y <strong style="color:#5bf5a3;">Segunda quincena (días 16 a fin)</strong>.
-                    <div style="margin-top:8px;">Elegís la quincena desde el mismo menú donde están "Mes en curso" y las semanas. La tabla, los gráficos y el Seguimiento de Uso acompañan la quincena elegida.</div>
+                    En el gráfico de tendencia, el modo <strong style="color:#5bd4f5;">Línea única</strong> ahora muestra a <strong style="color:#5bf5a3;">todos los vendedores que subieron textos</strong> en el período, cada uno con su etiqueta.
+                    <div style="margin-top:8px;">Antes solo aparecía el vendedor que más había aportado en cada punto; quien nunca era el máximo quedaba sin nombre. Ahora figura cada vendedor con textos en su punto más alto. Si un vendedor no cargó textos en los meses elegidos, no aparece.</div>
                     <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Ademas, el Tutorial recorre todo el Informe de Seguimiento sin saltearse secciones y el primer paso ya no aparece descolocado.</div>
                 </div>
             </div>
@@ -7278,13 +7278,21 @@ async function loadInforme() {
         // Each balloon sits JUST above its own point (small gap), connected by a
         // very short neon leader line. Only bumped up further if it would collide
         // with a nearby balloon — never more separation than necessary.
-        const domSeen = {};
-        for (let i = 0; i < nX; i++) {
-            const u = domUser[i];
-            if (!u || totalVals[i] === 0) continue;
-            if (domSeen[u] === undefined || totalVals[i] > totalVals[domSeen[u]]) domSeen[u] = i;
-        }
-        const balloonList = Object.keys(domSeen).map(function(u){ return { u: u, i: domSeen[u], x: singlePts[domSeen[u]][0] }; });
+        // Un globo por CADA vendedor con textos en el periodo (todos los de
+        // `series`, que ya viene filtrada a quienes tienen datos). Cada globo se
+        // ubica en el punto donde ESE vendedor mas aporto. Antes solo se
+        // mostraba al vendedor DOMINANTE de cada punto, asi que quien nunca era
+        // el maximo no aparecia; ahora aparecen todos los que subieron textos.
+        const bestIdxOf = {};
+        series.forEach(function(s){
+            let bi = -1, bv = -1;
+            for (let i = 0; i < nX; i++) {
+                if (s.values[i] > bv) { bv = s.values[i]; bi = i; }
+            }
+            // Solo si el vendedor tiene al menos un texto en el periodo.
+            if (bi >= 0 && bv > 0) bestIdxOf[s.user] = bi;
+        });
+        const balloonList = Object.keys(bestIdxOf).map(function(u){ return { u: u, i: bestIdxOf[u], x: singlePts[bestIdxOf[u]][0] }; });
         balloonList.sort(function(a, b){ return a.x - b.x; });
         const placed = [];  // {xl, xr, byl} of already-placed balloons for collision checks
         balloonList.forEach(function(item){
