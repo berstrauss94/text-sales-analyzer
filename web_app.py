@@ -2819,13 +2819,12 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v20.8{% if username == 'Berna.Strauss' %} &middot; paneles admin cargan mas rapido{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v20.9{% if username == 'Berna.Strauss' %} &middot; filtro de quincena en el informe{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v20.8)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v20.9)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    El <strong style="color:#5bd4f5;">Panel de Seguimiento</strong> y el <strong style="color:#5bd4f5;">Informe</strong> ahora cargan más rápido.
-                    <div style="margin-top:8px;">Antes, para armar el informe, el sistema consultaba la base de datos una vez por cada vendedor y traía el texto completo de cada análisis. Ahora hace <strong style="color:#5bf5a3;">una sola consulta</strong> y trae solo los datos que necesita, sin los textos completos. Menos idas y vueltas, carga más ágil.</div>
-                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Es solo un cambio en cómo se leen los datos: los números y la distribución por mes son exactamente los mismos.</div>
+                    El filtro de período del <strong style="color:#5bd4f5;">Informe</strong> ahora incluye <strong style="color:#5bf5a3;">Primera quincena (días 1 al 15)</strong> y <strong style="color:#5bf5a3;">Segunda quincena (días 16 a fin)</strong>.
+                    <div style="margin-top:8px;">Elegís la quincena desde el mismo menú donde están "Mes en curso" y las semanas. La tabla, los gráficos y el Seguimiento de Uso acompañan la quincena elegida.</div>
                     <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Ademas, el Tutorial recorre todo el Informe de Seguimiento sin saltearse secciones y el primer paso ya no aparece descolocado.</div>
                 </div>
             </div>
@@ -3041,6 +3040,8 @@ HTML = """
                     <option value="s4">Mes en curso · Semana 4</option>
                     <option value="s12">Mes en curso · Primeras 2 semanas</option>
                     <option value="s123">Mes en curso · Primeras 3 semanas</option>
+                    <option value="q1">Mes en curso · Primera quincena (1-15)</option>
+                    <option value="q2">Mes en curso · Segunda quincena (16-fin)</option>
                     <option value="custom">Personalizado</option>
                 </select>
                 <select id="informeYear" onchange="loadInforme()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.78rem;">
@@ -6892,6 +6893,7 @@ function applyInformePreset() {
     const now = new Date();
     const curMonth = now.getMonth() + 1;  // 1-12
     window._informeWeekUpto = 0;  // reset cumulative-week filter
+    window._informeQuincena = 0;  // reset quincena filter (1=1-15, 2=16-fin)
 
     if (v === 'anual') {
         // Enero a la fecha: all months, all weeks
@@ -6911,6 +6913,12 @@ function applyInformePreset() {
         if (monthSel) monthSel.value = String(curMonth);
         if (weekSel) weekSel.value = '0';
         window._informeWeekUpto = 3;  // weeks 1..3
+    } else if (v === 'q1' || v === 'q2') {
+        // Quincena: dias 1-15 (q1) o 16-fin (q2). No calza con el esquema de
+        // semanas de 7 dias, asi que va por su propio parametro (quincena).
+        if (monthSel) monthSel.value = String(curMonth);
+        if (weekSel) weekSel.value = '0';
+        window._informeQuincena = (v === 'q1') ? 1 : 2;
     } else if (v === 'custom') {
         // leave selectors as they are; user drives them manually
     }
@@ -6922,6 +6930,7 @@ function _informeManualChange() {
     const preset = document.getElementById('informePreset');
     if (preset) preset.value = 'custom';
     window._informeWeekUpto = 0;
+    window._informeQuincena = 0;
     loadInforme();
 }
 
@@ -6936,7 +6945,8 @@ async function loadInforme() {
 
     try {
         const weekUpto = window._informeWeekUpto || 0;
-        const resp = await fetch('/admin/informe?year=' + year + '&month=' + month + '&week=' + week + '&week_upto=' + weekUpto + '&seller=' + seller + '&_t=' + Date.now(), { cache: 'no-store' });
+        const quincena = window._informeQuincena || 0;
+        const resp = await fetch('/admin/informe?year=' + year + '&month=' + month + '&week=' + week + '&week_upto=' + weekUpto + '&quincena=' + quincena + '&seller=' + seller + '&_t=' + Date.now(), { cache: 'no-store' });
         if (!resp.ok) { container.innerHTML = '<div style="color:#f55b5b;">Error ' + resp.status + '</div>'; return; }
         const data = await resp.json();
         if (data.error) { container.innerHTML = '<div style="color:#f55b5b;">' + data.error + '</div>'; return; }
@@ -7382,15 +7392,18 @@ async function loadInforme() {
             const _am = data.filter_month || 0;
             const _aw = data.filter_week || 0;
             const _awu = data.week_upto || 0;
+            const _aq = data.quincena || 0;
             const _awr = { 1: '1 al 7', 2: '8 al 14', 3: '15 al 21', 4: '22 al 31' };
             if (_am === 0) actPeriodLabel = 'Enero a la fecha · ' + year;
+            else if (_aq === 1) actPeriodLabel = _mfn[_am] + ' ' + year + ' · Primera quincena (dias 1 al 15)';
+            else if (_aq === 2) actPeriodLabel = _mfn[_am] + ' ' + year + ' · Segunda quincena (dias 16 a fin)';
             else if (_aw > 0) actPeriodLabel = _mfn[_am] + ' ' + year + ' · Semana ' + _aw + ' (dias ' + (_awr[_aw] || '') + ')';
             else if (_awu > 0) actPeriodLabel = _mfn[_am] + ' ' + year + ' · Primeras ' + _awu + ' semanas (dias 1 al ' + (_awu * 7) + ')';
             else actPeriodLabel = _mfn[_am] + ' ' + year + ' · mes completo';
         }
         let actividadHtml = '';
         try {
-            const actResp = await fetch('/admin/actividad?year=' + year + '&month=' + month + '&week=' + week + '&week_upto=' + weekUpto + '&seller=' + seller + '&_t=' + Date.now(), { cache: 'no-store' });
+            const actResp = await fetch('/admin/actividad?year=' + year + '&month=' + month + '&week=' + week + '&week_upto=' + weekUpto + '&quincena=' + quincena + '&seller=' + seller + '&_t=' + Date.now(), { cache: 'no-store' });
             if (actResp.ok) {
                 const act = await actResp.json();
                 const au = (act && act.users) ? act.users : {};
@@ -7529,9 +7542,14 @@ async function loadInforme() {
         const _fm = data.filter_month || 0;
         const _fw = data.filter_week || 0;
         const _wu = data.week_upto || 0;
+        const _fq = data.quincena || 0;
         const _weekRanges = { 1: '1 al 7', 2: '8 al 14', 3: '15 al 21', 4: '22 al 31' };
         if (_fm === 0) {
             periodLabel = 'Enero a la fecha · ' + year;
+        } else if (_fq === 1) {
+            periodLabel = monthFullNames[_fm] + ' ' + year + ' · Primera quincena (dias 1 al 15)';
+        } else if (_fq === 2) {
+            periodLabel = monthFullNames[_fm] + ' ' + year + ' · Segunda quincena (dias 16 a fin)';
         } else if (_fw > 0) {
             periodLabel = monthFullNames[_fm] + ' ' + year + ' · Semana ' + _fw + ' (dias ' + (_weekRanges[_fw] || '') + ')';
         } else if (_wu > 0) {
@@ -10784,6 +10802,7 @@ def admin_informe():
     filter_month = request.args.get("month", type=int) or 0  # 0 = all months
     filter_week = request.args.get("week", type=int) or 0    # 0 = all weeks (exact week)
     week_upto = request.args.get("week_upto", type=int) or 0  # >0 = weeks 1..N inclusive
+    quincena = request.args.get("quincena", type=int) or 0    # 1 = dias 1-15, 2 = 16-fin
     filter_seller = request.args.get("seller", "") or "_all"
 
     from src.users.history_manager import get_flat_entries
@@ -10831,6 +10850,12 @@ def admin_informe():
                     continue
                 if week_upto > 0 and w > week_upto:
                     continue
+                # Apply quincena filter (dias 1-15 o 16-fin). Independiente del
+                # esquema de semanas: solo aplica si hay dia conocido.
+                if quincena == 1 and (not e_day or e_day > 15):
+                    continue
+                if quincena == 2 and (not e_day or e_day < 16):
+                    continue
                 # Apply month filter
                 if filter_month > 0 and e_month != filter_month:
                     continue
@@ -10869,6 +10894,7 @@ def admin_informe():
         "filter_month": filter_month,
         "filter_week": filter_week,
         "week_upto": week_upto,
+        "quincena": quincena,
         "filter_seller": filter_seller,
     })
 
@@ -10893,6 +10919,7 @@ def admin_actividad():
     filter_month = request.args.get("month", type=int) or 0
     filter_week = request.args.get("week", type=int) or 0
     week_upto = request.args.get("week_upto", type=int) or 0
+    quincena = request.args.get("quincena", type=int) or 0  # 1 = dias 1-15, 2 = 16-fin
     filter_seller = request.args.get("seller", "") or "_all"
 
     # Resolve the active filter into a [start, end) datetime range.
@@ -10907,7 +10934,15 @@ def admin_actividad():
         # A specific month is selected.
         month_start = _mk(year, filter_month, 1)
         month_end = _mk(year + 1, 1, 1) if filter_month == 12 else _mk(year, filter_month + 1, 1)
-        if filter_week > 0:
+        if quincena == 1:
+            # Primera quincena: dias 1-15 (rango [dia 1, dia 16)).
+            start = month_start
+            end = _mk(year, filter_month, 16)
+        elif quincena == 2:
+            # Segunda quincena: dia 16 hasta fin de mes.
+            start = _mk(year, filter_month, 16)
+            end = month_end
+        elif filter_week > 0:
             # Exact week of the month (weeks are 1-7, 8-14, 15-21, 22-end).
             sd = (filter_week - 1) * 7 + 1
             start = _mk(year, filter_month, sd)
