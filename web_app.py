@@ -2819,13 +2819,13 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v20.6{% if username == 'Berna.Strauss' %} &middot; seguimiento de uso estimado desde textos{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v20.7{% if username == 'Berna.Strauss' %} &middot; seguimiento solo de quienes ingresaron{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v20.6)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v20.7)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    El <strong style="color:#5bd4f5;">Seguimiento de Uso</strong> ahora acompaña el mes que elegís en el informe.
-                    <div style="margin-top:8px;">Si un mes no tiene registro de ingresos ni tiempo (porque esa medición empezó hace poco), el sistema <strong style="color:#5bf5a3;">completa la tabla a partir de los textos cargados</strong> ese mes: cuántos analizó cada vendedor y su última carga. Esas filas se marcan como <span style="color:#e0b46a;">estimado</span>, para distinguirlas de la actividad medida de verdad.</div>
-                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Aplica a los meses que ya pasaron y a los que vienen, siempre que haya textos cargados. No inventa ingresos ni tiempo: esos quedan en blanco cuando no hay medición real.</div>
+                    El <strong style="color:#5bd4f5;">Seguimiento de Uso</strong> ahora lista <strong style="color:#5bf5a3;">solo a los usuarios que ingresaron</strong> al sistema en el período elegido.
+                    <div style="margin-top:8px;">Antes aparecían todos los que tenían textos cargados, hubieran entrado o no. Ahora la tabla refleja el uso real: quien no inició sesión en ese período no figura, aunque tenga textos.</div>
+                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Sigue acompañando el mes/semana que elegís en el informe.</div>
                     <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Ademas, el Tutorial recorre todo el Informe de Seguimiento sin saltearse secciones y el primer paso ya no aparece descolocado.</div>
                 </div>
             </div>
@@ -7509,7 +7509,7 @@ async function loadInforme() {
                         actividadHtml += '</tr>';
                     });
                     actividadHtml += '</tbody></table></div>';
-                    actividadHtml += '<div style="font-size:0.58rem;color:#555;margin-top:6px;">Tiempo de sesion estimado (acotado a 45 min cuando no hay cierre explicito). Las filas marcadas <span style="color:#e0b46a;">estimado</span> derivan de los textos cargados ese periodo (sin registro de ingresos/tiempo medido).</div>';
+                    actividadHtml += '<div style="font-size:0.58rem;color:#555;margin-top:6px;">Solo se listan los usuarios que ingresaron al sistema en el periodo. Tiempo de sesion estimado (acotado a 45 min cuando no hay cierre explicito).</div>';
                 }
                 actividadHtml += '</div>';
             }
@@ -10940,69 +10940,23 @@ def admin_actividad():
     summary.setdefault("users", {})
 
     # ----------------------------------------------------------------------
-    # Fallback ESTIMADO desde el historial de textos.
+    # Solo usuarios que REALMENTE ENTRARON al sistema.
     #
-    # activity_log solo tiene eventos desde que se activo el registro, asi que
-    # meses sin eventos medidos aparecerian vacios aunque el vendedor SI haya
-    # cargado textos ese mes. Para esos usuarios derivamos una actividad
-    # ESTIMADA a partir del historial (misma resolucion de fecha que el
-    # informe): cantidad de textos como "Analizar texto" y la fecha del ultimo
-    # texto como "Ultima vez". Se marca estimated=True. NO inventamos ingresos
-    # ni tiempo de sesion (eso no queda registrado en los textos): quedan en 0.
+    # El Seguimiento de Uso debe reflejar quienes ingresaron (hay al menos un
+    # evento 'login' en el periodo), NO todo el que tenga textos cargados. Por
+    # eso NO derivamos actividad desde el historial de textos: filtramos el
+    # resumen a los usuarios con logins > 0. Asi, quien nunca inicio sesion en
+    # el periodo no aparece en la tabla, aunque tenga textos.
     #
-    # Solo LECTURA del historial: no toca resolve_entry_date, add_entry ni el
-    # guardado; no reasigna fechas. Solo completa usuarios que NO tengan ya
-    # actividad medida en el periodo, para no pisar datos reales.
+    # Solo LECTURA de activity_log: no toca historial de textos, resolve_entry_date
+    # ni el guardado.
     # ----------------------------------------------------------------------
-    try:
-        from src.users.history_manager import get_all_entries, resolve_entry_date
-        medidos = set(summary["users"].keys())
-        cand_users = usernames if usernames else user_manager.list_users()
-        for u in cand_users:
-            if u in medidos:
-                continue  # ya tiene actividad real medida: no la pisamos
-            textos = 0
-            last_iso = None
-            last_day = 0
-            for e in get_all_entries(u):
-                e_year, e_month, e_day = resolve_entry_date(e)
-                if e_year != year:
-                    continue
-                # Respetar el mismo filtro de mes/semana del periodo activo.
-                if filter_month > 0 and e_month != filter_month:
-                    continue
-                if filter_month > 0 and e_day:
-                    w = min(4, (e_day - 1) // 7 + 1)
-                    if filter_week > 0 and w != filter_week:
-                        continue
-                    if week_upto > 0 and w > week_upto:
-                        continue
-                textos += 1
-                # Guardar el dia mas reciente para "Ultima vez" (aprox).
-                d = e_day or 1
-                mo = e_month if (e_month and 1 <= e_month <= 12) else 1
-                if d >= last_day:
-                    last_day = d
-                    try:
-                        last_iso = _mk(year, mo, d).isoformat()
-                    except Exception:
-                        last_iso = None
-            if textos > 0:
-                summary["users"][u] = {
-                    "logins": 0,
-                    "last_seen": last_iso,
-                    "total_minutes": 0.0,
-                    "avg_session_minutes": 0.0,
-                    "tools": {"analizar": textos},
-                    "events": textos,
-                    "logins_by_day": {},
-                    "minutes_by_day": {},
-                    "estimated": True,   # actividad derivada de textos, no medida
-                }
-        summary["ok"] = True
-    except Exception as exc:
-        # El fallback es best-effort: si algo falla, devolvemos lo que haya.
-        summary.setdefault("estimate_error", str(exc))
+    users = summary.get("users") or {}
+    summary["users"] = {
+        u: info for u, info in users.items()
+        if (info or {}).get("logins", 0) > 0
+    }
+    summary["ok"] = True
 
     summary["filter_seller"] = filter_seller
     return jsonify(summary)
