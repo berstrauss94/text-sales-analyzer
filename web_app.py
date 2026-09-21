@@ -2819,13 +2819,13 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v20.7{% if username == 'Berna.Strauss' %} &middot; seguimiento solo de quienes ingresaron{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v20.8{% if username == 'Berna.Strauss' %} &middot; paneles admin cargan mas rapido{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v20.7)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v20.8)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    El <strong style="color:#5bd4f5;">Seguimiento de Uso</strong> ahora lista <strong style="color:#5bf5a3;">solo a los usuarios que ingresaron</strong> al sistema en el período elegido.
-                    <div style="margin-top:8px;">Antes aparecían todos los que tenían textos cargados, hubieran entrado o no. Ahora la tabla refleja el uso real: quien no inició sesión en ese período no figura, aunque tenga textos.</div>
-                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Sigue acompañando el mes/semana que elegís en el informe.</div>
+                    El <strong style="color:#5bd4f5;">Panel de Seguimiento</strong> y el <strong style="color:#5bd4f5;">Informe</strong> ahora cargan más rápido.
+                    <div style="margin-top:8px;">Antes, para armar el informe, el sistema consultaba la base de datos una vez por cada vendedor y traía el texto completo de cada análisis. Ahora hace <strong style="color:#5bf5a3;">una sola consulta</strong> y trae solo los datos que necesita, sin los textos completos. Menos idas y vueltas, carga más ágil.</div>
+                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Es solo un cambio en cómo se leen los datos: los números y la distribución por mes son exactamente los mismos.</div>
                     <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Ademas, el Tutorial recorre todo el Informe de Seguimiento sin saltearse secciones y el primer paso ya no aparece descolocado.</div>
                 </div>
             </div>
@@ -10610,19 +10610,18 @@ def admin_stats(username):
     period = request.args.get("period", "mensual")
     year = request.args.get("year", type=int) or 2026
 
-    from src.users.history_manager import get_all_entries, resolve_entry_date
-    # If _all, aggregate across all users
+    from src.users.history_manager import get_report_entries_all, resolve_entry_date
+    # If _all, aggregate across all users — en UNA query multi-usuario (entradas
+    # ligeras, sin text_full) en vez de una query por usuario.
     if username == "_all":
         all_users = user_manager.list_users()
         entries = []
+        by_user = get_report_entries_all(all_users)
         for u in all_users:
-            try:
-                entries.extend(get_all_entries(u))
-            except Exception:
-                pass
+            entries.extend(by_user.get(u, []))
         display_name = "General (todos)"
     else:
-        entries = get_all_entries(username)
+        entries = get_report_entries_all([username]).get(username, [])
         display_name = username
 
     # Determine which months to include based on period
@@ -10803,10 +10802,14 @@ def admin_informe():
     weekly = {}
     daily = {}  # per-user day-of-month counts, only populated when a week is selected
 
-    from src.users.history_manager import get_all_entries, resolve_entry_date
+    from src.users.history_manager import get_report_entries_all, resolve_entry_date
+
+    # Una sola query multi-usuario (entradas ligeras, sin text_full) en vez de
+    # una query PG por cada usuario. Reduce N round-trips a 1 y baja el volumen.
+    entries_by_user = get_report_entries_all(target_users)
 
     for u in target_users:
-        entries = get_all_entries(u)
+        entries = entries_by_user.get(u, [])
         matrix[u] = {m: 0 for m in range(1, 13)}
         weekly[u] = {m: {1: 0, 2: 0, 3: 0, 4: 0} for m in range(1, 13)}
         daily[u] = {}

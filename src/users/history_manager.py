@@ -1286,3 +1286,113 @@ def migrate_json_to_pg(users_dir: str = USERS_DIR) -> dict:
 
     logger.info(f"Migración JSON→PG completada: {summary}")
     return summary
+
+
+# ---------------------------------------------------------------------------
+# Lectura AGREGADA multi-usuario para paneles admin (optimizacion de carga)
+# ---------------------------------------------------------------------------
+def get_report_entries_all(usernames: list[str]) -> dict:
+    """
+    Devuelve, para TODOS los usuarios dados, sus entradas en forma LIGERA, en
+    UNA sola query PG (en vez de una query por usuario).
+
+    Optimizacion para los paneles admin (/admin/informe, /admin/stats): esos
+    endpoints solo necesitan, por entrada, la fecha (day_label/year/month/
+    timestamp) y el dict `commercial` ya guardado. NO necesitan text_full ni
+    text_short (payload grande). Al pedir solo esas columnas y agrupar en una
+    query, se elimina el patron N+ queries y se reduce drasticamente el volumen
+    de datos traido.
+
+    Devuelve: { username: [ {id, timestamp, year, month, day_label, commercial}, ... ] }
+    Solo LECTURA. No toca resolve_entry_date ni el guardado; la resolucion de
+    fecha la sigue haciendo el llamador con resolve_entry_date sobre estos dicts.
+    Fallback: si PG no esta disponible, arma el mismo shape leyendo por usuario
+    (mismo resultado, sin la optimizacion).
+    """
+    result: dict = {u: [] for u in (usernames or [])}
+    if not usernames:
+        return result
+
+    if not _is_pg_available():
+        # Fallback JSON/local: reusar la ruta existente por usuario.
+        for u in usernames:
+            light = []
+            for e in get_all_entries(u):
+                light.append({
+                    "id": e.get("id"),
+                    "timestamp": e.get("timestamp"),
+                    "year": e.get("year"),
+                    "month": e.get("month"),
+                    "day_label": e.get("day_label", ""),
+                    "commercial": e.get("commercial") or {},
+                })
+            result[u] = light
+        return result
+
+    conn = _get_pg_conn()
+    if conn is None:
+        return result
+    try:
+        with conn.cursor() as cur:
+            # Una sola query para todos los usuarios; solo columnas necesarias
+            # (sin text_full/text_short). ANY(%s) recibe la lista de usernames.
+            cur.execute(
+                """
+                SELECT username, id, timestamp, commercial, day_label
+                FROM analysis_history
+                WHERE username = ANY(%s)
+                ORDER BY username ASC, timestamp DESC
+                """,
+                (list(usernames),),
+            )
+            rows = cur.fetchall()
+        _return_pg_conn(conn)
+    except Exception as exc:
+        logger.error(f"Error en get_report_entries_all: {exc}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        _return_pg_conn(conn, close=True)
+        # Best-effort: devolver lo que se pueda via fallback por usuario.
+        for u in usernames:
+            try:
+                result[u] = [{
+                    "id": e.get("id"), "timestamp": e.get("timestamp"),
+                    "year": e.get("year"), "month": e.get("month"),
+                    "day_label": e.get("day_label", ""),
+                    "commercial": e.get("commercial") or {},
+                } for e in get_all_entries(u)]
+            except Exception:
+                result[u] = []
+        return result
+
+    for row in rows:
+        username, eid, ts, commercial, day_label = row
+        ts_str = ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
+        entry_year = getattr(ts, "year", None)
+        entry_month = getattr(ts, "month", None)
+        if entry_year is None:
+            try:
+                parsed_ts = datetime.fromisoformat(ts_str)
+                entry_year = parsed_ts.year
+                entry_month = parsed_ts.month
+            except Exception:
+                pass
+        # commercial puede venir como dict (JSONB) o como str JSON.
+        if isinstance(commercial, dict) or commercial is None:
+            comm = commercial or {}
+        else:
+            try:
+                comm = json.loads(commercial or "{}")
+            except Exception:
+                comm = {}
+        result.setdefault(username, []).append({
+            "id": eid,
+            "timestamp": ts_str,
+            "year": entry_year,
+            "month": entry_month,
+            "day_label": day_label or "",
+            "commercial": comm,
+        })
+    return result
