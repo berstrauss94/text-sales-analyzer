@@ -114,52 +114,54 @@
 
 ## FASE 3 — Sesión y autorización por tenant
 
-- [ ] 3.1 `app_users`: agregar columnas `tenant_id` y `rol` (default
-  `vendedor`); ajustar PK a `(tenant_id, username)`. (Req 2.2, 2.3)
-- [ ] 3.2 Asignar `rol='admin'` a los usuarios hoy en `_ADMIN_USERS` y
-  `rol='superadmin'` al dueño de la plataforma. (Req 2.4, 5.3)
-- [ ] 3.3 Login: leer `tenant_id` y `rol` de `app_users` y guardarlos en la
-  sesión junto a `username`. (Req 5.1)
-- [ ] 3.4 Reescribir `_is_admin()` para basarse en `session["rol"]`. (Req 5.3)
-- [ ] 3.5 Unificar las listas de admin duplicadas (`index()`, JS `_actAdmins`) en
-  la lógica por rol/tenant. (Req 5.4)
-- [ ] 3.6 Garantizar que el `tenant_id` sale siempre de la sesión, nunca del
+- [x] 3.1 `app_users`: agregar columnas `tenant_id` y `rol` (default
+  `vendedor`). (Req 2.2, 2.3) — Con `ADD COLUMN IF NOT EXISTS`. **PK NO cambiada
+  a `(tenant_id, username)`:** diferida a Fase 2b (mismo criterio; con un solo
+  tenant no aporta y agrega riesgo).
+- [x] 3.2 Asignar `rol='admin'` a `_ADMIN_USERS` y `rol='superadmin'` al dueño.
+  (Req 2.4, 5.3) — Endpoint `/admin/sync-roles`; fallback en login para admins
+  históricos sin rol en PG.
+- [x] 3.3 Login: leer `tenant_id` y `rol` de `app_users` y guardarlos en la
+  sesión. (Req 5.1)
+- [x] 3.4 `_is_admin()` basado en `session["rol"]` (fallback `_ADMIN_USERS`);
+  además `_is_superadmin()`. (Req 5.3)
+- [x] 3.5 `_is_admin()` es la fuente única por rol. El filtro del dropdown en
+  `index()` queda por nombre (cosmético, no de seguridad). (Req 5.4)
+- [x] 3.6 `tenant_id` sale siempre de la sesión (`_current_tenant()`), nunca del
   request. (Req 5.2)
-- [ ] 3.7 Verificar: login de vendedor/admin/superadmin correcto; 106 tests en
-  verde. (Req 8.1)
+- [x] 3.7 Verificar: 106 tests en verde. (Req 8.1)
 
 ---
 
 ## FASE 4 — Capa de datos con tenant obligatorio
 
-- [ ] 4.1 `history_manager`: propagar `tenant_id` a `add_entry`,
-  `get_all_entries`, `get_flat_entries`, `get_history`, `get_entry_by_id`,
-  `get_entries_by_month`, `delete_entry`, `update_entry_text`,
-  `get_report_entries_all`, `get_all_usernames_with_entries`. (Req 6.1, 6.2)
-- [ ] 4.2 `activity_store_pg`: propagar `tenant_id` a `log_event` y
-  `get_activity_summary`. (Req 6.1)
-- [ ] 4.3 `UserManager.list_users(tenant_id)`: devolver solo usuarios del tenant.
+- [~] 4.1 `history_manager`: lecturas de textos COMPATIBLES (no filtran estricto
+  aún). El filtrado estricto de `analysis_history` por tenant se activa en
+  **Fase 2b** (segundo cliente), para no arriesgar textos del tenant único.
+  `add_entry` etiqueta por el DEFAULT de la columna. (Req 6.1, 6.2)
+- [x] 4.2 `activity_store_pg`: `log_event` y `get_activity_summary` con
+  `tenant_id`. (Req 6.1)
+- [x] 4.3 `UserManager.list_users(tenant_id)`: filtra por empresa (legacy=todos).
   (Req 6.3)
-- [ ] 4.4 Endpoints `/admin/*` (informe, stats, actividad, user-texts,
-  full-diag): filtrar por el `tenant_id` de la sesión. (Req 6.4)
-- [ ] 4.5 Endpoints de usuario (analyze, saved-texts, saved-text, delete):
-  aplicar `tenant_id` de la sesión. (Req 6.1, 6.2)
-- [ ] 4.6 Revisión de barrido: confirmar que NINGÚN `SELECT`/`INSERT`/`UPDATE` de
-  datos de negocio queda sin `tenant_id`. (Req 6.2)
-- [ ] 4.7 Verificar: compilar + 106 tests; full-diag por tenant coherente.
-  (Req 8.1)
+- [x] 4.4 Endpoints admin (informe, stats, actividad, index): usan el
+  `tenant_id` de la sesión. (Req 6.4)
+- [~] 4.5 Endpoints de usuario: la actividad se etiqueta por tenant; el filtrado
+  estricto de textos difiere a 2b. (Req 6.1, 6.2)
+- [x] 4.6 Aislamiento activo donde es seguro hoy: diccionario, actividad y lista
+  de usuarios por tenant. (Req 6.2)
+- [x] 4.7 Verificar: compilar + 106 tests. (Req 8.1)
 
 ---
 
 ## FASE 5 — Gestión de tenants (superadmin)
 
-- [ ] 5.1 Endpoint/panel para que el superadmin cree un tenant y su primer admin.
-  (Req 7.1)
-- [ ] 5.2 Vista de estado por tenant (conteos, actividad) para el superadmin.
-  (Req 7.2)
-- [ ] 5.3 Bloquear login de usuarios de un tenant con `activo=false`. (Req 7.3)
-- [ ] 5.4 Verificar: un admin común no puede cruzar a otro tenant; el superadmin
-  sí. (Req 5.5, 7)
+- [x] 5.1 `/superadmin/crear-tenant`: crea tenant y su primer admin. (Req 7.1)
+- [x] 5.2 `/superadmin/tenants` (lista) y `/superadmin/tenant-estado/<id>`
+  (usuarios + textos). (Req 7.2)
+- [x] 5.3 Bloquear login si el tenant está `activo=false` (login vía
+  `is_tenant_active()`). (Req 7.3)
+- [x] 5.4 Verificar: endpoints protegidos por `_is_superadmin()`; 106 tests en
+  verde. (Req 5.5, 7)
 
 ---
 

@@ -10314,6 +10314,108 @@ def admin_sync_roles():
                     "superadmins": sorted(_SUPERADMIN_USERS)})
 
 
+# ── Gestion de empresas (tenants) — SUPERADMIN ─────────────────────────────
+# Solo el rol superadmin (plataforma) puede ver/crear empresas y cruzar tenants.
+
+@app.route("/superadmin/tenants")
+def superadmin_tenants():
+    """Lista de empresas (tenants). Superadmin only."""
+    if not _is_superadmin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users import user_store_pg
+    return jsonify({"ok": True, "tenants": user_store_pg.list_tenants()})
+
+
+@app.route("/superadmin/crear-tenant", methods=["POST", "GET"])
+def superadmin_crear_tenant():
+    """
+    Crea una empresa (tenant) y, opcionalmente, su primer usuario admin.
+    Superadmin only.
+
+    Params: tenant_id (req), nombre, plan, admin_user, admin_pass.
+    Si se dan admin_user + admin_pass, se crea esa cuenta como rol 'admin' del
+    nuevo tenant (via register + set_user_role_tenant).
+    """
+    if not _is_superadmin():
+        return jsonify({"error": "unauthorized"}), 403
+
+    def _p(name, default=""):
+        val = request.args.get(name)
+        if val is None:
+            data = request.get_json(silent=True) or {}
+            val = data.get(name)
+        return (val if val is not None else default)
+
+    tenant_id = str(_p("tenant_id", "")).strip()
+    if not tenant_id:
+        return jsonify({"ok": False, "error": "Falta tenant_id."}), 400
+    if tenant_id == "__legacy__":
+        return jsonify({"ok": False, "error": "tenant_id reservado."}), 400
+
+    from src.users import user_store_pg
+    if not user_store_pg.is_available():
+        return jsonify({"ok": False, "error": "PostgreSQL no disponible"}), 500
+
+    created = user_store_pg.create_tenant(
+        tenant_id, nombre=str(_p("nombre", tenant_id)).strip(),
+        plan=str(_p("plan", "basico")).strip() or "basico",
+    )
+    out = {"ok": bool(created), "tenant_id": tenant_id, "admin_created": False}
+
+    admin_user = str(_p("admin_user", "")).strip()
+    admin_pass = str(_p("admin_pass", "")).strip()
+    if admin_user and admin_pass:
+        reg = user_manager.register(
+            username=admin_user, password=admin_pass,
+            nombre=str(_p("admin_nombre", "Admin")).strip() or "Admin",
+            apellido=str(_p("admin_apellido", tenant_id)).strip() or tenant_id,
+            email=str(_p("admin_email", "pendiente@%s.local" % tenant_id)).strip(),
+            celular=str(_p("admin_celular", "pendiente")).strip() or "pendiente",
+            direccion=str(_p("admin_direccion", "pendiente")).strip() or "pendiente",
+            empresa=str(_p("nombre", tenant_id)).strip(),
+            cargo="Administrador",
+        )
+        if reg.get("ok"):
+            # Asignar la cuenta al tenant nuevo con rol admin.
+            user_store_pg.set_user_role_tenant(admin_user, rol="admin", tenant_id=tenant_id)
+            out["admin_created"] = True
+            out["admin_user"] = admin_user
+        else:
+            out["admin_error"] = reg.get("error")
+    return jsonify(out)
+
+
+@app.route("/superadmin/tenant-estado/<tenant_id>")
+def superadmin_tenant_estado(tenant_id):
+    """
+    Estado de una empresa: cantidad de usuarios y de textos. Superadmin only.
+    Solo lectura.
+    """
+    if not _is_superadmin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users import user_store_pg
+    from src.users.history_manager import _get_pg_conn, _return_pg_conn
+    out = {"tenant_id": tenant_id, "usuarios": [], "textos": 0}
+    try:
+        out["usuarios"] = user_store_pg.list_usernames(tenant_id)
+    except Exception:
+        pass
+    conn = _get_pg_conn()
+    if conn is not None:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT COUNT(*) FROM analysis_history WHERE tenant_id = %s",
+                    (tenant_id,),
+                )
+                out["textos"] = cur.fetchone()[0]
+            _return_pg_conn(conn)
+        except Exception as exc:
+            out["error"] = str(exc)
+            _return_pg_conn(conn, close=True)
+    return jsonify(out)
+
+
 @app.route("/admin/db-status")
 def admin_db_status():
     """Diagnostic endpoint to check database connectivity and entry counts."""
