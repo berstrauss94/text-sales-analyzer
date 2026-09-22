@@ -39,18 +39,34 @@ VALID_CATEGORIES = {
 # phrases in memory with a short TTL and invalidate on any write, so analysis
 # reads from RAM in the common case. Per-process cache (safe across gunicorn
 # workers — each has its own; the TTL bounds staleness anyway).
+# Tenant por defecto (multi-tenant Fase 1). Mientras la sesion no provea un
+# tenant (llega en la Fase 3), todo cae en este tenant, dejando el comportamiento
+# actual IDENTICO para la empresa existente. El aislamiento por tenant ya queda
+# implementado en el esquema y las consultas.
+DEFAULT_TENANT = "__legacy__"
+
 _CACHE_TTL_SECONDS = 60.0
-_cache_by_category: dict | None = None
-_cache_ts: float = 0.0
+# Cache POR TENANT: { tenant_id: {category: [phrase, ...]} } y su timestamp.
+# Antes era un unico cache global; en multi-tenant cada empresa tiene el suyo,
+# para que el diccionario de una no se mezcle con el de otra.
+_cache_by_tenant: dict = {}
+_cache_ts_by_tenant: dict = {}
 # _ensure_table runs a DDL round-trip; only needed once per process.
 _table_ready = False
 
 
-def _invalidate_cache() -> None:
-    """Drop the in-memory cache so the next read reflects fresh writes."""
-    global _cache_by_category, _cache_ts
-    _cache_by_category = None
-    _cache_ts = 0.0
+def _invalidate_cache(tenant_id: str | None = None) -> None:
+    """
+    Drop the in-memory cache so the next read reflects fresh writes. Si se pasa
+    tenant_id, invalida solo el de ese tenant; si no, invalida todos.
+    """
+    global _cache_by_tenant, _cache_ts_by_tenant
+    if tenant_id is None:
+        _cache_by_tenant = {}
+        _cache_ts_by_tenant = {}
+    else:
+        _cache_by_tenant.pop(tenant_id, None)
+        _cache_ts_by_tenant.pop(tenant_id, None)
 
 
 def _conn():
@@ -90,29 +106,41 @@ def _ensure_table(conn) -> None:
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS dictionary_overrides (
-                id       BIGSERIAL   PRIMARY KEY,
-                phrase   TEXT        NOT NULL,
-                category TEXT        NOT NULL,
-                added_by TEXT        NOT NULL DEFAULT '',
-                ts       TIMESTAMPTZ NOT NULL DEFAULT now()
+                id        BIGSERIAL   PRIMARY KEY,
+                tenant_id TEXT        NOT NULL DEFAULT '__legacy__',
+                phrase    TEXT        NOT NULL,
+                category  TEXT        NOT NULL,
+                added_by  TEXT        NOT NULL DEFAULT '',
+                ts        TIMESTAMPTZ NOT NULL DEFAULT now()
             )
             """
         )
-        # Prevent exact duplicates (same phrase in the same category).
+        # Migracion segura para tablas ya existentes: agregar tenant_id si falta.
+        # Todas las filas actuales quedan en '__legacy__' sin perder nada.
         cur.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_dictov_phrase_cat "
-            "ON dictionary_overrides (lower(phrase), category)"
+            "ALTER TABLE dictionary_overrides "
+            "ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT '__legacy__'"
         )
+        # Indice unico AHORA POR TENANT: la misma frase puede existir en dos
+        # empresas distintas sin colisionar. Se crea el nuevo y se descarta el
+        # viejo global si existiera.
+        cur.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_dictov_tenant_phrase_cat "
+            "ON dictionary_overrides (tenant_id, lower(phrase), category)"
+        )
+        cur.execute("DROP INDEX IF EXISTS idx_dictov_phrase_cat")
     conn.commit()
     _table_ready = True
 
 
-def add_phrase(phrase: str, category: str, added_by: str = "") -> bool:
+def add_phrase(phrase: str, category: str, added_by: str = "",
+               tenant_id: str = DEFAULT_TENANT) -> bool:
     """
-    Add a user phrase to a category. Idempotent: a duplicate (same phrase+category)
-    is silently ignored. Returns True on success. Best-effort.
+    Add a user phrase to a category, WITHIN a tenant. Idempotent: un duplicado
+    (misma frase+categoria+tenant) se ignora. Returns True on success.
     """
     phrase = (phrase or "").strip()
+    tenant_id = tenant_id or DEFAULT_TENANT
     if not phrase or category not in VALID_CATEGORIES or not is_available():
         return False
     conn = _conn()
@@ -122,13 +150,13 @@ def add_phrase(phrase: str, category: str, added_by: str = "") -> bool:
         _ensure_table(conn)
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO dictionary_overrides (phrase, category, added_by) "
-                "VALUES (%s, %s, %s) "
-                "ON CONFLICT (lower(phrase), category) DO NOTHING",
-                (phrase, category, added_by or ""),
+                "INSERT INTO dictionary_overrides (tenant_id, phrase, category, added_by) "
+                "VALUES (%s, %s, %s, %s) "
+                "ON CONFLICT (tenant_id, lower(phrase), category) DO NOTHING",
+                (tenant_id, phrase, category, added_by or ""),
             )
         conn.commit()
-        _invalidate_cache()
+        _invalidate_cache(tenant_id)
         _release(conn)
         return True
     except Exception as exc:
@@ -141,12 +169,13 @@ def add_phrase(phrase: str, category: str, added_by: str = "") -> bool:
         return False
 
 
-def list_phrases() -> list[dict]:
+def list_phrases(tenant_id: str = DEFAULT_TENANT) -> list[dict]:
     """
-    Return all override phrases as a list of dicts:
+    Return the override phrases OF A TENANT as a list of dicts:
       [{ "id": int, "phrase": str, "category": str, "added_by": str, "ts": iso }]
     Empty list if PG is unavailable.
     """
+    tenant_id = tenant_id or DEFAULT_TENANT
     if not is_available():
         return []
     conn = _conn()
@@ -157,7 +186,9 @@ def list_phrases() -> list[dict]:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT id, phrase, category, added_by, ts "
-                "FROM dictionary_overrides ORDER BY category ASC, ts DESC"
+                "FROM dictionary_overrides WHERE tenant_id = %s "
+                "ORDER BY category ASC, ts DESC",
+                (tenant_id,),
             )
             rows = cur.fetchall()
         _release(conn)
@@ -179,28 +210,32 @@ def list_phrases() -> list[dict]:
         return []
 
 
-def phrases_by_category() -> dict:
+def phrases_by_category(tenant_id: str = DEFAULT_TENANT) -> dict:
     """
-    Return { category: [phrase, ...], ... } for the analysis engine.
+    Return { category: [phrase, ...], ... } for the analysis engine, DEL TENANT
+    indicado.
 
-    CACHED in memory with a short TTL: this is read on every text analysis, so
-    hitting PostgreSQL each time was a real slowdown. The cache is invalidated
-    on any write (add/delete/move/seed) and expires after _CACHE_TTL_SECONDS.
+    CACHED en memoria POR TENANT con TTL corto: se lee en cada analisis de texto.
+    El cache se invalida en cualquier escritura del tenant y expira tras
+    _CACHE_TTL_SECONDS.
     """
-    global _cache_by_category, _cache_ts
+    tenant_id = tenant_id or DEFAULT_TENANT
     now = _time.time()
-    if _cache_by_category is not None and (now - _cache_ts) < _CACHE_TTL_SECONDS:
-        return _cache_by_category
+    cached = _cache_by_tenant.get(tenant_id)
+    ts = _cache_ts_by_tenant.get(tenant_id, 0.0)
+    if cached is not None and (now - ts) < _CACHE_TTL_SECONDS:
+        return cached
     grouped: dict = {}
-    for row in list_phrases():
+    for row in list_phrases(tenant_id):
         grouped.setdefault(row["category"], []).append(row["phrase"])
-    _cache_by_category = grouped
-    _cache_ts = now
+    _cache_by_tenant[tenant_id] = grouped
+    _cache_ts_by_tenant[tenant_id] = now
     return grouped
 
 
-def count_phrases() -> int:
-    """Return how many override rows exist (0 if unavailable)."""
+def count_phrases(tenant_id: str = DEFAULT_TENANT) -> int:
+    """Return how many override rows exist FOR A TENANT (0 if unavailable)."""
+    tenant_id = tenant_id or DEFAULT_TENANT
     if not is_available():
         return 0
     conn = _conn()
@@ -209,7 +244,10 @@ def count_phrases() -> int:
     try:
         _ensure_table(conn)
         with conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM dictionary_overrides")
+            cur.execute(
+                "SELECT COUNT(*) FROM dictionary_overrides WHERE tenant_id = %s",
+                (tenant_id,),
+            )
             n = cur.fetchone()[0]
         _release(conn)
         return int(n or 0)
@@ -223,20 +261,21 @@ def count_phrases() -> int:
         return 0
 
 
-def seed_from_base(base_by_category: dict) -> int:
+def seed_from_base(base_by_category: dict, tenant_id: str = DEFAULT_TENANT) -> int:
     """
-    One-time seed: if the overrides table is EMPTY, populate it with every base
-    phrase so the editor shows the full dictionary and the engine reads
-    everything from a single, editable source ("segunda capa" / effective dict).
+    One-time seed POR TENANT: si el tenant no tiene frases aun, lo puebla con
+    todas las frases base, para que el editor muestre el diccionario completo y
+    el motor lea todo de una unica fuente editable.
 
-    base_by_category: { category: [phrase, ...] }. Categories not in
-    VALID_CATEGORIES are ignored. Returns the number of phrases inserted (0 if
-    the table already had rows, or PG is unavailable).
+    base_by_category: { category: [phrase, ...] }. Categorias fuera de
+    VALID_CATEGORIES se ignoran. Devuelve cuantas frases se insertaron (0 si el
+    tenant ya tenia filas, o PG no esta disponible).
     """
+    tenant_id = tenant_id or DEFAULT_TENANT
     if not is_available():
         return 0
-    # Only seed when empty, so we never duplicate or overwrite user edits.
-    if count_phrases() > 0:
+    # Only seed when empty (for this tenant), so we never duplicate/overwrite.
+    if count_phrases(tenant_id) > 0:
         return 0
     conn = _conn()
     if conn is None:
@@ -253,17 +292,17 @@ def seed_from_base(base_by_category: dict) -> int:
                     if not p:
                         continue
                     cur.execute(
-                        "INSERT INTO dictionary_overrides (phrase, category, added_by) "
-                        "VALUES (%s, %s, %s) "
-                        "ON CONFLICT (lower(phrase), category) DO NOTHING",
-                        (p, category, "sistema"),
+                        "INSERT INTO dictionary_overrides (tenant_id, phrase, category, added_by) "
+                        "VALUES (%s, %s, %s, %s) "
+                        "ON CONFLICT (tenant_id, lower(phrase), category) DO NOTHING",
+                        (tenant_id, p, category, "sistema"),
                     )
                     if cur.rowcount > 0:
                         inserted += 1
         conn.commit()
-        _invalidate_cache()
+        _invalidate_cache(tenant_id)
         _release(conn)
-        logger.info(f"dictionary_overrides seeded with {inserted} base phrases")
+        logger.info(f"dictionary_overrides seeded with {inserted} base phrases (tenant={tenant_id})")
         return inserted
     except Exception as exc:
         logger.error(f"dictionary_overrides seed error: {exc}")
@@ -275,8 +314,13 @@ def seed_from_base(base_by_category: dict) -> int:
         return 0
 
 
-def delete_phrase(override_id: int) -> bool:
-    """Delete an override phrase by its id. Returns True if a row was removed."""
+def delete_phrase(override_id: int, tenant_id: str = DEFAULT_TENANT) -> bool:
+    """
+    Delete an override phrase by its id, SOLO si pertenece al tenant dado. Asi
+    una empresa no puede borrar una frase de otra pasando un id ajeno.
+    Returns True if a row was removed.
+    """
+    tenant_id = tenant_id or DEFAULT_TENANT
     if not is_available():
         return False
     conn = _conn()
@@ -285,10 +329,13 @@ def delete_phrase(override_id: int) -> bool:
     try:
         _ensure_table(conn)
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM dictionary_overrides WHERE id = %s", (int(override_id),))
+            cur.execute(
+                "DELETE FROM dictionary_overrides WHERE id = %s AND tenant_id = %s",
+                (int(override_id), tenant_id),
+            )
             removed = cur.rowcount > 0
         conn.commit()
-        _invalidate_cache()
+        _invalidate_cache(tenant_id)
         _release(conn)
         return removed
     except Exception as exc:
@@ -301,8 +348,13 @@ def delete_phrase(override_id: int) -> bool:
         return False
 
 
-def move_phrase(override_id: int, new_category: str) -> bool:
-    """Move an override phrase to another category. Returns True on success."""
+def move_phrase(override_id: int, new_category: str,
+                tenant_id: str = DEFAULT_TENANT) -> bool:
+    """
+    Move an override phrase to another category, SOLO si pertenece al tenant
+    dado. Returns True on success.
+    """
+    tenant_id = tenant_id or DEFAULT_TENANT
     if new_category not in VALID_CATEGORIES or not is_available():
         return False
     conn = _conn()
@@ -312,12 +364,13 @@ def move_phrase(override_id: int, new_category: str) -> bool:
         _ensure_table(conn)
         with conn.cursor() as cur:
             cur.execute(
-                "UPDATE dictionary_overrides SET category = %s WHERE id = %s",
-                (new_category, int(override_id)),
+                "UPDATE dictionary_overrides SET category = %s "
+                "WHERE id = %s AND tenant_id = %s",
+                (new_category, int(override_id), tenant_id),
             )
             moved = cur.rowcount > 0
         conn.commit()
-        _invalidate_cache()
+        _invalidate_cache(tenant_id)
         _release(conn)
         return moved
     except Exception as exc:

@@ -9762,6 +9762,22 @@ def _is_admin():
     return session.get("username") in _ADMIN_USERS
 
 
+# Multi-tenant (Fase 1): tenant activo de la sesion. Hoy la sesion todavia no
+# guarda tenant (eso llega en la Fase 3), asi que devolvemos el tenant por
+# defecto y el comportamiento es identico al actual para la empresa existente.
+# Cuando la Fase 3 pueble session["tenant_id"], este helper lo tomara solo.
+_DEFAULT_TENANT = "__legacy__"
+
+
+def _current_tenant():
+    """
+    Tenant de la sesion actual. SIEMPRE sale de la sesion, nunca del request,
+    para que ningun usuario pueda pedir datos de otro tenant. Fallback al tenant
+    por defecto mientras la sesion no lo provea (pre Fase 3).
+    """
+    return session.get("tenant_id") or _DEFAULT_TENANT
+
+
 def _log_activity(event_type, tool="", entry_id="", detail="", username=None):
     """
     Best-effort activity logging. Never raises, never blocks the caller's action.
@@ -9808,7 +9824,8 @@ def dictionary_add():
     if not phrase or not category:
         return jsonify({"ok": False, "error": "faltan phrase/category"}), 400
     from src.users import dictionary_store_pg
-    ok = dictionary_store_pg.add_phrase(phrase, category, added_by=session["username"])
+    ok = dictionary_store_pg.add_phrase(phrase, category, added_by=session["username"],
+                                        tenant_id=_current_tenant())
     return jsonify({"ok": ok})
 
 
@@ -9841,12 +9858,13 @@ def dictionary_list():
     if not session.get("username"):
         return jsonify({"ok": False, "error": "unauthorized"}), 401
     from src.users import dictionary_store_pg
-    # One-time seed: fill the (empty) table with the base dictionary.
+    tenant = _current_tenant()
+    # One-time seed (por tenant): llena el diccionario del tenant con la base.
     try:
-        dictionary_store_pg.seed_from_base(_base_dictionary_by_category())
+        dictionary_store_pg.seed_from_base(_base_dictionary_by_category(), tenant_id=tenant)
     except Exception:
         pass
-    return jsonify({"ok": True, "phrases": dictionary_store_pg.list_phrases()})
+    return jsonify({"ok": True, "phrases": dictionary_store_pg.list_phrases(tenant_id=tenant)})
 
 
 @app.route("/dictionary/<int:override_id>", methods=["DELETE"])
@@ -9855,7 +9873,7 @@ def dictionary_delete(override_id):
     if not session.get("username"):
         return jsonify({"ok": False, "error": "unauthorized"}), 401
     from src.users import dictionary_store_pg
-    ok = dictionary_store_pg.delete_phrase(override_id)
+    ok = dictionary_store_pg.delete_phrase(override_id, tenant_id=_current_tenant())
     return jsonify({"ok": ok})
 
 
@@ -9869,7 +9887,7 @@ def dictionary_move(override_id):
     if not new_category:
         return jsonify({"ok": False, "error": "falta category"}), 400
     from src.users import dictionary_store_pg
-    ok = dictionary_store_pg.move_phrase(override_id, new_category)
+    ok = dictionary_store_pg.move_phrase(override_id, new_category, tenant_id=_current_tenant())
     return jsonify({"ok": ok})
 
 

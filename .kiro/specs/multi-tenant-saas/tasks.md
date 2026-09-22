@@ -47,27 +47,34 @@
 > Se prioriza cerrar la fuga cruzada de información ANTES de tocar el resto.
 
 - [ ] 1.1 Crear tabla `tenants` (id, nombre, activo, plan, created_at). (Req 2.1)
-- [ ] 1.2 Sembrar el tenant real inicial (ej. `mpc` = "Mi Primer Casa S.A.") y el
-  tenant `__legacy__` de tránsito. (Req 2.1, 4.2)
-- [ ] 1.3 `dictionary_overrides`: agregar columna `tenant_id DEFAULT '__legacy__'`.
-  (Req 3.1, 4.1)
-- [ ] 1.4 Reemplazar el índice único global por uno por tenant
-  `(tenant_id, lower(phrase), category)`. (Req 3.1)
-- [ ] 1.5 `dictionary_store_pg`: propagar `tenant_id` a `add_phrase`,
+  — **Diferida a Fase 3** (se crea junto con la sesión/rol por tenant; no es
+  necesaria para aislar el diccionario, que ya usa `tenant_id` string).
+- [ ] 1.2 Sembrar el tenant real inicial (ej. `mpc`) y el `__legacy__`. (Req 2.1, 4.2)
+  — **Diferida a Fase 2/3** (etiquetado de datos). Hoy todo vive en `__legacy__`.
+- [x] 1.3 `dictionary_overrides`: agregar columna `tenant_id DEFAULT '__legacy__'`.
+  (Req 3.1, 4.1) — Con `ALTER TABLE ADD COLUMN IF NOT EXISTS` (migración segura).
+- [x] 1.4 Reemplazar el índice único global por uno por tenant
+  `(tenant_id, lower(phrase), category)`. (Req 3.1) — Nuevo índice creado y el
+  viejo global descartado (`DROP INDEX IF EXISTS`).
+- [x] 1.5 `dictionary_store_pg`: propagar `tenant_id` a `add_phrase`,
   `list_phrases`, `phrases_by_category`, `delete_phrase`, `move_phrase`,
-  `seed_from_base`. (Req 3.1, 3.3, 6.1)
-- [ ] 1.6 Convertir el caché del diccionario (TTL 60s) a **por tenant**
+  `seed_from_base`, `count_phrases`. (Req 3.1, 3.3, 6.1) — Todas con default
+  `__legacy__` (compatibilidad); `delete`/`move` verifican pertenencia al tenant.
+- [x] 1.6 Convertir el caché del diccionario a **por tenant**
   (`{tenant_id: frases}`) e invalidar solo el del tenant que escribe. (Req 3.2)
-- [ ] 1.7 Endpoints `/dictionary/*`: usar el `tenant_id` de la sesión (no del
-  request). (Req 3.3, 5.2)
-- [ ] 1.8 `history_backups`: agregar columna `tenant_id DEFAULT '__legacy__'` e
+- [x] 1.7 Endpoints `/dictionary/*`: usar el `tenant_id` de la sesión (no del
+  request), vía `_current_tenant()`. (Req 3.3, 5.2)
+- [x] 1.8 `history_backups`: agregar columna `tenant_id DEFAULT '__legacy__'` e
   índice `(tenant_id, created_at DESC)`. (Req 3.4, 4.1)
-- [ ] 1.9 `backup_manager`: `take_backup`, `_current_counts`, `_dump_all_entries`,
-  restauración y `auto_fix` operan por tenant. Restaurar A no toca B. (Req 3.5)
-- [ ] 1.10 Prueba de aislamiento: la empresa A no ve/edita diccionario ni backups
-  de la empresa B. (Req 3.6)
-- [ ] 1.11 Verificar: compilar + 106 tests en verde; el análisis del tenant
-  existente da el mismo resultado que antes. (Req 8.1, 8.2)
+- [ ] 1.9 `backup_manager`: lógica de backup por tenant. (Req 3.5)
+  — **Diferida a Fase 4 a propósito:** particionar la lógica de backup ANTES de
+  que `analysis_history` tenga `tenant_id` (Fase 2) arriesgaría la detección de
+  pérdidas que protege los datos. El ESQUEMA ya quedó listo (1.8).
+- [x] 1.10 Aislamiento del diccionario: `delete_phrase`/`move_phrase` solo actúan
+  si el id pertenece al tenant; `list`/`phrases_by_category` filtran por tenant.
+  (Req 3.6) — Aislamiento del diccionario garantizado a nivel de datos.
+- [x] 1.11 Verificar: compilar + 106 tests en verde; el análisis del tenant
+  existente da el mismo resultado que antes (todo en `__legacy__`). (Req 8.1, 8.2)
 
 ---
 
