@@ -295,19 +295,30 @@ class UserManager:
         except Exception:
             pass
 
-    def list_users(self) -> list[str]:
+    def list_users(self, tenant_id: str | None = None) -> list[str]:
         """
         Return the list of registered usernames.
 
-        Combines two sources so no seller ever disappears from the list:
-          1. Local usuarios/*.txt credential files (fast, but EPHEMERAL on
-             Railway — wiped on every redeploy).
-          2. Every username that has saved texts in PostgreSQL (PERSISTENT).
+        Multi-tenant Fase 4: si se pasa un tenant_id REAL (distinto de None y de
+        '__legacy__'), la lista se acota a los usuarios de esa empresa (segun
+        app_users). Para el tenant por defecto '__legacy__' (o sin tenant) se
+        mantiene el comportamiento actual: todos los usuarios, uniendo las tres
+        fuentes, para que ningun vendedor existente desaparezca de la lista.
 
-        A seller registered after the last deploy keeps only their PG entries;
-        including PG usernames here means they still show up in the list even
-        though their .txt was lost on redeploy.
+        Combines three sources so no seller ever disappears:
+          1. Local usuarios/*.txt credential files (EPHEMERAL on Railway).
+          2. Usernames with saved texts in PostgreSQL (PERSISTENT).
+          3. Accounts in app_users (may exist without texts yet).
         """
+        # Tenant real -> filtrar estrictamente por app_users de ese tenant.
+        real_tenant = tenant_id and tenant_id != "__legacy__"
+        if real_tenant:
+            try:
+                from src.users import user_store_pg
+                return sorted({n for n in user_store_pg.list_usernames(tenant_id) if n})
+            except Exception:
+                return []
+
         users: set[str] = set()
 
         # 1. Local .txt credential files

@@ -170,8 +170,11 @@ def get_user(username: str) -> dict | None:
         return None
 
 
-def list_usernames() -> list[str]:
-    """Return all usernames stored in app_users (empty list if unavailable)."""
+def list_usernames(tenant_id: str | None = None) -> list[str]:
+    """
+    Return usernames stored in app_users. Si se pasa tenant_id, solo los de ese
+    tenant; si no, todos. Empty list if unavailable.
+    """
     if not is_available():
         return []
     conn = _conn()
@@ -180,7 +183,10 @@ def list_usernames() -> list[str]:
     try:
         _ensure_table(conn)
         with conn.cursor() as cur:
-            cur.execute("SELECT username FROM app_users")
+            if tenant_id:
+                cur.execute("SELECT username FROM app_users WHERE tenant_id = %s", (tenant_id,))
+            else:
+                cur.execute("SELECT username FROM app_users")
             names = [r[0] for r in cur.fetchall() if r[0]]
         _release(conn)
         return names

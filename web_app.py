@@ -9212,7 +9212,9 @@ def logout():
 def index():
     if not session.get("username"):
         return redirect(url_for("login_page"))
-    html = render_template_string(HTML, username=session["username"], indicador_categorias_json=_INDICADOR_CATEGORIAS_JSON, all_users=[u for u in user_manager.list_users() if u not in ('admin', 'Vanesa.Admin', 'Vanesa_Admin', 'FedericoCeballos', 'MartinianoSosa', 'GarciaTania', 'Berna.Strauss')])
+    _tenant = _current_tenant()
+    _users_for_dropdown = user_manager.list_users(tenant_id=(None if _tenant == "__legacy__" else _tenant))
+    html = render_template_string(HTML, username=session["username"], indicador_categorias_json=_INDICADOR_CATEGORIAS_JSON, all_users=[u for u in _users_for_dropdown if u not in ('admin', 'Vanesa.Admin', 'Vanesa_Admin', 'FedericoCeballos', 'MartinianoSosa', 'GarciaTania', 'Berna.Strauss')])
     # Prevent the browser from serving a stale cached page after each deploy.
     resp = app.make_response(html)
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
@@ -9837,7 +9839,8 @@ def _log_activity(event_type, tool="", entry_id="", detail="", username=None):
         u = username if username is not None else session.get("username")
         if u:
             activity_store_pg.log_event(u, event_type, tool=tool,
-                                        entry_id=entry_id, detail=detail)
+                                        entry_id=entry_id, detail=detail,
+                                        tenant_id=session.get("tenant_id") or "__legacy__")
     except Exception:
         pass
 
@@ -10728,7 +10731,8 @@ def admin_stats(username):
     # If _all, aggregate across all users — en UNA query multi-usuario (entradas
     # ligeras, sin text_full) en vez de una query por usuario.
     if username == "_all":
-        all_users = user_manager.list_users()
+        _tenant = _current_tenant()
+        all_users = user_manager.list_users(tenant_id=(None if _tenant == "__legacy__" else _tenant))
         entries = []
         by_user = get_report_entries_all(all_users)
         for u in all_users:
@@ -10904,7 +10908,11 @@ def admin_informe():
     from src.users.history_manager import get_flat_entries
     from datetime import datetime as _dt
 
-    all_users = user_manager.list_users()
+    # Multi-tenant Fase 4: la lista de vendedores del informe se acota al tenant
+    # de la sesion. Con '__legacy__' (unico tenant hoy) devuelve todos, igual que
+    # antes; con un tenant real, solo los de esa empresa.
+    _tenant = _current_tenant()
+    all_users = user_manager.list_users(tenant_id=(None if _tenant == "__legacy__" else _tenant))
     if filter_seller != "_all" and filter_seller in all_users:
         target_users = [filter_seller]
     else:
@@ -11062,10 +11070,16 @@ def admin_actividad():
     if filter_seller and filter_seller != "_all":
         usernames = [filter_seller]
 
+    # Multi-tenant Fase 4: acotar la actividad al tenant de la sesion. Con un
+    # tenant real aisla; con '__legacy__' (unico tenant hoy) no filtra, porque
+    # toda la actividad vive ahi (mismo comportamiento que antes).
+    _tenant = _current_tenant()
+    _tenant_arg = _tenant if _tenant and _tenant != "__legacy__" else None
+
     try:
         from src.users import activity_store_pg
         summary = activity_store_pg.get_activity_summary(
-            start=start, end=end, usernames=usernames)
+            start=start, end=end, usernames=usernames, tenant_id=_tenant_arg)
     except Exception as exc:
         summary = {"ok": False, "reason": str(exc), "users": {}}
 
