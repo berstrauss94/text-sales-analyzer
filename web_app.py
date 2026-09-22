@@ -9126,9 +9126,35 @@ def login_page():
             password = request.form.get("password", "")
             result = user_manager.login(username, password)
             if result["ok"]:
-                session["username"] = username
-                _log_activity("login", username=username)
-                return redirect(url_for("index"))
+                # Multi-tenant Fase 3: cargar tenant_id y rol de la cuenta en la
+                # sesion. Salen SIEMPRE de la base (app_users), nunca del request.
+                tenant_id = "__legacy__"
+                rol = "vendedor"
+                try:
+                    from src.users import user_store_pg
+                    pg_user = user_store_pg.get_user(username)
+                    if pg_user:
+                        tenant_id = pg_user.get("tenant_id") or "__legacy__"
+                        rol = pg_user.get("rol") or "vendedor"
+                    # Bloquear login si la empresa esta desactivada.
+                    if not user_store_pg.is_tenant_active(tenant_id):
+                        error = "La empresa esta desactivada. Contacta al administrador."
+                        saved_username = username
+                        pg_user = None
+                        raise _TenantInactive()
+                except _TenantInactive:
+                    pg_user = None
+                except Exception:
+                    pass  # PG no disponible (dev): seguir con defaults
+                if error is None:
+                    # Fallback de rol para admins historicos aun sin rol en PG.
+                    if rol == "vendedor" and username in _ADMIN_USERS:
+                        rol = "admin"
+                    session["username"] = username
+                    session["tenant_id"] = tenant_id
+                    session["rol"] = rol
+                    _log_activity("login", username=username)
+                    return redirect(url_for("index"))
             else:
                 error = result["error"]
                 saved_username = username
@@ -9753,13 +9779,36 @@ def debug_entries(username):
     })
 
 
-# Admin usernames
+# Admin usernames (bootstrap: se sincronizan como rol 'admin' en app_users).
 _ADMIN_USERS = {"admin", "Vanesa.Admin", "Berna.Strauss", "FedericoCeballos", "MartinianoSosa"}
+# Superadmin de plataforma (rol 'superadmin': gestiona todos los tenants).
+_SUPERADMIN_USERS = {"Berna.Strauss"}
+
+
+class _TenantInactive(Exception):
+    """Señal interna: el tenant del usuario esta desactivado (login bloqueado)."""
+    pass
 
 
 def _is_admin():
-    """Check if current session user is an admin."""
+    """
+    True si el usuario de la sesion es admin o superadmin.
+    Multi-tenant Fase 3: se basa en el ROL de la sesion. Fallback al set
+    hardcodeado _ADMIN_USERS para el bootstrap (sesiones viejas sin rol, o
+    cuentas admin que todavia no sincronizaron su rol en app_users).
+    """
+    rol = session.get("rol")
+    if rol in ("admin", "superadmin"):
+        return True
+    if rol == "vendedor":
+        return False
+    # Sin rol en sesion (bootstrap / sesion previa): usar la lista hardcodeada.
     return session.get("username") in _ADMIN_USERS
+
+
+def _is_superadmin():
+    """True solo para el rol superadmin (gestion de toda la plataforma)."""
+    return session.get("rol") == "superadmin"
 
 
 # Multi-tenant (Fase 1): tenant activo de la sesion. Hoy la sesion todavia no
@@ -10239,6 +10288,27 @@ def admin_sync_users_to_pg():
     result["num_synced"] = len(result["synced"])
     result["note"] = "Cuentas persistidas en app_users. Sobreviven redeploys."
     return jsonify(result)
+
+
+@app.route("/admin/sync-roles", methods=["POST", "GET"])
+def admin_sync_roles():
+    """
+    Bootstrap de roles multi-tenant: marca en app_users como 'admin' a las
+    cuentas de _ADMIN_USERS y como 'superadmin' a las de _SUPERADMIN_USERS.
+    Idempotente. Admin only. Correr una vez tras desplegar la Fase 3.
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users import user_store_pg
+    if not user_store_pg.is_available():
+        return jsonify({"error": "PostgreSQL no disponible"}), 500
+    updated = user_store_pg.sync_admin_roles(
+        admin_usernames=list(_ADMIN_USERS),
+        superadmin_usernames=list(_SUPERADMIN_USERS),
+    )
+    return jsonify({"ok": True, "rows_updated": updated,
+                    "admins": sorted(_ADMIN_USERS),
+                    "superadmins": sorted(_SUPERADMIN_USERS)})
 
 
 @app.route("/admin/db-status")
