@@ -167,19 +167,79 @@
 
 ## FASE 6 — Verificación integral y despliegue
 
-- [ ] 6.1 Tests de aislamiento: crear dos tenants de prueba y confirmar que
-  ninguno ve datos del otro (textos, diccionario, backups, actividad, informes).
-  (Req 3.6, 6, 8)
-- [ ] 6.2 Correr toda la suite `py -m pytest tests/ -q` (106+). (Req 8.1)
-- [ ] 6.3 `/admin/full-diag` del tenant existente idéntico al estado pre-proyecto
-  (total y distribución por mes). (Req 8.2, 8.3)
-- [ ] 6.4 Despliegue por fases a producción con backup previo en cada una;
-  desplegar develop→master solo tras verde. (Req 8.3)
+- [ ] 6.1 Tests de aislamiento con dos tenants reales. (Req 3.6, 6, 8)
+  — **Se completa junto con la Fase 2b** (cuando exista un segundo tenant).
+- [x] 6.2 Correr toda la suite `py -m pytest tests/ -q`. (Req 8.1) — 106 en verde
+  en cada fase.
+- [ ] 6.3 `/admin/full-diag` del tenant existente idéntico al estado pre-proyecto.
+  (Req 8.2, 8.3) — **PENDIENTE: lo verifica el usuario en producción tras el deploy
+  de v22.0.**
+- [x] 6.4 Despliegue: Fases 0-5 desplegadas juntas como **v22.0** (master
+  `83af7ec`). (Req 8.3)
+  - [ ] Post-deploy (usuario): correr `/admin/sync-roles` una vez; verificar
+    `/admin/full-diag`; confirmar login de admin y de un vendedor.
+
+---
+
+## FASE 2b — Aislamiento ESTRICTO de textos (SOLO al sumar el 2º cliente)
+
+> **No ejecutar con un solo tenant.** Con una sola empresa, todo vive en
+> `__legacy__` y filtrar no aporta aislamiento (no hay de quién aislar) y sí
+> agrega riesgo. Esta fase se hace el día que entra un SEGUNDO cliente real, y es
+> la de MAYOR riesgo del proyecto (toca la PK de una tabla con datos de
+> producción y el filtrado de los textos). Backup obligatorio y ensayo en copia.
+
+### Preparación
+- [ ] 2b.1 Backup total (datos + tag de código estable). Registrar
+  `/admin/full-diag`: total y distribución por mes por usuario.
+- [ ] 2b.2 Ensayar TODA esta fase primero contra una COPIA de la base, no en
+  producción directa.
+- [ ] 2b.3 Crear el segundo tenant real con `/superadmin/crear-tenant`
+  (tenant_id + su primer admin).
+
+### Etiquetado del tenant existente
+- [ ] 2b.4 Renombrar/etiquetar los datos actuales al tenant real (ej. `mpc`):
+  `UPDATE analysis_history SET tenant_id='mpc' WHERE tenant_id='__legacy__';`
+  ídem en `activity_log`, `dictionary_overrides`, `history_backups`, `app_users`.
+  Es solo etiquetado: NO toca fechas, NO borra. Verificar full-diag = idéntico.
+- [ ] 2b.5 Asignar cada usuario existente a su tenant en `app_users`
+  (`set_user_role_tenant`), y el tenant en la sesión ya se toma solo del login.
+
+### Cambio de clave primaria (el paso delicado)
+- [ ] 2b.6 `analysis_history`: cambiar PK de `(id, username)` a
+  `(tenant_id, id, username)`. Antes de esto, cambiar los `ON CONFLICT (id, username)`
+  de `_pg_add_entry`/`_pg_upsert_entry` a `ON CONFLICT (tenant_id, id, username)`.
+  (El id ya es único dentro de un tenant; la PK compuesta lo formaliza.)
+- [ ] 2b.7 `app_users`: PK a `(tenant_id, username)` (permite el mismo username
+  en dos empresas). Ajustar `get_user`/`upsert_user` para localizar por
+  `(tenant_id, username)` y el login para resolver el tenant (ver design.md 4.2:
+  usuario único global vs. por tenant — decidir modelo aquí).
+
+### Filtrado estricto de textos por tenant
+- [ ] 2b.8 Propagar `tenant_id` OBLIGATORIO a las lecturas/escrituras de
+  `analysis_history`: `add_entry`, `get_all_entries`, `get_flat_entries`,
+  `get_history`, `get_entry_by_id`, `get_entries_by_month`, `delete_entry`,
+  `update_entry_text`, `get_report_entries_all`, `get_all_usernames_with_entries`.
+  Todas con `WHERE tenant_id = %s`. Los endpoints ya pasan `_current_tenant()`.
+- [ ] 2b.9 Quitar los fallbacks "legacy = todos" de `list_users` y de la
+  actividad, para que el aislamiento sea estricto entre tenants.
+- [ ] 2b.10 `backup_manager`: `take_backup`/restore/`auto_fix` por tenant
+  (restaurar A no toca B) — usar la columna `tenant_id` ya presente en
+  `history_backups`.
+
+### Verificación (obligatoria)
+- [ ] 2b.11 Test de aislamiento real: el tenant A no ve NI un texto, frase,
+  evento, informe o backup del tenant B, y viceversa.
+- [ ] 2b.12 `/admin/full-diag` del tenant existente: total y distribución por mes
+  IDÉNTICOS a 2b.1. Si cambian, revertir.
+- [ ] 2b.13 `py -m pytest tests/ -q` en verde; agregar tests de aislamiento
+  multi-tenant a la suite.
 
 ---
 
 ## Notas de ejecución
 - Ninguna fase avanza si la anterior no quedó verificada (tests + full-diag).
-- Las Fases 0, 1 y 2 son las prioritarias y se hacen primero, en ese orden.
+- Las Fases 0, 1 y 2a son las prioritarias y ya están desplegadas (v22.0).
+- **Fase 2b es la de mayor riesgo y NO se hace hasta que entre un 2º cliente.**
 - Cada cambio que toque guardado/fechas se mide antes y después con full-diag y
   se acompaña de backup. Un cambio de distribución por mes = revertir.
