@@ -74,6 +74,7 @@ def _ensure_table(conn) -> None:
             CREATE TABLE IF NOT EXISTS activity_log (
                 id         BIGSERIAL   PRIMARY KEY,
                 username   TEXT        NOT NULL,
+                tenant_id  TEXT        NOT NULL DEFAULT '__legacy__',
                 event_type TEXT        NOT NULL,
                 tool       TEXT        NOT NULL DEFAULT '',
                 entry_id   TEXT        NOT NULL DEFAULT '',
@@ -82,16 +83,27 @@ def _ensure_table(conn) -> None:
             )
             """
         )
+        # Multi-tenant Fase 2a: agregar tenant_id de forma segura a tablas
+        # existentes. Todas las filas actuales quedan en '__legacy__'.
+        cur.execute(
+            "ALTER TABLE activity_log "
+            "ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT '__legacy__'"
+        )
         cur.execute(
             "CREATE INDEX IF NOT EXISTS idx_activity_user_ts "
             "ON activity_log (username, ts DESC)"
+        )
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_activity_tenant_user_ts "
+            "ON activity_log (tenant_id, username, ts DESC)"
         )
     conn.commit()
     _table_ready = True
 
 
 def log_event(username: str, event_type: str, tool: str = "",
-              entry_id: str = "", detail: str = "") -> bool:
+              entry_id: str = "", detail: str = "",
+              tenant_id: str = "__legacy__") -> bool:
     """
     Record one activity event. Best-effort: returns False (never raises) if PG
     is unavailable or the insert fails, so the caller's action is never blocked.
@@ -105,9 +117,10 @@ def log_event(username: str, event_type: str, tool: str = "",
         _ensure_table(conn)
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO activity_log (username, event_type, tool, entry_id, detail) "
-                "VALUES (%s, %s, %s, %s, %s)",
-                (username, event_type, tool or "", entry_id or "", detail or ""),
+                "INSERT INTO activity_log (username, tenant_id, event_type, tool, entry_id, detail) "
+                "VALUES (%s, %s, %s, %s, %s, %s)",
+                (username, tenant_id or "__legacy__", event_type,
+                 tool or "", entry_id or "", detail or ""),
             )
         conn.commit()
         _release(conn)
@@ -123,7 +136,8 @@ def log_event(username: str, event_type: str, tool: str = "",
 
 
 def get_activity_summary(days: int = 90, start=None, end=None,
-                         usernames: list | None = None) -> dict:
+                         usernames: list | None = None,
+                         tenant_id: str | None = None) -> dict:
     """
     Aggregate per-user activity, filtered by a date range and (optionally) a set
     of usernames — so the panel can mirror the report's active filters
@@ -176,6 +190,11 @@ def get_activity_summary(days: int = 90, start=None, end=None,
     if usernames:
         where.append("username = ANY(%s)")
         params.append(list(usernames))
+    # Filtro por tenant (multi-tenant Fase 2a). Si no se pasa, no se filtra por
+    # tenant (comportamiento actual: todo cae en '__legacy__' de todos modos).
+    if tenant_id:
+        where.append("tenant_id = %s")
+        params.append(tenant_id)
     where_sql = " AND ".join(where)
 
     try:

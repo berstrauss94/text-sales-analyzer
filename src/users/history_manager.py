@@ -115,6 +115,7 @@ def _ensure_pg_table(conn) -> None:
             CREATE TABLE IF NOT EXISTS analysis_history (
                 id            TEXT        NOT NULL,
                 username      TEXT        NOT NULL,
+                tenant_id     TEXT        NOT NULL DEFAULT '__legacy__',
                 timestamp     TIMESTAMPTZ NOT NULL,
                 source        TEXT        NOT NULL DEFAULT 'text',
                 audio_filename TEXT       NOT NULL DEFAULT '',
@@ -132,9 +133,25 @@ def _ensure_pg_table(conn) -> None:
                 PRIMARY KEY (id, username)
             )
         """)
+        # Multi-tenant Fase 2a: agregar tenant_id a tablas ya existentes de forma
+        # SEGURA. ADD COLUMN IF NOT EXISTS con DEFAULT deja TODAS las filas
+        # actuales en '__legacy__' sin tocar sus datos, fechas ni PK. NO se
+        # cambia la PK (sigue (id, username)): mientras haya un solo tenant es
+        # suficiente y evita el riesgo de reescribir la clave de una tabla con
+        # datos de produccion. El cambio de PK a (tenant_id, id, username) queda
+        # para la Fase 2b, cuando entre un segundo tenant real.
+        cur.execute(
+            "ALTER TABLE analysis_history "
+            "ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT '__legacy__'"
+        )
         cur.execute("""
             CREATE INDEX IF NOT EXISTS idx_ah_username_ts
             ON analysis_history (username, timestamp DESC)
+        """)
+        # Indice por tenant para las lecturas multi-tenant futuras.
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_ah_tenant_user_ts
+            ON analysis_history (tenant_id, username, timestamp DESC)
         """)
     conn.commit()
     # Cleanup: drop the problematic unique index if it exists from previous deploy

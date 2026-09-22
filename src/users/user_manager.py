@@ -46,7 +46,55 @@ class UserManager:
         return os.path.join(self.users_dir, f"{safe}.txt")
 
     def _hash_password(self, password: str) -> str:
+        """
+        Hash LEGACY: SHA-256 sin salt. Se mantiene SOLO para poder verificar
+        cuentas viejas que todavia no migraron. NO usar para cuentas nuevas:
+        para eso esta _hash_password_secure().
+        """
         return hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+    def _hash_password_secure(self, password: str) -> str:
+        """
+        Hash SEGURO con salt (Werkzeug scrypt por defecto). Formato:
+        'metodo:params$salt$hash' — contiene ':' y '$', lo que permite
+        distinguirlo del SHA-256 legacy (64 hex sin separadores).
+        Werkzeug viene con Flask, no agrega dependencia nueva.
+        """
+        from werkzeug.security import generate_password_hash
+        return generate_password_hash(password)
+
+    @staticmethod
+    def _is_legacy_hash(stored: str) -> bool:
+        """
+        True si el hash guardado es del formato viejo (SHA-256 sin salt):
+        exactamente 64 caracteres hexadecimales, sin ':' ni '$'. Los hashes de
+        Werkzeug siempre llevan ':' y '$', asi que la distincion es inequivoca.
+        """
+        s = (stored or "").strip()
+        if len(s) != 64 or ":" in s or "$" in s:
+            return False
+        try:
+            int(s, 16)  # todos hex
+            return True
+        except ValueError:
+            return False
+
+    def _verify_password(self, password: str, stored_hash: str) -> bool:
+        """
+        Verifica una contrasena contra el hash guardado, soportando AMBOS
+        formatos: el nuevo (Werkzeug, con salt) y el viejo (SHA-256). Asi ningun
+        usuario existente queda bloqueado durante la migracion.
+        """
+        stored = (stored_hash or "").strip()
+        if not stored:
+            return False
+        if self._is_legacy_hash(stored):
+            return hashlib.sha256(password.encode("utf-8")).hexdigest() == stored
+        try:
+            from werkzeug.security import check_password_hash
+            return check_password_hash(stored, password)
+        except Exception:
+            return False
 
     def user_exists(self, username: str) -> bool:
         return os.path.exists(self._user_file(username))
@@ -95,7 +143,9 @@ class UserManager:
             return {"ok": False, "error": f"El usuario '{username}' ya existe."}
 
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-        password_hash = self._hash_password(password)
+        # Cuentas NUEVAS: hash seguro con salt (Werkzeug). Las viejas siguen
+        # validando por _verify_password y migran solas al iniciar sesion.
+        password_hash = self._hash_password_secure(password)
 
         # Build full name
         nombre_completo_parts = [nombre]
@@ -152,8 +202,6 @@ class UserManager:
         Authenticate a user.
         Returns {"ok": True, "username": ...} or {"ok": False, "error": ...}.
         """
-        password_hash = self._hash_password(password)
-
         # Primary source: local .txt credential file (fast, dev-friendly).
         # Fallback: PostgreSQL app_users, for accounts whose .txt was wiped on a
         # Railway redeploy. Without this, a persisted user could not log back in.
@@ -163,13 +211,19 @@ class UserManager:
                 pg_user = user_store_pg.get_user(username)
             except Exception:
                 pg_user = None
-            if pg_user and pg_user.get("password_hash") == password_hash:
+            if pg_user and self._verify_password(password, pg_user.get("password_hash", "")):
+                ficha = pg_user.get("ficha", "")
                 # Rehydrate the local .txt cache so subsequent reads work offline.
                 try:
                     with open(self._user_file(username), "w", encoding="utf-8") as f:
-                        f.write(pg_user.get("ficha", ""))
+                        f.write(ficha)
                 except Exception:
                     pass
+                # Migracion perezosa: si el hash guardado era legacy (SHA-256),
+                # re-hashear al formato seguro y persistir. La cuenta migra sola
+                # la primera vez que su dueno inicia sesion.
+                if self._is_legacy_hash(pg_user.get("password_hash", "")):
+                    self._migrate_password(username, password, ficha_txt=ficha)
                 return {"ok": True, "username": username}
             return {"ok": False, "error": "Usuario o contrasena incorrectos."}
 
@@ -186,26 +240,85 @@ class UserManager:
                     stored_hash = parts[1].strip()
                 break
 
-        if stored_hash is not None and stored_hash == password_hash:
+        if stored_hash is not None and self._verify_password(password, stored_hash):
+            # Migracion perezosa para cuentas locales con hash legacy.
+            if self._is_legacy_hash(stored_hash):
+                self._migrate_password(username, password, ficha_txt=content)
             return {"ok": True, "username": username}
         # Legacy fallback: files written before this fix used a looser check
-        if stored_hash is None and password_hash in content:
-            return {"ok": True, "username": username}
+        # (el hash SHA-256 aparecia suelto en el contenido).
+        if stored_hash is None:
+            legacy = self._hash_password(password)
+            if legacy in content:
+                return {"ok": True, "username": username}
         return {"ok": False, "error": "Usuario o contrasena incorrectos."}
 
-    def list_users(self) -> list[str]:
+    def _migrate_password(self, username: str, password: str, ficha_txt: str = "") -> None:
+        """
+        Re-hashea la contrasena al formato seguro y actualiza tanto el .txt local
+        como app_users en PostgreSQL. Best-effort: si algo falla, el usuario
+        sigue pudiendo entrar (su hash viejo aun valida), solo que migrara la
+        proxima vez. Nunca bloquea ni rompe el login.
+        """
+        try:
+            new_hash = self._hash_password_secure(password)
+        except Exception:
+            return
+        # 1. Actualizar la linea del hash en la ficha .txt (y reescribir archivo).
+        new_ficha = ficha_txt
+        try:
+            path = self._user_file(username)
+            content = ficha_txt
+            if not content and os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+            lines = content.splitlines()
+            replaced = False
+            for i, line in enumerate(lines):
+                if line.startswith("Contrasena (hash)"):
+                    prefix = line.split(":", 1)[0]
+                    lines[i] = f"{prefix}: {new_hash}"
+                    replaced = True
+                    break
+            if replaced:
+                new_ficha = "\n".join(lines)
+                if content.endswith("\n"):
+                    new_ficha += "\n"
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(new_ficha)
+        except Exception:
+            new_ficha = ficha_txt  # si falla la reescritura, dejamos la ficha como estaba
+        # 2. Persistir el nuevo hash (y ficha actualizada) en PostgreSQL.
+        try:
+            from src.users import user_store_pg
+            user_store_pg.upsert_user(username, new_hash, new_ficha or ficha_txt)
+        except Exception:
+            pass
+
+    def list_users(self, tenant_id: str | None = None) -> list[str]:
         """
         Return the list of registered usernames.
 
-        Combines two sources so no seller ever disappears from the list:
-          1. Local usuarios/*.txt credential files (fast, but EPHEMERAL on
-             Railway — wiped on every redeploy).
-          2. Every username that has saved texts in PostgreSQL (PERSISTENT).
+        Multi-tenant Fase 4: si se pasa un tenant_id REAL (distinto de None y de
+        '__legacy__'), la lista se acota a los usuarios de esa empresa (segun
+        app_users). Para el tenant por defecto '__legacy__' (o sin tenant) se
+        mantiene el comportamiento actual: todos los usuarios, uniendo las tres
+        fuentes, para que ningun vendedor existente desaparezca de la lista.
 
-        A seller registered after the last deploy keeps only their PG entries;
-        including PG usernames here means they still show up in the list even
-        though their .txt was lost on redeploy.
+        Combines three sources so no seller ever disappears:
+          1. Local usuarios/*.txt credential files (EPHEMERAL on Railway).
+          2. Usernames with saved texts in PostgreSQL (PERSISTENT).
+          3. Accounts in app_users (may exist without texts yet).
         """
+        # Tenant real -> filtrar estrictamente por app_users de ese tenant.
+        real_tenant = tenant_id and tenant_id != "__legacy__"
+        if real_tenant:
+            try:
+                from src.users import user_store_pg
+                return sorted({n for n in user_store_pg.list_usernames(tenant_id) if n})
+            except Exception:
+                return []
+
         users: set[str] = set()
 
         # 1. Local .txt credential files

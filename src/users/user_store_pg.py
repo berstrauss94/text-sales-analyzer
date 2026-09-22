@@ -69,6 +69,35 @@ def _ensure_table(conn) -> None:
             )
             """
         )
+        # Multi-tenant Fase 3: tabla de empresas (tenants).
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tenants (
+                id         TEXT PRIMARY KEY,
+                nombre     TEXT NOT NULL DEFAULT '',
+                activo     BOOLEAN NOT NULL DEFAULT true,
+                plan       TEXT NOT NULL DEFAULT 'basico',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            """
+        )
+        # Asegurar que exista el tenant por defecto donde viven los datos actuales.
+        cur.execute(
+            "INSERT INTO tenants (id, nombre) VALUES ('__legacy__', 'Empresa (legacy)') "
+            "ON CONFLICT (id) DO NOTHING"
+        )
+        # app_users gana tenant_id y rol (migracion segura para filas existentes).
+        # rol: 'vendedor' | 'admin' | 'superadmin'. Todas las cuentas actuales
+        # quedan en el tenant '__legacy__' y rol 'vendedor' por defecto; los
+        # admins reales se ajustan en el bootstrap (ver sync_admin_roles).
+        cur.execute(
+            "ALTER TABLE app_users "
+            "ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT '__legacy__'"
+        )
+        cur.execute(
+            "ALTER TABLE app_users "
+            "ADD COLUMN IF NOT EXISTS rol TEXT NOT NULL DEFAULT 'vendedor'"
+        )
     conn.commit()
     _table_ready = True
 
@@ -107,7 +136,7 @@ def upsert_user(username: str, password_hash: str, ficha: str) -> bool:
 
 
 def get_user(username: str) -> dict | None:
-    """Return {'password_hash', 'ficha'} for a user, or None if not found."""
+    """Return {'password_hash', 'ficha', 'tenant_id', 'rol'} or None if not found."""
     if not is_available():
         return None
     conn = _conn()
@@ -117,14 +146,20 @@ def get_user(username: str) -> dict | None:
         _ensure_table(conn)
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT password_hash, ficha FROM app_users WHERE username = %s LIMIT 1",
+                "SELECT password_hash, ficha, tenant_id, rol "
+                "FROM app_users WHERE username = %s LIMIT 1",
                 (username,),
             )
             row = cur.fetchone()
         _release(conn)
         if not row:
             return None
-        return {"password_hash": row[0] or "", "ficha": row[1] or ""}
+        return {
+            "password_hash": row[0] or "",
+            "ficha": row[1] or "",
+            "tenant_id": row[2] or "__legacy__",
+            "rol": row[3] or "vendedor",
+        }
     except Exception as exc:
         logger.error(f"app_users get error: {exc}")
         try:
@@ -135,8 +170,11 @@ def get_user(username: str) -> dict | None:
         return None
 
 
-def list_usernames() -> list[str]:
-    """Return all usernames stored in app_users (empty list if unavailable)."""
+def list_usernames(tenant_id: str | None = None) -> list[str]:
+    """
+    Return usernames stored in app_users. Si se pasa tenant_id, solo los de ese
+    tenant; si no, todos. Empty list if unavailable.
+    """
     if not is_available():
         return []
     conn = _conn()
@@ -145,7 +183,10 @@ def list_usernames() -> list[str]:
     try:
         _ensure_table(conn)
         with conn.cursor() as cur:
-            cur.execute("SELECT username FROM app_users")
+            if tenant_id:
+                cur.execute("SELECT username FROM app_users WHERE tenant_id = %s", (tenant_id,))
+            else:
+                cur.execute("SELECT username FROM app_users")
             names = [r[0] for r in cur.fetchall() if r[0]]
         _release(conn)
         return names
@@ -157,3 +198,175 @@ def list_usernames() -> list[str]:
             pass
         _release(conn, close=True)
         return []
+
+
+# ---------------------------------------------------------------------------
+# Multi-tenant: roles y gestion de empresas (Fase 3 / Fase 5)
+# ---------------------------------------------------------------------------
+def set_user_role_tenant(username: str, rol: str | None = None,
+                         tenant_id: str | None = None) -> bool:
+    """
+    Ajusta el rol y/o el tenant de una cuenta. Best-effort. Solo actualiza los
+    campos provistos (no pisa el otro).
+    """
+    if not username or not is_available():
+        return False
+    if rol is None and tenant_id is None:
+        return False
+    conn = _conn()
+    if conn is None:
+        return False
+    try:
+        _ensure_table(conn)
+        sets, params = [], []
+        if rol is not None:
+            sets.append("rol = %s")
+            params.append(rol)
+        if tenant_id is not None:
+            sets.append("tenant_id = %s")
+            params.append(tenant_id)
+        params.append(username)
+        with conn.cursor() as cur:
+            cur.execute(
+                f"UPDATE app_users SET {', '.join(sets)} WHERE username = %s",
+                tuple(params),
+            )
+            ok = cur.rowcount > 0
+        conn.commit()
+        _release(conn)
+        return ok
+    except Exception as exc:
+        logger.error(f"app_users set_role_tenant error: {exc}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        _release(conn, close=True)
+        return False
+
+
+def sync_admin_roles(admin_usernames, superadmin_usernames=None) -> int:
+    """
+    Bootstrap de roles: marca como 'admin' a las cuentas de admin_usernames y
+    como 'superadmin' a las de superadmin_usernames que existan en app_users.
+    Idempotente. Devuelve cuantas filas se actualizaron. Best-effort.
+    """
+    if not is_available():
+        return 0
+    conn = _conn()
+    if conn is None:
+        return 0
+    updated = 0
+    try:
+        _ensure_table(conn)
+        with conn.cursor() as cur:
+            if admin_usernames:
+                cur.execute(
+                    "UPDATE app_users SET rol = 'admin' "
+                    "WHERE username = ANY(%s) AND rol <> 'superadmin'",
+                    (list(admin_usernames),),
+                )
+                updated += cur.rowcount
+            if superadmin_usernames:
+                cur.execute(
+                    "UPDATE app_users SET rol = 'superadmin' WHERE username = ANY(%s)",
+                    (list(superadmin_usernames),),
+                )
+                updated += cur.rowcount
+        conn.commit()
+        _release(conn)
+        return updated
+    except Exception as exc:
+        logger.error(f"app_users sync_admin_roles error: {exc}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        _release(conn, close=True)
+        return 0
+
+
+def create_tenant(tenant_id: str, nombre: str = "", plan: str = "basico") -> bool:
+    """Crea una empresa (tenant). Idempotente. Best-effort."""
+    tenant_id = (tenant_id or "").strip()
+    if not tenant_id or not is_available():
+        return False
+    conn = _conn()
+    if conn is None:
+        return False
+    try:
+        _ensure_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO tenants (id, nombre, plan) VALUES (%s, %s, %s) "
+                "ON CONFLICT (id) DO NOTHING",
+                (tenant_id, nombre or tenant_id, plan or "basico"),
+            )
+        conn.commit()
+        _release(conn)
+        return True
+    except Exception as exc:
+        logger.error(f"tenants create error: {exc}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        _release(conn, close=True)
+        return False
+
+
+def list_tenants() -> list[dict]:
+    """Lista de empresas: [{id, nombre, activo, plan, created_at}]. []."""
+    if not is_available():
+        return []
+    conn = _conn()
+    if conn is None:
+        return []
+    try:
+        _ensure_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, nombre, activo, plan, created_at FROM tenants ORDER BY id ASC")
+            rows = cur.fetchall()
+        _release(conn)
+        return [{
+            "id": r[0], "nombre": r[1], "activo": bool(r[2]), "plan": r[3],
+            "created_at": r[4].isoformat() if hasattr(r[4], "isoformat") else str(r[4]),
+        } for r in rows]
+    except Exception as exc:
+        logger.error(f"tenants list error: {exc}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        _release(conn, close=True)
+        return []
+
+
+def is_tenant_active(tenant_id: str) -> bool:
+    """
+    True si el tenant existe y esta activo. Un tenant desconocido se considera
+    ACTIVO (para no bloquear el login del tenant '__legacy__' antes de crearlo).
+    """
+    tenant_id = (tenant_id or "").strip()
+    if not tenant_id or not is_available():
+        return True
+    conn = _conn()
+    if conn is None:
+        return True
+    try:
+        _ensure_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT activo FROM tenants WHERE id = %s LIMIT 1", (tenant_id,))
+            row = cur.fetchone()
+        _release(conn)
+        if row is None:
+            return True  # tenant no registrado aun -> no bloquear
+        return bool(row[0])
+    except Exception as exc:
+        logger.error(f"tenants is_active error: {exc}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        _release(conn, close=True)
+        return True

@@ -80,12 +80,27 @@ def ensure_backup_tables() -> None:
                 CREATE TABLE IF NOT EXISTS history_backups (
                     id          SERIAL PRIMARY KEY,
                     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    tenant_id   TEXT        NOT NULL DEFAULT '__legacy__',
                     total_count INTEGER     NOT NULL DEFAULT 0,
                     per_user    JSONB       NOT NULL DEFAULT '{}',
                     entries     JSONB       NOT NULL DEFAULT '[]',
                     reason      TEXT        NOT NULL DEFAULT 'auto'
                 )
             """)
+            # Migracion segura para tablas ya existentes: agregar tenant_id si
+            # falta. Todas las filas actuales quedan en '__legacy__'. (Multi-tenant
+            # Fase 1: se prepara el ESQUEMA. El particionado FUNCIONAL de los
+            # backups por tenant se hace en la Fase 4, cuando analysis_history ya
+            # tenga tenant_id; hoy la logica de backup sigue siendo global para no
+            # arriesgar la deteccion de perdidas que protege los datos.)
+            cur.execute(
+                "ALTER TABLE history_backups "
+                "ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT '__legacy__'"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_backups_tenant "
+                "ON history_backups (tenant_id, created_at DESC)"
+            )
         conn.commit()
     except Exception as exc:
         logger.warning(f"[backup] no se pudo crear history_backups: {exc}")

@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v21.0{% if username == 'Berna.Strauss' %} &middot; linea unica muestra a todos los vendedores{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v22.0{% if username == 'Berna.Strauss' %} &middot; base multi-tenant + seguridad de contrasenas{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v21.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -9126,9 +9126,35 @@ def login_page():
             password = request.form.get("password", "")
             result = user_manager.login(username, password)
             if result["ok"]:
-                session["username"] = username
-                _log_activity("login", username=username)
-                return redirect(url_for("index"))
+                # Multi-tenant Fase 3: cargar tenant_id y rol de la cuenta en la
+                # sesion. Salen SIEMPRE de la base (app_users), nunca del request.
+                tenant_id = "__legacy__"
+                rol = "vendedor"
+                try:
+                    from src.users import user_store_pg
+                    pg_user = user_store_pg.get_user(username)
+                    if pg_user:
+                        tenant_id = pg_user.get("tenant_id") or "__legacy__"
+                        rol = pg_user.get("rol") or "vendedor"
+                    # Bloquear login si la empresa esta desactivada.
+                    if not user_store_pg.is_tenant_active(tenant_id):
+                        error = "La empresa esta desactivada. Contacta al administrador."
+                        saved_username = username
+                        pg_user = None
+                        raise _TenantInactive()
+                except _TenantInactive:
+                    pg_user = None
+                except Exception:
+                    pass  # PG no disponible (dev): seguir con defaults
+                if error is None:
+                    # Fallback de rol para admins historicos aun sin rol en PG.
+                    if rol == "vendedor" and username in _ADMIN_USERS:
+                        rol = "admin"
+                    session["username"] = username
+                    session["tenant_id"] = tenant_id
+                    session["rol"] = rol
+                    _log_activity("login", username=username)
+                    return redirect(url_for("index"))
             else:
                 error = result["error"]
                 saved_username = username
@@ -9186,7 +9212,9 @@ def logout():
 def index():
     if not session.get("username"):
         return redirect(url_for("login_page"))
-    html = render_template_string(HTML, username=session["username"], indicador_categorias_json=_INDICADOR_CATEGORIAS_JSON, all_users=[u for u in user_manager.list_users() if u not in ('admin', 'Vanesa.Admin', 'Vanesa_Admin', 'FedericoCeballos', 'MartinianoSosa', 'GarciaTania', 'Berna.Strauss')])
+    _tenant = _current_tenant()
+    _users_for_dropdown = user_manager.list_users(tenant_id=(None if _tenant == "__legacy__" else _tenant))
+    html = render_template_string(HTML, username=session["username"], indicador_categorias_json=_INDICADOR_CATEGORIAS_JSON, all_users=[u for u in _users_for_dropdown if u not in ('admin', 'Vanesa.Admin', 'Vanesa_Admin', 'FedericoCeballos', 'MartinianoSosa', 'GarciaTania', 'Berna.Strauss')])
     # Prevent the browser from serving a stale cached page after each deploy.
     resp = app.make_response(html)
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
@@ -9753,13 +9781,52 @@ def debug_entries(username):
     })
 
 
-# Admin usernames
+# Admin usernames (bootstrap: se sincronizan como rol 'admin' en app_users).
 _ADMIN_USERS = {"admin", "Vanesa.Admin", "Berna.Strauss", "FedericoCeballos", "MartinianoSosa"}
+# Superadmin de plataforma (rol 'superadmin': gestiona todos los tenants).
+_SUPERADMIN_USERS = {"Berna.Strauss"}
+
+
+class _TenantInactive(Exception):
+    """Señal interna: el tenant del usuario esta desactivado (login bloqueado)."""
+    pass
 
 
 def _is_admin():
-    """Check if current session user is an admin."""
+    """
+    True si el usuario de la sesion es admin o superadmin.
+    Multi-tenant Fase 3: se basa en el ROL de la sesion. Fallback al set
+    hardcodeado _ADMIN_USERS para el bootstrap (sesiones viejas sin rol, o
+    cuentas admin que todavia no sincronizaron su rol en app_users).
+    """
+    rol = session.get("rol")
+    if rol in ("admin", "superadmin"):
+        return True
+    if rol == "vendedor":
+        return False
+    # Sin rol en sesion (bootstrap / sesion previa): usar la lista hardcodeada.
     return session.get("username") in _ADMIN_USERS
+
+
+def _is_superadmin():
+    """True solo para el rol superadmin (gestion de toda la plataforma)."""
+    return session.get("rol") == "superadmin"
+
+
+# Multi-tenant (Fase 1): tenant activo de la sesion. Hoy la sesion todavia no
+# guarda tenant (eso llega en la Fase 3), asi que devolvemos el tenant por
+# defecto y el comportamiento es identico al actual para la empresa existente.
+# Cuando la Fase 3 pueble session["tenant_id"], este helper lo tomara solo.
+_DEFAULT_TENANT = "__legacy__"
+
+
+def _current_tenant():
+    """
+    Tenant de la sesion actual. SIEMPRE sale de la sesion, nunca del request,
+    para que ningun usuario pueda pedir datos de otro tenant. Fallback al tenant
+    por defecto mientras la sesion no lo provea (pre Fase 3).
+    """
+    return session.get("tenant_id") or _DEFAULT_TENANT
 
 
 def _log_activity(event_type, tool="", entry_id="", detail="", username=None):
@@ -9772,7 +9839,8 @@ def _log_activity(event_type, tool="", entry_id="", detail="", username=None):
         u = username if username is not None else session.get("username")
         if u:
             activity_store_pg.log_event(u, event_type, tool=tool,
-                                        entry_id=entry_id, detail=detail)
+                                        entry_id=entry_id, detail=detail,
+                                        tenant_id=session.get("tenant_id") or "__legacy__")
     except Exception:
         pass
 
@@ -9808,7 +9876,8 @@ def dictionary_add():
     if not phrase or not category:
         return jsonify({"ok": False, "error": "faltan phrase/category"}), 400
     from src.users import dictionary_store_pg
-    ok = dictionary_store_pg.add_phrase(phrase, category, added_by=session["username"])
+    ok = dictionary_store_pg.add_phrase(phrase, category, added_by=session["username"],
+                                        tenant_id=_current_tenant())
     return jsonify({"ok": ok})
 
 
@@ -9841,12 +9910,13 @@ def dictionary_list():
     if not session.get("username"):
         return jsonify({"ok": False, "error": "unauthorized"}), 401
     from src.users import dictionary_store_pg
-    # One-time seed: fill the (empty) table with the base dictionary.
+    tenant = _current_tenant()
+    # One-time seed (por tenant): llena el diccionario del tenant con la base.
     try:
-        dictionary_store_pg.seed_from_base(_base_dictionary_by_category())
+        dictionary_store_pg.seed_from_base(_base_dictionary_by_category(), tenant_id=tenant)
     except Exception:
         pass
-    return jsonify({"ok": True, "phrases": dictionary_store_pg.list_phrases()})
+    return jsonify({"ok": True, "phrases": dictionary_store_pg.list_phrases(tenant_id=tenant)})
 
 
 @app.route("/dictionary/<int:override_id>", methods=["DELETE"])
@@ -9855,7 +9925,7 @@ def dictionary_delete(override_id):
     if not session.get("username"):
         return jsonify({"ok": False, "error": "unauthorized"}), 401
     from src.users import dictionary_store_pg
-    ok = dictionary_store_pg.delete_phrase(override_id)
+    ok = dictionary_store_pg.delete_phrase(override_id, tenant_id=_current_tenant())
     return jsonify({"ok": ok})
 
 
@@ -9869,7 +9939,7 @@ def dictionary_move(override_id):
     if not new_category:
         return jsonify({"ok": False, "error": "falta category"}), 400
     from src.users import dictionary_store_pg
-    ok = dictionary_store_pg.move_phrase(override_id, new_category)
+    ok = dictionary_store_pg.move_phrase(override_id, new_category, tenant_id=_current_tenant())
     return jsonify({"ok": ok})
 
 
@@ -10221,6 +10291,129 @@ def admin_sync_users_to_pg():
     result["num_synced"] = len(result["synced"])
     result["note"] = "Cuentas persistidas en app_users. Sobreviven redeploys."
     return jsonify(result)
+
+
+@app.route("/admin/sync-roles", methods=["POST", "GET"])
+def admin_sync_roles():
+    """
+    Bootstrap de roles multi-tenant: marca en app_users como 'admin' a las
+    cuentas de _ADMIN_USERS y como 'superadmin' a las de _SUPERADMIN_USERS.
+    Idempotente. Admin only. Correr una vez tras desplegar la Fase 3.
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users import user_store_pg
+    if not user_store_pg.is_available():
+        return jsonify({"error": "PostgreSQL no disponible"}), 500
+    updated = user_store_pg.sync_admin_roles(
+        admin_usernames=list(_ADMIN_USERS),
+        superadmin_usernames=list(_SUPERADMIN_USERS),
+    )
+    return jsonify({"ok": True, "rows_updated": updated,
+                    "admins": sorted(_ADMIN_USERS),
+                    "superadmins": sorted(_SUPERADMIN_USERS)})
+
+
+# ── Gestion de empresas (tenants) — SUPERADMIN ─────────────────────────────
+# Solo el rol superadmin (plataforma) puede ver/crear empresas y cruzar tenants.
+
+@app.route("/superadmin/tenants")
+def superadmin_tenants():
+    """Lista de empresas (tenants). Superadmin only."""
+    if not _is_superadmin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users import user_store_pg
+    return jsonify({"ok": True, "tenants": user_store_pg.list_tenants()})
+
+
+@app.route("/superadmin/crear-tenant", methods=["POST", "GET"])
+def superadmin_crear_tenant():
+    """
+    Crea una empresa (tenant) y, opcionalmente, su primer usuario admin.
+    Superadmin only.
+
+    Params: tenant_id (req), nombre, plan, admin_user, admin_pass.
+    Si se dan admin_user + admin_pass, se crea esa cuenta como rol 'admin' del
+    nuevo tenant (via register + set_user_role_tenant).
+    """
+    if not _is_superadmin():
+        return jsonify({"error": "unauthorized"}), 403
+
+    def _p(name, default=""):
+        val = request.args.get(name)
+        if val is None:
+            data = request.get_json(silent=True) or {}
+            val = data.get(name)
+        return (val if val is not None else default)
+
+    tenant_id = str(_p("tenant_id", "")).strip()
+    if not tenant_id:
+        return jsonify({"ok": False, "error": "Falta tenant_id."}), 400
+    if tenant_id == "__legacy__":
+        return jsonify({"ok": False, "error": "tenant_id reservado."}), 400
+
+    from src.users import user_store_pg
+    if not user_store_pg.is_available():
+        return jsonify({"ok": False, "error": "PostgreSQL no disponible"}), 500
+
+    created = user_store_pg.create_tenant(
+        tenant_id, nombre=str(_p("nombre", tenant_id)).strip(),
+        plan=str(_p("plan", "basico")).strip() or "basico",
+    )
+    out = {"ok": bool(created), "tenant_id": tenant_id, "admin_created": False}
+
+    admin_user = str(_p("admin_user", "")).strip()
+    admin_pass = str(_p("admin_pass", "")).strip()
+    if admin_user and admin_pass:
+        reg = user_manager.register(
+            username=admin_user, password=admin_pass,
+            nombre=str(_p("admin_nombre", "Admin")).strip() or "Admin",
+            apellido=str(_p("admin_apellido", tenant_id)).strip() or tenant_id,
+            email=str(_p("admin_email", "pendiente@%s.local" % tenant_id)).strip(),
+            celular=str(_p("admin_celular", "pendiente")).strip() or "pendiente",
+            direccion=str(_p("admin_direccion", "pendiente")).strip() or "pendiente",
+            empresa=str(_p("nombre", tenant_id)).strip(),
+            cargo="Administrador",
+        )
+        if reg.get("ok"):
+            # Asignar la cuenta al tenant nuevo con rol admin.
+            user_store_pg.set_user_role_tenant(admin_user, rol="admin", tenant_id=tenant_id)
+            out["admin_created"] = True
+            out["admin_user"] = admin_user
+        else:
+            out["admin_error"] = reg.get("error")
+    return jsonify(out)
+
+
+@app.route("/superadmin/tenant-estado/<tenant_id>")
+def superadmin_tenant_estado(tenant_id):
+    """
+    Estado de una empresa: cantidad de usuarios y de textos. Superadmin only.
+    Solo lectura.
+    """
+    if not _is_superadmin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users import user_store_pg
+    from src.users.history_manager import _get_pg_conn, _return_pg_conn
+    out = {"tenant_id": tenant_id, "usuarios": [], "textos": 0}
+    try:
+        out["usuarios"] = user_store_pg.list_usernames(tenant_id)
+    except Exception:
+        pass
+    conn = _get_pg_conn()
+    if conn is not None:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT COUNT(*) FROM analysis_history WHERE tenant_id = %s",
+                    (tenant_id,),
+                )
+                out["textos"] = cur.fetchone()[0]
+            _return_pg_conn(conn)
+        except Exception as exc:
+            out["error"] = str(exc)
+            _return_pg_conn(conn, close=True)
+    return jsonify(out)
 
 
 @app.route("/admin/db-status")
@@ -10640,7 +10833,8 @@ def admin_stats(username):
     # If _all, aggregate across all users — en UNA query multi-usuario (entradas
     # ligeras, sin text_full) en vez de una query por usuario.
     if username == "_all":
-        all_users = user_manager.list_users()
+        _tenant = _current_tenant()
+        all_users = user_manager.list_users(tenant_id=(None if _tenant == "__legacy__" else _tenant))
         entries = []
         by_user = get_report_entries_all(all_users)
         for u in all_users:
@@ -10816,7 +11010,11 @@ def admin_informe():
     from src.users.history_manager import get_flat_entries
     from datetime import datetime as _dt
 
-    all_users = user_manager.list_users()
+    # Multi-tenant Fase 4: la lista de vendedores del informe se acota al tenant
+    # de la sesion. Con '__legacy__' (unico tenant hoy) devuelve todos, igual que
+    # antes; con un tenant real, solo los de esa empresa.
+    _tenant = _current_tenant()
+    all_users = user_manager.list_users(tenant_id=(None if _tenant == "__legacy__" else _tenant))
     if filter_seller != "_all" and filter_seller in all_users:
         target_users = [filter_seller]
     else:
@@ -10974,10 +11172,16 @@ def admin_actividad():
     if filter_seller and filter_seller != "_all":
         usernames = [filter_seller]
 
+    # Multi-tenant Fase 4: acotar la actividad al tenant de la sesion. Con un
+    # tenant real aisla; con '__legacy__' (unico tenant hoy) no filtra, porque
+    # toda la actividad vive ahi (mismo comportamiento que antes).
+    _tenant = _current_tenant()
+    _tenant_arg = _tenant if _tenant and _tenant != "__legacy__" else None
+
     try:
         from src.users import activity_store_pg
         summary = activity_store_pg.get_activity_summary(
-            start=start, end=end, usernames=usernames)
+            start=start, end=end, usernames=usernames, tenant_id=_tenant_arg)
     except Exception as exc:
         summary = {"ok": False, "reason": str(exc), "users": {}}
 
