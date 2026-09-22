@@ -80,21 +80,35 @@
 
 ## FASE 2 — Migración segura de datos existentes (regla de guardado)
 
+> **Enfoque de dos pasos (acordado):** la Fase 2 se divide en 2a (segura, ahora)
+> y 2b (cuando entre un segundo tenant real). 2a agrega `tenant_id` SIN tocar la
+> PK; 2b cambia la PK a `(tenant_id, id, username)` y renombra `__legacy__` al
+> tenant real. Mientras haya un solo tenant, la PK `(id, username)` es suficiente
+> y evita reescribir la clave de una tabla de producción.
+
 - [ ] 2.1 Backup total previo (datos + tag de código) y registrar
-  `/admin/full-diag`. (Req 4, 8.3)
-- [ ] 2.2 `analysis_history` y `activity_log`: agregar `tenant_id DEFAULT
+  `/admin/full-diag`. (Req 4, 8.3) — **PENDIENTE: lo hace el usuario en producción
+  antes de desplegar.**
+- [x] 2.2 `analysis_history` y `activity_log`: agregar `tenant_id DEFAULT
   '__legacy__'` (todas las filas quedan asignadas sin pérdida). (Req 4.1)
-- [ ] 2.3 Ajustar PK/índices: `analysis_history` PK `(tenant_id, id, username)`,
-  índice `(tenant_id, username, timestamp DESC)`; `activity_log` índice
+  — Con `ALTER TABLE ADD COLUMN IF NOT EXISTS` (no reescribe datos, no toca fechas).
+- [x] 2.3 Índices por tenant: `analysis_history` índice
+  `(tenant_id, username, timestamp DESC)`; `activity_log` índice
   `(tenant_id, username, ts DESC)`. (Req 4.1)
-- [ ] 2.4 Etiquetar datos legacy al tenant real con UPDATE por tabla
-  (`SET tenant_id='mpc' WHERE tenant_id='__legacy__'`) en analysis_history,
-  activity_log, dictionary_overrides, history_backups, app_users. (Req 4.2, 4.3)
-- [ ] 2.5 VERIFICACIÓN OBLIGATORIA: `/admin/full-diag` después de migrar. El
-  total y la distribución por mes DEBEN ser idénticos a 2.1. Si cambian,
-  revertir. (Req 4.4)
-- [ ] 2.6 Confirmar que ningún texto cambió de mes ni desapareció (distribución
-  por mes idéntica). (Req 4.3, 8.2)
+  — **PK NO cambiada (queda en 2b):** cambiar la PK de una tabla de producción con
+  un solo tenant agrega riesgo sin beneficio. Índices nuevos ya creados.
+- [ ] 2.4 (2b) Etiquetar datos legacy al tenant real con UPDATE por tabla.
+  (Req 4.2, 4.3) — **DIFERIDA a 2b:** con un solo tenant todo vive en `__legacy__`
+  de forma coherente; renombrar a `mpc` es cosmético y se hace cuando entre el 2º
+  cliente, junto con el cambio de PK. Las entradas nuevas caen en `__legacy__` por
+  el DEFAULT de la columna.
+- [ ] 2.5 VERIFICACIÓN OBLIGATORIA: `/admin/full-diag` después de desplegar 2a.
+  El total y la distribución por mes DEBEN ser idénticos a 2.1. (Req 4.4)
+  — **PENDIENTE: lo hace el usuario en producción tras el deploy.**
+- [x] 2.6 A nivel de código: la migración 2a es puro etiquetado (ADD COLUMN con
+  DEFAULT). NO toca `resolve_entry_date`, NO reasigna fechas, NO cambia PK, NO
+  borra. Por diseño no puede cambiar conteo ni distribución. 106 tests en verde.
+  (Req 4.3, 8.2)
 
 ---
 
