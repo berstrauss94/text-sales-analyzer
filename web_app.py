@@ -2819,13 +2819,13 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v23.7{% if username == 'Berna.Strauss' %} &middot; chat reformula y confirma lo entendido{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v24.0{% if username == 'Berna.Strauss' %} &middot; chat con IA real (interpreta al vendedor){% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v23.3)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v24.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    El <strong style="color:#5bd4f5;">Chat</strong> ahora permite <strong style="color:#5bf5a3;">adjuntar una foto</strong> (opcional) a tu consulta o sugerencia, para explicar mejor lo que quieras mostrar.
-                    <div style="margin-top:8px;">Tocás "Adjuntar foto", elegís la imagen (se optimiza sola para que viaje liviana), confirmás y se envía junto al mensaje. El administrador la ve en la campana y puede ampliarla.</div>
-                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">La foto es opcional: podés enviar solo texto si preferís. Todo queda guardado y separado por empresa.</div>
+                    El <strong style="color:#5bd4f5;">Chat</strong> ahora usa <strong style="color:#5bf5a3;">inteligencia artificial</strong>: cuando escribís tu consulta o sugerencia, te devuelve "esto entendí..." con lo que quisiste decir, en palabras claras.
+                    <div style="margin-top:8px;">Si está bien, confirmás y se envía. Si no, corregís o ampliás y lo vuelve a interpretar, hasta que quede justo. Al administrador le llega el mensaje junto a la interpretación, para entenderlo de una.</div>
+                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Seguís pudiendo adjuntar una foto. Si la IA no está disponible, el chat sigue funcionando igual.</div>
                 </div>
             </div>
         </div>
@@ -8543,7 +8543,7 @@ function toggleChatWidget() {
     // 'flex' (no 'block') para que el header quede fijo y el cuerpo scrollee
     // dentro del widget; asi nunca se corta contra el borde de la pantalla.
     w.style.display = showing ? 'none' : 'flex';
-    if (!showing) { _chatStep = 'welcome'; _chatMessage = ''; _chatImage = ''; renderChatStep(); }
+    if (!showing) { _chatStep = 'welcome'; _chatMessage = ''; _chatImage = ''; _chatInterpretacion = ''; renderChatStep(); }
 }
 
 function _chatBtnStyle(primary) {
@@ -8593,11 +8593,10 @@ function renderChatStep() {
             _renderChatImagePreview();
         }, 30);
     } else if (_chatStep === 'interpret') {
-        body.innerHTML =
-            _interpretacionHtml()
-            + '<div style="margin-bottom:6px;">Es correcto lo que entendi?</div>'
-            + _chatBtn('Si, se entendio', 'understood', '', true)
-            + _chatBtn('No, quiero corregir o ampliar', 'refine', '', false);
+        // Mientras la IA piensa, mostrar un estado de carga; al volver, pintar la
+        // interpretacion y las opciones. Se dispara el fetch aca.
+        body.innerHTML = '<div style="color:#9aa0b0;">Interpretando lo que escribiste...</div>';
+        _fetchInterpretacion();
     } else if (_chatStep === 'confirm') {
         var imgPreview = _chatImage
             ? '<img src="' + _chatImage + '" alt="adjunto" style="max-width:100%;max-height:110px;border-radius:8px;border:1px solid #2a3350;display:block;margin-bottom:8px;">'
@@ -8703,53 +8702,64 @@ function chatSubmitInput() {
     }
 }
 
-// Reformulacion ESTRUCTURADA (sin IA): clasifica el tema por palabras clave y
-// arma un "esto entendi" claro para que el usuario confirme o corrija. No finge
-// inteligencia: es un reflejo ordenado del mensaje.
-function _detectarTema(texto) {
-    var t = (texto || '').toLowerCase();
-    var temas = [
-        { clave: 'permiso', kw: ['permiso', 'acceso', 'no puedo entrar', 'no me deja', 'habilitar', 'rol'] },
-        { clave: 'un error o falla del sistema', kw: ['error', 'falla', 'no funciona', 'no carga', 'se cuelga', 'roto', 'bug', 'no anda'] },
-        { clave: 'los informes o estadisticas', kw: ['informe', 'estadistic', 'grafico', 'reporte', 'seguimiento', 'panel'] },
-        { clave: 'la carga o el analisis de textos', kw: ['texto', 'analiz', 'cargar', 'guardar', 'audio', 'transcrip'] },
-        { clave: 'el diccionario o los filtros', kw: ['diccionario', 'filtro', 'palabra', 'frase', 'categoria', 'resaltar'] },
-        { clave: 'una funcion nueva', kw: ['agregar', 'sumar', 'nueva', 'poder', 'se podria', 'seria bueno', 'propon'] }
-    ];
-    for (var i = 0; i < temas.length; i++) {
-        for (var j = 0; j < temas[i].kw.length; j++) {
-            if (t.indexOf(temas[i].kw[j]) !== -1) return temas[i].clave;
-        }
-    }
-    return '';
-}
+// Interpretacion con IA: le pide al backend que parafrasee lo que el vendedor
+// quiso decir, y pinta el resultado con las opciones de confirmar o corregir.
+// El backend usa OpenAI (gpt-4o-mini) y cae a reglas si la IA no esta.
+var _chatInterpretacion = '';   // ultima interpretacion recibida
 
-function _interpretacionHtml() {
-    var tipo = (_chatKind === 'sugerencia') ? 'una sugerencia' : 'un pedido de ayuda';
-    var tema = _detectarTema(_chatMessage);
-    var sobre = tema ? (' sobre <strong style="color:#aaccff;">' + _esc(tema) + '</strong>') : '';
-    return '<div style="margin-bottom:8px;">Esto es lo que entendi:</div>'
-        + '<div style="background:#0d0f18;border:1px solid #2a2d3e;border-radius:6px;padding:8px;margin-bottom:8px;">'
-        + '<div style="color:#e0b46a;font-size:0.7rem;margin-bottom:4px;">Es ' + tipo + sobre + '.</div>'
-        + '<div style="color:#cfd3dc;">&ldquo;' + _esc(_chatMessage) + '&rdquo;</div>'
-        + '</div>';
+async function _fetchInterpretacion() {
+    var body = document.getElementById('chatBody');
+    var interp = '';
+    try {
+        var res = await fetch('/api/messages/interpret', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: _chatMessage, kind: _chatKind })
+        });
+        var data = await res.json();
+        interp = (data && data.interpretation) ? data.interpretation : '';
+    } catch (e) {}
+    if (!interp) {
+        // Ultimo recurso si ni el endpoint respondio: reflejo minimo local.
+        interp = 'Entendi que decis: "' + _chatMessage + '".';
+    }
+    _chatInterpretacion = interp;
+    // El paso pudo haber cambiado si el usuario cerro/avanzo mientras cargaba.
+    if (_chatStep !== 'interpret' || !body) return;
+    body.innerHTML =
+        '<div style="margin-bottom:8px;">Esto es lo que entendi:</div>'
+        + '<div style="background:#0d0f18;border:1px solid #2a2d3e;border-radius:6px;padding:8px;margin-bottom:8px;color:#cfd3dc;">' + _esc(interp) + '</div>'
+        + '<div style="margin-bottom:6px;">Es correcto lo que entendi?</div>'
+        + _chatBtn('Si, se entendio', 'understood', '', true)
+        + _chatBtn('No, quiero corregir o ampliar', 'refine', '', false);
 }
 
 async function chatSend(shouldSend) {
     if (shouldSend) {
+        // Al admin le llega el mensaje del vendedor y, si hubo interpretacion de
+        // la IA, se adjunta para dar contexto claro de que se quiso decir.
+        var textoFinal = _chatMessage;
+        if (_chatInterpretacion) {
+            // Salto de linea via fromCharCode (evita el escape que interpreta
+            // Python al vivir el JS dentro de un string del template).
+            var _nl = String.fromCharCode(10);
+            textoFinal += _nl + _nl + '[Interpretado: ' + _chatInterpretacion + ']';
+        }
         try {
             await fetch('/api/messages/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: _chatMessage, kind: _chatKind, image: _chatImage })
+                body: JSON.stringify({ text: textoFinal, kind: _chatKind, image: _chatImage })
             });
         } catch (e) {}
         _chatStep = 'finish';
         _chatImage = '';
+        _chatInterpretacion = '';
     } else {
         _chatStep = 'welcome';
         _chatMessage = '';
         _chatImage = '';
+        _chatInterpretacion = '';
     }
     renderChatStep();
 }
@@ -10366,6 +10376,80 @@ def messages_history():
     msgs = message_store_pg.list_messages(
         tenant_id=_current_tenant(), only_unresolved=False, limit=200)
     return jsonify({"ok": True, "count": len(msgs), "messages": msgs})
+
+
+def _interpret_por_reglas(text: str, kind: str) -> str:
+    """
+    Fallback SIN IA: reformulacion estructurada por palabras clave. Se usa si la
+    IA no esta disponible (sin OPENAI_API_KEY o error), para que el chat nunca
+    quede sin respuesta.
+    """
+    t = (text or "").lower()
+    tipo = "una sugerencia" if kind == "sugerencia" else "un pedido de ayuda"
+    temas = [
+        ("permisos o accesos", ["permiso", "acceso", "no puedo entrar", "no me deja", "habilitar", "rol"]),
+        ("un error o falla del sistema", ["error", "falla", "no funciona", "no carga", "se cuelga", "roto", "bug", "no anda"]),
+        ("los informes o estadisticas", ["informe", "estadistic", "grafico", "reporte", "seguimiento", "panel"]),
+        ("la carga o el analisis de textos", ["texto", "analiz", "cargar", "guardar", "audio", "transcrip"]),
+        ("el diccionario o los filtros", ["diccionario", "filtro", "palabra", "frase", "categoria", "resaltar"]),
+        ("una funcion nueva", ["agregar", "sumar", "nueva", "poder", "se podria", "seria bueno", "propon"]),
+    ]
+    tema = ""
+    for nombre, kws in temas:
+        if any(k in t for k in kws):
+            tema = nombre
+            break
+    sobre = (" sobre " + tema) if tema else ""
+    return "Entendi que es " + tipo + sobre + ", y que decis: \"" + (text or "").strip() + "\"."
+
+
+@app.route("/api/messages/interpret", methods=["POST"])
+def messages_interpret():
+    """
+    Interpreta/parafrasea con IA lo que el vendedor escribio, para que valide que
+    esta bien entendido antes de enviarlo al admin. Usa el mismo patron que el
+    simulador (OPENAI_API_KEY, gpt-4o-mini). Si la IA no esta disponible, cae al
+    reflejo por reglas para que el chat nunca quede sin respuesta.
+    """
+    if not session.get("username"):
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    text = str(data.get("text", "")).strip()
+    kind = str(data.get("kind", "ayuda")).strip().lower()
+    if not text:
+        return jsonify({"ok": False, "error": "mensaje vacio"}), 400
+
+    tipo_txt = "una sugerencia para el sistema" if kind == "sugerencia" else "un pedido de ayuda"
+    system_prompt = (
+        "Sos un asistente que ayuda a un vendedor a dejar clara su consulta o "
+        "sugerencia para el administrador de un sistema de analisis de ventas "
+        "inmobiliarias. El usuario escribio " + tipo_txt + ". Tu tarea: reformular "
+        "en 1 o 2 frases, en espanol rioplatense claro y respetuoso, LO QUE QUISO "
+        "DECIR, empezando con 'Entendi que...'. No inventes datos que no dijo. Si "
+        "el mensaje es muy vago, agrega al final una breve pregunta para que lo "
+        "aclare. Maximo 60 palabras."
+    )
+
+    try:
+        import openai
+        client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text},
+            ],
+            max_tokens=120,
+            temperature=0.4,
+        )
+        interpretacion = (response.choices[0].message.content or "").strip()
+        if not interpretacion:
+            raise ValueError("respuesta vacia de la IA")
+        return jsonify({"ok": True, "interpretation": interpretacion, "source": "ia"})
+    except Exception as exc:
+        app.logger.warning(f"messages_interpret IA no disponible, uso reglas: {exc}")
+        return jsonify({"ok": True, "interpretation": _interpret_por_reglas(text, kind),
+                        "source": "reglas"})
 
 
 # ── Dictionary overrides (user-contributed phrases) ────────────────────────
