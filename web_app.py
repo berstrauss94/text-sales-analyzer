@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v24.4{% if username == 'Berna.Strauss' %} &middot; fix respuestas cortadas de la IA{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v24.5{% if username == 'Berna.Strauss' %} &middot; simulador con respuestas sugeridas{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v24.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -3127,6 +3127,8 @@ HTML = """
             <!-- Chat panel -->
             <div id="simChat" style="display:none;">
                 <div id="simMessages" style="height:320px; overflow-y:auto; background:#0f1117; border:1px solid #2a2d3a; border-radius:8px; padding:12px; margin-bottom:10px;"></div>
+                <!-- Sugerencias de respuesta para el vendedor (las genera la IA) -->
+                <div id="simSuggestions" style="display:none; gap:6px; flex-wrap:wrap; margin-bottom:8px;"></div>
                 <div style="display:flex; gap:8px;">
                     <input type="text" id="simInput" placeholder="Escribe tu mensaje de vendedor..." style="flex:1; background:#0f1117; border:1px solid #2a2d3a; border-radius:6px; color:#e0e0e0; padding:10px; font-size:0.88rem; outline:none;" onkeydown="if(event.key==='Enter')sendSimMessage()">
                     <button class="btn-primary" onclick="sendSimMessage()" style="padding:10px 18px;">Enviar</button>
@@ -8447,6 +8449,7 @@ async function sendSimMessage() {
     const text = input.value.trim();
     if (!text || !simActive) return;
     input.value = '';
+    renderSimSuggestions([]);   // limpiar sugerencias del turno anterior
     addSimMessage('vendor', text);
     await sendToSimulator(text);
 }
@@ -8472,6 +8475,7 @@ async function sendToSimulator(message) {
         if (data.response) {
             addSimMessage('client', data.response);
         }
+        renderSimSuggestions(data.suggestions || []);
         if (data.ended) {
             endSimulation();
         }
@@ -8481,6 +8485,31 @@ async function sendToSimulator(message) {
         addSimMessage('system', 'Error de conexi\u00f3n. Intenta de nuevo.');
     }
 }
+
+// Muestra las 3 sugerencias de respuesta para el vendedor como botones. Al tocar
+// uno, rellena el input (el vendedor puede enviarlo tal cual o editarlo).
+function renderSimSuggestions(suggestions) {
+    const box = document.getElementById('simSuggestions');
+    if (!box) return;
+    if (!suggestions || suggestions.length === 0) {
+        box.style.display = 'none';
+        box.innerHTML = '';
+        return;
+    }
+    box.innerHTML = '<div style="width:100%;font-size:0.62rem;color:#777;margin-bottom:2px;">Sugerencias para responder:</div>'
+        + suggestions.map(function (s) {
+            return '<button type="button" class="sim-suggestion" style="background:#141b2e;border:1px solid #2a3350;border-radius:16px;color:#aaccff;font-size:0.72rem;padding:5px 11px;cursor:pointer;text-align:left;max-width:100%;">' + _esc(s) + '</button>';
+        }).join('');
+    box.style.display = 'flex';
+}
+
+// Al tocar una sugerencia, cargarla en el input (delegado, sin onclick inline).
+document.addEventListener('click', function (e) {
+    var btn = _closest(e, '.sim-suggestion');
+    if (!btn) return;
+    var input = document.getElementById('simInput');
+    if (input) { input.value = btn.textContent; input.focus(); }
+});
 
 function endSimulation() {
     simActive = false;
@@ -10108,6 +10137,16 @@ def simulator_chat():
 
     system_prompt = difficulty_prompts.get(difficulty, difficulty_prompts["mediano"])
     system_prompt += "\n\nREGLAS:\n- Responde SIEMPRE en espanol.\n- Maximo 60 palabras por respuesta.\n- Nunca rompas el personaje.\n- Si el vendedor logra convencerte genuinamente, acepta la compra.\n- Si detectas que el vendedor no maneja objeciones, muestra mas resistencia."
+    # Ademas de responder como cliente, sugerir 3 respuestas cortas que el
+    # VENDEDOR podria darte en el proximo turno (para guiarlo). Se pide en JSON.
+    system_prompt += (
+        "\n\nFORMATO DE SALIDA: responde EXCLUSIVAMENTE con un JSON valido, sin "
+        "texto extra ni markdown, con esta forma exacta:\n"
+        '{\"response\": \"tu respuesta como cliente\", \"suggestions\": '
+        '[\"posible respuesta 1 del vendedor\", \"posible respuesta 2\", \"posible respuesta 3\"]}\n'
+        "Las 3 sugerencias son opciones BREVES que el VENDEDOR podria usar para "
+        "responderte, utiles segun lo que acabas de decir."
+    )
 
     # Build messages for OpenAI
     openai_messages = [{"role": "system", "content": system_prompt}]
@@ -10135,10 +10174,26 @@ def simulator_chat():
             max_tokens=800,
             temperature=0.8,
         )
-        reply = (response.choices[0].message.content or "").strip()
+        raw = (response.choices[0].message.content or "").strip()
+        # La IA deberia devolver JSON {response, suggestions}. Puede venir con
+        # cercos de markdown (```json ... ```): los limpiamos antes de parsear.
+        reply = raw
+        suggestions = []
+        try:
+            import json as _json, re as _re
+            cleaned = _re.sub(r'^```(?:json)?|```$', '', raw.strip(), flags=_re.MULTILINE).strip()
+            parsed = _json.loads(cleaned)
+            reply = (parsed.get("response") or "").strip() or raw
+            sug = parsed.get("suggestions") or []
+            if isinstance(sug, list):
+                suggestions = [str(s).strip() for s in sug if str(s).strip()][:3]
+        except Exception:
+            # Si no vino JSON, usamos el texto crudo como respuesta (sin sugerencias).
+            reply = raw
+            suggestions = []
         if not reply:
             reply = "Disculpa, no te escuche bien. Me lo repetis?"
-        return jsonify({"response": reply, "ended": False})
+        return jsonify({"response": reply, "suggestions": suggestions, "ended": False})
     except Exception as exc:
         app.logger.error(f"Simulator error: {exc}")
         return jsonify({"response": "Lo siento, no pude generar una respuesta. Verifica que la clave de IA (GEMINI_API_KEY) este configurada.", "ended": False})
