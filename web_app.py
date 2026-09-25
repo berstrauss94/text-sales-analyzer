@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v23.5{% if username == 'Berna.Strauss' %} &middot; chat solo vendedores + panel de notif. arreglado{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v23.6{% if username == 'Berna.Strauss' %} &middot; notif. ancladas + historial + copiar{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v23.3)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -2843,8 +2843,14 @@ HTML = """
             <!-- Panel de notificaciones: fuera del header y como hijo directo del
                  flujo para poder posicionarlo FIXED desde JS (el transform del
                  .container rompe position:absolute/fixed anidado). -->
-            <div id="notifDropdown" style="display:none;position:fixed;z-index:100000;width:320px;max-width:calc(100vw - 24px);max-height:70vh;overflow-y:auto;background:#12141c;border:1px solid #3a3d4a;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;padding:10px;">
-                <div style="font-size:0.75rem;font-weight:700;color:#fff;margin-bottom:8px;">Consultas y sugerencias</div>
+            <div id="notifDropdown" style="display:none;position:fixed;z-index:100000;width:340px;max-width:calc(100vw - 24px);max-height:70vh;overflow-y:auto;background:#12141c;border:1px solid #3a3d4a;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;padding:10px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px;">
+                    <span style="font-size:0.75rem;font-weight:700;color:#fff;">Consultas y sugerencias</span>
+                    <span style="display:inline-flex;border:1px solid #2a2d3a;border-radius:7px;overflow:hidden;">
+                        <button type="button" id="notifTabPend" data-notif-mode="pendientes" style="background:#1a2a4a;color:#7b9cff;border:none;padding:3px 9px;font-size:0.6rem;font-weight:700;cursor:pointer;">Pendientes</button>
+                        <button type="button" id="notifTabHist" data-notif-mode="historial" style="background:transparent;color:#888;border:none;padding:3px 9px;font-size:0.6rem;font-weight:700;cursor:pointer;">Historial</button>
+                    </span>
+                </div>
                 <div id="notifMessagesContent" style="font-size:0.72rem;color:#cfd3dc;"></div>
             </div>
             {% endif %}
@@ -8724,47 +8730,107 @@ function toggleNotificationsMenu() {
         panel.style.left = left + 'px';
         panel.style.right = 'auto';
     }
+    _notifMode = 'pendientes';   // al abrir, arrancar en Pendientes
     fetchNotifications();
 }
 
-// Reposicionar / cerrar el panel al hacer scroll o resize (sigue a la campana).
+// El panel queda ANCLADO a la campana (no acompana el scroll): al hacer scroll
+// o resize se cierra, para no quedar flotando desalineado en el medio.
 window.addEventListener('resize', function () {
     var p = document.getElementById('notifDropdown');
     if (p && p.style.display !== 'none') { p.style.display = 'none'; }
 });
+window.addEventListener('scroll', function () {
+    var p = document.getElementById('notifDropdown');
+    if (p && p.style.display !== 'none') { p.style.display = 'none'; }
+}, true);
 
-async function fetchNotifications() {
+var _notifMode = 'pendientes';       // 'pendientes' | 'historial'
+var _notifTextById = {};             // id -> texto (para el boton Copiar)
+
+function _setNotifTab() {
+    var pend = document.getElementById('notifTabPend');
+    var hist = document.getElementById('notifTabHist');
+    if (!pend || !hist) return;
+    var on = 'background:#1a2a4a;color:#7b9cff;';
+    var off = 'background:transparent;color:#888;';
+    pend.style.cssText = 'border:none;padding:3px 9px;font-size:0.6rem;font-weight:700;cursor:pointer;' + (_notifMode === 'pendientes' ? on : off);
+    hist.style.cssText = 'border:none;padding:3px 9px;font-size:0.6rem;font-weight:700;cursor:pointer;' + (_notifMode === 'historial' ? on : off);
+}
+
+// El badge (numero rojo) SIEMPRE refleja los pendientes, sin importar el modo.
+async function _refreshBadge() {
     var badge = document.getElementById('notifBadge');
-    var container = document.getElementById('notifMessagesContent');
+    if (!badge) return;
     try {
         var res = await fetch('/api/messages/admin-notifications', { cache: 'no-store' });
         if (!res.ok) return;
         var data = await res.json();
-        var msgs = (data && data.messages) ? data.messages : [];
-        if (badge) {
-            if (msgs.length > 0) { badge.textContent = msgs.length; badge.style.display = 'block'; }
-            else { badge.style.display = 'none'; }
-        }
-        if (container) {
-            if (msgs.length === 0) {
-                container.innerHTML = '<div style="color:#777;">No hay consultas pendientes.</div>';
-            } else {
-                container.innerHTML = msgs.map(function (m) {
-                    var tag = m.kind === 'sugerencia' ? 'Sugerencia' : 'Ayuda';
-                    var imgHtml = m.image
-                        ? '<img src="' + m.image + '" alt="adjunto" data-notif-img="' + m.id + '" title="Toca para ampliar" style="max-width:100%;max-height:120px;border-radius:8px;border:1px solid #2a3350;display:block;margin:4px 0 6px;cursor:zoom-in;">'
-                        : '';
-                    return '<div style="border-bottom:1px solid #22242e;padding:7px 0;">'
-                        + '<div style="font-size:0.6rem;color:#e0b46a;text-transform:uppercase;letter-spacing:0.03em;">' + tag + ' &middot; ' + _esc((m.ts || '').slice(0, 10)) + '</div>'
-                        + '<div style="color:#fff;font-weight:600;">' + _esc(m.from_user) + '</div>'
-                        + '<div style="color:#cfd3dc;margin:2px 0 5px;">' + _esc(m.text) + '</div>'
-                        + imgHtml
-                        + '<button type="button" style="font-size:0.62rem;padding:2px 8px;background:#1e2235;color:#5bf5a3;border:1px solid #2a5a3a;border-radius:5px;cursor:pointer;" data-notif-resolve="' + m.id + '">Marcar resuelto</button>'
-                        + '</div>';
-                }).join('');
-            }
-        }
+        var n = (data && data.messages) ? data.messages.length : 0;
+        if (n > 0) { badge.textContent = n; badge.style.display = 'block'; }
+        else { badge.style.display = 'none'; }
     } catch (e) {}
+}
+
+async function fetchNotifications() {
+    _setNotifTab();
+    _refreshBadge();
+    var container = document.getElementById('notifMessagesContent');
+    var url = (_notifMode === 'historial')
+        ? '/api/messages/history'
+        : '/api/messages/admin-notifications';
+    try {
+        var res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) return;
+        var data = await res.json();
+        var msgs = (data && data.messages) ? data.messages : [];
+        if (!container) return;
+        if (msgs.length === 0) {
+            container.innerHTML = (_notifMode === 'historial')
+                ? '<div style="color:#777;">Todavia no hay mensajes enviados.</div>'
+                : '<div style="color:#777;">No hay consultas pendientes.</div>';
+            return;
+        }
+        _notifTextById = {};
+        container.innerHTML = msgs.map(function (m) {
+            _notifTextById[m.id] = m.text || '';
+            var tag = m.kind === 'sugerencia' ? 'Sugerencia' : 'Ayuda';
+            var estado = m.resolved
+                ? '<span style="color:#5bf5a3;">resuelto</span>'
+                : '<span style="color:#e0b46a;">pendiente</span>';
+            var imgHtml = m.image
+                ? '<img src="' + m.image + '" alt="adjunto" data-notif-img="' + m.id + '" title="Toca para ampliar" style="max-width:100%;max-height:120px;border-radius:8px;border:1px solid #2a3350;display:block;margin:4px 0 6px;cursor:zoom-in;">'
+                : '';
+            // Copiar (izquierda) + Marcar resuelto (solo si aun esta pendiente).
+            var acciones = '<button type="button" style="font-size:0.62rem;padding:2px 8px;background:#1e2235;color:#aaccff;border:1px solid #2a3350;border-radius:5px;cursor:pointer;margin-right:6px;" data-notif-copy="' + m.id + '">Copiar</button>';
+            if (!m.resolved) {
+                acciones += '<button type="button" style="font-size:0.62rem;padding:2px 8px;background:#1e2235;color:#5bf5a3;border:1px solid #2a5a3a;border-radius:5px;cursor:pointer;" data-notif-resolve="' + m.id + '">Marcar resuelto</button>';
+            }
+            return '<div style="border-bottom:1px solid #22242e;padding:7px 0;">'
+                + '<div style="font-size:0.6rem;color:#e0b46a;text-transform:uppercase;letter-spacing:0.03em;">' + tag + ' &middot; ' + _esc((m.ts || '').slice(0, 10)) + ' &middot; ' + estado + '</div>'
+                + '<div style="color:#fff;font-weight:600;">' + _esc(m.from_user) + '</div>'
+                + '<div style="color:#cfd3dc;margin:2px 0 5px;">' + _esc(m.text) + '</div>'
+                + imgHtml
+                + '<div style="display:flex;align-items:center;">' + acciones + '</div>'
+                + '</div>';
+        }).join('');
+    } catch (e) {}
+}
+
+// Copiar el texto de un mensaje al portapapeles.
+function copyNotifText(id) {
+    var txt = _notifTextById[id] || '';
+    if (!txt) return;
+    try {
+        navigator.clipboard.writeText(txt);
+    } catch (e) {
+        // Fallback para navegadores viejos.
+        var ta = document.createElement('textarea');
+        ta.value = txt; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (x) {}
+        document.body.removeChild(ta);
+    }
+    try { UISound.click(); } catch (e) {}
 }
 
 async function resolveNotification(id) {
@@ -8788,6 +8854,27 @@ document.addEventListener('click', function (e) {
     if (!img) return;
     var src = img.getAttribute('src');
     if (src) { try { window.open(src, '_blank'); } catch (x) {} }
+});
+
+// Cambiar entre Pendientes / Historial en el panel de notificaciones.
+document.addEventListener('click', function (e) {
+    var tab = _closest(e, '[data-notif-mode]');
+    if (!tab) return;
+    _notifMode = tab.getAttribute('data-notif-mode');
+    fetchNotifications();
+});
+
+// Boton Copiar de un mensaje.
+document.addEventListener('click', function (e) {
+    var btn = _closest(e, '[data-notif-copy]');
+    if (!btn) return;
+    var id = parseInt(btn.getAttribute('data-notif-copy'), 10);
+    if (id) {
+        copyNotifText(id);
+        var prev = btn.textContent;
+        btn.textContent = 'Copiado';
+        setTimeout(function () { btn.textContent = prev; }, 1200);
+    }
 });
 
 // Al cargar: si existe la campana (admin), traer el conteo inicial.
@@ -10220,6 +10307,17 @@ def messages_resolve(message_id):
     from src.users import message_store_pg
     ok = message_store_pg.mark_resolved(message_id, tenant_id=_current_tenant())
     return jsonify({"ok": ok})
+
+
+@app.route("/api/messages/history")
+def messages_history():
+    """Historial COMPLETO (resueltos y no) de la empresa del admin."""
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users import message_store_pg
+    msgs = message_store_pg.list_messages(
+        tenant_id=_current_tenant(), only_unresolved=False, limit=200)
+    return jsonify({"ok": True, "count": len(msgs), "messages": msgs})
 
 
 # ── Dictionary overrides (user-contributed phrases) ────────────────────────
