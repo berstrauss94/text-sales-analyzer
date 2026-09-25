@@ -2819,13 +2819,13 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v23.2{% if username == 'Berna.Strauss' %} &middot; chat fijo a la pantalla en el scroll{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v23.3{% if username == 'Berna.Strauss' %} &middot; adjuntar foto en el chat{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v23.0)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v23.3)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    Nuevo botón <strong style="color:#5bd4f5;">Chat</strong> (arriba, junto a Sonido): un asistente guiado para enviar <strong style="color:#5bf5a3;">consultas o sugerencias</strong> al administrador.
-                    <div style="margin-top:8px;">Elegís si es una duda o una sugerencia, escribís el mensaje, confirmás y se envía. El administrador las ve en una <strong style="color:#5bd4f5;">campana de notificaciones</strong> y puede marcarlas como resueltas.</div>
-                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Los mensajes quedan guardados y separados por empresa.</div>
+                    El <strong style="color:#5bd4f5;">Chat</strong> ahora permite <strong style="color:#5bf5a3;">adjuntar una foto</strong> (opcional) a tu consulta o sugerencia, para explicar mejor lo que quieras mostrar.
+                    <div style="margin-top:8px;">Tocás "Adjuntar foto", elegís la imagen (se optimiza sola para que viaje liviana), confirmás y se envía junto al mensaje. El administrador la ve en la campana y puede ampliarla.</div>
+                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">La foto es opcional: podés enviar solo texto si preferís. Todo queda guardado y separado por empresa.</div>
                 </div>
             </div>
         </div>
@@ -8532,7 +8532,7 @@ function toggleChatWidget() {
     // 'flex' (no 'block') para que el header quede fijo y el cuerpo scrollee
     // dentro del widget; asi nunca se corta contra el borde de la pantalla.
     w.style.display = showing ? 'none' : 'flex';
-    if (!showing) { _chatStep = 'welcome'; _chatMessage = ''; renderChatStep(); }
+    if (!showing) { _chatStep = 'welcome'; _chatMessage = ''; _chatImage = ''; renderChatStep(); }
 }
 
 function _chatBtnStyle(primary) {
@@ -8563,12 +8563,26 @@ function renderChatStep() {
         body.innerHTML =
             '<div style="margin-bottom:6px;">Escribi tu ' + (_chatKind === 'sugerencia' ? 'sugerencia' : 'consulta') + ':</div>'
             + '<textarea id="chatTextInput" rows="3" style="width:100%;background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:8px;font-size:0.75rem;font-family:inherit;box-sizing:border-box;resize:vertical;"></textarea>'
+            + '<div style="margin-top:8px;">'
+            + '<label for="chatImageInput" style="display:inline-block;font-size:0.72rem;padding:6px 10px;border-radius:7px;cursor:pointer;background:#1e2235;color:#aaccff;border:1px solid #3a3d4a;">&#128247; Adjuntar foto (opcional)</label>'
+            + '<input type="file" id="chatImageInput" accept="image/*" style="display:none;">'
+            + '<div id="chatImagePreview" style="margin-top:8px;"></div>'
+            + '</div>'
             + _chatBtn('Siguiente', 'submit', '', true);
-        setTimeout(function () { var t = document.getElementById('chatTextInput'); if (t) t.focus(); }, 30);
+        setTimeout(function () {
+            var t = document.getElementById('chatTextInput'); if (t) t.focus();
+            var fi = document.getElementById('chatImageInput');
+            if (fi) fi.addEventListener('change', chatOnImagePicked);
+            _renderChatImagePreview();
+        }, 30);
     } else if (_chatStep === 'confirm') {
+        var imgPreview = _chatImage
+            ? '<img src="' + _chatImage + '" alt="adjunto" style="max-width:100%;max-height:110px;border-radius:8px;border:1px solid #2a3350;display:block;margin-bottom:8px;">'
+            : '';
         body.innerHTML =
             '<div style="margin-bottom:8px;">Vas a enviar:</div>'
             + '<div style="background:#0d0f18;border:1px solid #2a2d3e;border-radius:6px;padding:8px;margin-bottom:8px;color:#aaccff;">' + _esc(_chatMessage) + '</div>'
+            + imgPreview
             + '<div>Es correcto?</div>'
             + _chatBtn('Si, esta bien', 'confirm', 'yes', true)
             + _chatBtn('No, elegir categoria', 'confirm', 'no', false);
@@ -8601,7 +8615,57 @@ document.addEventListener('click', function (e) {
     else if (action === 'confirm') { _chatStep = (arg === 'yes') ? 'send_ask' : 'options_abc'; renderChatStep(); }
     else if (action === 'abc') { _chatMessage += ' [Categoria: ' + arg + ']'; _chatStep = 'send_ask'; renderChatStep(); }
     else if (action === 'send') { chatSend(arg === 'yes'); }
+    else if (action === 'rmimg') { _chatImage = ''; _renderChatImagePreview(); }
 });
+
+var _chatImage = '';   // data URL de la foto adjunta (opcional)
+
+// Comprime y redimensiona la imagen elegida EN EL NAVEGADOR antes de enviarla,
+// para no inflar la base ni la red. Max ~1000px de lado, JPEG calidad 0.7.
+function chatOnImagePicked(e) {
+    var file = e.target && e.target.files ? e.target.files[0] : null;
+    if (!file || file.type.indexOf('image/') !== 0) return;
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+        var img = new Image();
+        img.onload = function () {
+            var MAX = 1000;
+            var w = img.width, h = img.height;
+            if (w > MAX || h > MAX) {
+                if (w >= h) { h = Math.round(h * MAX / w); w = MAX; }
+                else { w = Math.round(w * MAX / h); h = MAX; }
+            }
+            var canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            try {
+                _chatImage = canvas.toDataURL('image/jpeg', 0.7);
+            } catch (x) { _chatImage = ''; }
+            // Red de seguridad: si aun quedo muy grande, descartar y avisar.
+            if (_chatImage.length > 1400000) {
+                _chatImage = '';
+                alert('La imagen es demasiado grande. Proba con una mas chica.');
+            }
+            _renderChatImagePreview();
+        };
+        img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function _renderChatImagePreview() {
+    var box = document.getElementById('chatImagePreview');
+    if (!box) return;
+    if (_chatImage) {
+        box.innerHTML =
+            '<div style="position:relative;display:inline-block;">'
+            + '<img src="' + _chatImage + '" alt="adjunto" style="max-width:100%;max-height:120px;border-radius:8px;border:1px solid #2a3350;display:block;">'
+            + '<button type="button" data-chat-action="rmimg" title="Quitar foto" style="position:absolute;top:-8px;right:-8px;width:20px;height:20px;border-radius:50%;background:#f55b5b;color:#fff;border:none;cursor:pointer;font-size:0.7rem;line-height:1;">&times;</button>'
+            + '</div>';
+    } else {
+        box.innerHTML = '';
+    }
+}
 
 function chatSubmitInput() {
     var input = document.getElementById('chatTextInput');
@@ -8618,13 +8682,15 @@ async function chatSend(shouldSend) {
             await fetch('/api/messages/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: _chatMessage, kind: _chatKind })
+                body: JSON.stringify({ text: _chatMessage, kind: _chatKind, image: _chatImage })
             });
         } catch (e) {}
         _chatStep = 'finish';
+        _chatImage = '';
     } else {
         _chatStep = 'welcome';
         _chatMessage = '';
+        _chatImage = '';
     }
     renderChatStep();
 }
@@ -8656,10 +8722,14 @@ async function fetchNotifications() {
             } else {
                 container.innerHTML = msgs.map(function (m) {
                     var tag = m.kind === 'sugerencia' ? 'Sugerencia' : 'Ayuda';
+                    var imgHtml = m.image
+                        ? '<img src="' + m.image + '" alt="adjunto" data-notif-img="' + m.id + '" title="Toca para ampliar" style="max-width:100%;max-height:120px;border-radius:8px;border:1px solid #2a3350;display:block;margin:4px 0 6px;cursor:zoom-in;">'
+                        : '';
                     return '<div style="border-bottom:1px solid #22242e;padding:7px 0;">'
                         + '<div style="font-size:0.6rem;color:#e0b46a;text-transform:uppercase;letter-spacing:0.03em;">' + tag + ' &middot; ' + _esc((m.ts || '').slice(0, 10)) + '</div>'
                         + '<div style="color:#fff;font-weight:600;">' + _esc(m.from_user) + '</div>'
                         + '<div style="color:#cfd3dc;margin:2px 0 5px;">' + _esc(m.text) + '</div>'
+                        + imgHtml
                         + '<button type="button" style="font-size:0.62rem;padding:2px 8px;background:#1e2235;color:#5bf5a3;border:1px solid #2a5a3a;border-radius:5px;cursor:pointer;" data-notif-resolve="' + m.id + '">Marcar resuelto</button>'
                         + '</div>';
                 }).join('');
@@ -8681,6 +8751,14 @@ document.addEventListener('click', function (e) {
     if (!btn) return;
     var id = parseInt(btn.getAttribute('data-notif-resolve'), 10);
     if (id) resolveNotification(id);
+});
+
+// Ampliar la foto adjunta de una notificacion: abrir en pestana nueva.
+document.addEventListener('click', function (e) {
+    var img = _closest(e, '[data-notif-img]');
+    if (!img) return;
+    var src = img.getAttribute('src');
+    if (src) { try { window.open(src, '_blank'); } catch (x) {} }
 });
 
 // Al cargar: si existe la campana (admin), traer el conteo inicial.
@@ -10083,12 +10161,13 @@ def messages_send():
     data = request.get_json(silent=True) or {}
     text = str(data.get("text", "")).strip()
     kind = str(data.get("kind", "ayuda")).strip().lower()
+    image = str(data.get("image", "") or "")
     if not text:
         return jsonify({"ok": False, "error": "mensaje vacio"}), 400
     from src.users import message_store_pg
     ok = message_store_pg.add_message(
         from_user=session["username"], text=text, kind=kind,
-        tenant_id=_current_tenant(),
+        tenant_id=_current_tenant(), image=image,
     )
     return jsonify({"ok": ok})
 

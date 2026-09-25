@@ -62,10 +62,16 @@ def _ensure_table(conn) -> None:
                 from_user  TEXT        NOT NULL,
                 kind       TEXT        NOT NULL DEFAULT 'ayuda',
                 text       TEXT        NOT NULL,
+                image      TEXT        NOT NULL DEFAULT '',
                 resolved   BOOLEAN     NOT NULL DEFAULT false,
                 ts         TIMESTAMPTZ NOT NULL DEFAULT now()
             )
             """
+        )
+        # Migracion segura para tablas ya existentes: agregar la columna image
+        # (data URL de la foto adjunta, opcional). Vacio = sin imagen.
+        cur.execute(
+            "ALTER TABLE user_messages ADD COLUMN IF NOT EXISTS image TEXT NOT NULL DEFAULT ''"
         )
         cur.execute(
             "CREATE INDEX IF NOT EXISTS idx_msg_tenant_resolved_ts "
@@ -75,14 +81,28 @@ def _ensure_table(conn) -> None:
     _table_ready = True
 
 
+# Tope de tamano de la imagen adjunta (data URL). ~1.4 MB de texto base64 ~
+# 1 MB de imagen. El cliente ya comprime/redimensiona antes de enviar; esto es
+# la red de seguridad del backend para no inflar la base.
+_MAX_IMAGE_CHARS = 1_400_000
+
+
 def add_message(from_user: str, text: str, kind: str = "ayuda",
-                tenant_id: str = "__legacy__") -> bool:
-    """Guarda un mensaje del vendedor. Best-effort: nunca lanza."""
+                tenant_id: str = "__legacy__", image: str = "") -> bool:
+    """
+    Guarda un mensaje del vendedor, con imagen adjunta OPCIONAL (data URL).
+    Best-effort: nunca lanza.
+    """
     text = (text or "").strip()
+    image = (image or "").strip()
     if not from_user or not text or not is_available():
         return False
     if kind not in VALID_KINDS:
         kind = "ayuda"
+    # Validar la imagen: solo data URLs de imagen y dentro del tope de tamano.
+    if image:
+        if not image.startswith("data:image/") or len(image) > _MAX_IMAGE_CHARS:
+            image = ""  # descartar silenciosamente algo invalido o demasiado grande
     conn = _conn()
     if conn is None:
         return False
@@ -90,9 +110,9 @@ def add_message(from_user: str, text: str, kind: str = "ayuda",
         _ensure_table(conn)
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO user_messages (tenant_id, from_user, kind, text) "
-                "VALUES (%s, %s, %s, %s)",
-                (tenant_id or "__legacy__", from_user, kind, text[:2000]),
+                "INSERT INTO user_messages (tenant_id, from_user, kind, text, image) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                (tenant_id or "__legacy__", from_user, kind, text[:2000], image),
             )
         conn.commit()
         _release(conn)
@@ -126,7 +146,7 @@ def list_messages(tenant_id: str = "__legacy__", only_unresolved: bool = True,
             where += " AND resolved = false"
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT id, from_user, kind, text, resolved, ts FROM user_messages "
+                "SELECT id, from_user, kind, text, resolved, ts, image FROM user_messages "
                 "WHERE " + where + " ORDER BY ts DESC LIMIT %s",
                 tuple(params) + (int(limit),),
             )
@@ -138,6 +158,7 @@ def list_messages(tenant_id: str = "__legacy__", only_unresolved: bool = True,
                 "id": r[0], "from_user": r[1], "kind": r[2], "text": r[3],
                 "resolved": bool(r[4]),
                 "ts": r[5].isoformat() if hasattr(r[5], "isoformat") else str(r[5]),
+                "image": r[6] or "",
             })
         return out
     except Exception as exc:
