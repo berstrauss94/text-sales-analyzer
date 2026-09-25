@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v24.0{% if username == 'Berna.Strauss' %} &middot; chat con IA real (interpreta al vendedor){% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v24.1{% if username == 'Berna.Strauss' %} &middot; IA con Gemini (chat + simulador){% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v24.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -10123,10 +10123,9 @@ def simulator_chat():
         openai_messages.append({"role": "user", "content": "Hola, buenas tardes."})
 
     try:
-        import openai
-        client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+        client, _model = _ai_client()
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=_model,
             messages=openai_messages,
             max_tokens=150,
             temperature=0.8,
@@ -10135,7 +10134,7 @@ def simulator_chat():
         return jsonify({"response": reply, "ended": False})
     except Exception as exc:
         app.logger.error(f"Simulator error: {exc}")
-        return jsonify({"response": "Lo siento, no pude generar una respuesta. Verifica que OPENAI_API_KEY este configurada.", "ended": False})
+        return jsonify({"response": "Lo siento, no pude generar una respuesta. Verifica que la clave de IA (GEMINI_API_KEY) este configurada.", "ended": False})
 
 
 @app.route("/api/simulator/feedback", methods=["POST"])
@@ -10291,6 +10290,32 @@ def _current_tenant():
     return session.get("tenant_id") or _DEFAULT_TENANT
 
 
+# Endpoint compatible con OpenAI de la API de Gemini (Google). Permite usar la
+# libreria `openai` ya instalada apuntando a Gemini, cambiando solo base_url,
+# key y modelo (segun la doc oficial ai.google.dev/gemini-api/docs/openai).
+_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+
+
+def _ai_client():
+    """
+    Devuelve (client, model) para el chat de IA. Prioriza Gemini (key en
+    GEMINI_API_KEY o GOOGLE_API_KEY) usando la libreria openai apuntada al
+    endpoint compatible de Google; si no, usa OpenAI (OPENAI_API_KEY).
+    Lanza RuntimeError si no hay ninguna key configurada.
+    """
+    import openai
+    gemini_key = (os.environ.get("GEMINI_API_KEY")
+                  or os.environ.get("GOOGLE_API_KEY") or "").strip()
+    if gemini_key:
+        client = openai.OpenAI(api_key=gemini_key, base_url=_GEMINI_BASE_URL)
+        return client, "gemini-1.5-flash"
+    openai_key = (os.environ.get("OPENAI_API_KEY") or "").strip()
+    if openai_key:
+        client = openai.OpenAI(api_key=openai_key)
+        return client, "gpt-4o-mini"
+    raise RuntimeError("No hay clave de IA configurada (GEMINI_API_KEY/OPENAI_API_KEY).")
+
+
 def _log_activity(event_type, tool="", entry_id="", detail="", username=None):
     """
     Best-effort activity logging. Never raises, never blocks the caller's action.
@@ -10403,6 +10428,39 @@ def _interpret_por_reglas(text: str, kind: str) -> str:
     return "Entendi que es " + tipo + sobre + ", y que decis: \"" + (text or "").strip() + "\"."
 
 
+@app.route("/admin/ai-diag")
+def admin_ai_diag():
+    """
+    Diagnostico de la IA (admin only). Dice que clave detecto, con que proveedor
+    y modelo, y hace una llamada minima para devolver el error EXACTO si falla.
+    No expone la clave completa (solo prefijo/sufijo). Open: /admin/ai-diag
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    out = {
+        "gemini_key_set": bool((os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or "").strip()),
+        "openai_key_set": bool((os.environ.get("OPENAI_API_KEY") or "").strip()),
+    }
+    key = (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+           or os.environ.get("OPENAI_API_KEY") or "").strip()
+    if key:
+        out["key_preview"] = (key[:6] + "..." + key[-4:]) if len(key) > 12 else "(corta)"
+    try:
+        client, model = _ai_client()
+        out["provider_model"] = model
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": "Responde solo con: OK"}],
+            max_tokens=5,
+        )
+        out["ok"] = True
+        out["reply"] = (resp.choices[0].message.content or "").strip()
+    except Exception as exc:
+        out["ok"] = False
+        out["error"] = str(exc)
+    return jsonify(out)
+
+
 @app.route("/api/messages/interpret", methods=["POST"])
 def messages_interpret():
     """
@@ -10431,10 +10489,9 @@ def messages_interpret():
     )
 
     try:
-        import openai
-        client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+        client, _model = _ai_client()
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=_model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": text},
