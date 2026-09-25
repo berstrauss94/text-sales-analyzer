@@ -2819,13 +2819,13 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v22.1{% if username == 'Berna.Strauss' %} &middot; fix boton Resaltar y definir{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v23.0{% if username == 'Berna.Strauss' %} &middot; chat de consultas y sugerencias al admin{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v21.0)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v23.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    En el gráfico de tendencia, el modo <strong style="color:#5bd4f5;">Línea única</strong> ahora muestra a <strong style="color:#5bf5a3;">todos los vendedores que subieron textos</strong> en el período, cada uno con su etiqueta.
-                    <div style="margin-top:8px;">Antes solo aparecía el vendedor que más había aportado en cada punto; quien nunca era el máximo quedaba sin nombre. Ahora figura cada vendedor con textos en su punto más alto. Si un vendedor no cargó textos en los meses elegidos, no aparece.</div>
-                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Ademas, el Tutorial recorre todo el Informe de Seguimiento sin saltearse secciones y el primer paso ya no aparece descolocado.</div>
+                    Nuevo botón <strong style="color:#5bd4f5;">Chat</strong> (arriba, junto a Sonido): un asistente guiado para enviar <strong style="color:#5bf5a3;">consultas o sugerencias</strong> al administrador.
+                    <div style="margin-top:8px;">Elegís si es una duda o una sugerencia, escribís el mensaje, confirmás y se envía. El administrador las ve en una <strong style="color:#5bd4f5;">campana de notificaciones</strong> y puede marcarlas como resueltas.</div>
+                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Los mensajes quedan guardados y separados por empresa.</div>
                 </div>
             </div>
         </div>
@@ -2833,6 +2833,16 @@ HTML = """
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
             <button id="tutorialBtn" type="button" onclick="startTour()" disabled title="El tutorial se habilita cuando el sistema termina de cargar" aria-label="Iniciar tutorial guiado" style="font-size:0.75rem;padding:4px 10px;margin-right:6px;background:#22242e;color:#666;border:1px solid #3a3d4a;border-radius:6px;cursor:not-allowed;opacity:0.7;">&#127891; Cargando...</button>
             <button id="soundToggleBtn" type="button" onclick="toggleUISound()" title="Activar/silenciar sonidos de interfaz" aria-label="Activar o silenciar sonidos de interfaz" style="font-size:0.75rem;padding:4px 10px;margin-right:6px;background:#2a2d3a;color:#888;border:1px solid #3a3d4a;border-radius:6px;cursor:pointer;">&#128266; Sonido</button>
+            <button id="chatBtn" type="button" onclick="toggleChatWidget()" title="Consultas y sugerencias" aria-label="Abrir chat de consultas y sugerencias" style="font-size:0.75rem;padding:4px 10px;margin-right:6px;background:#1a2a4a;color:#7b9cff;border:1px solid #4a6cf7;border-radius:6px;cursor:pointer;">&#128172; Chat</button>
+            {% if username in ['admin', 'Vanesa.Admin', 'Berna.Strauss', 'FedericoCeballos', 'MartinianoSosa'] %}
+            <span id="adminNotifWrapper" style="position:relative;display:inline-block;margin-right:6px;vertical-align:middle;">
+                <button id="notifBellBtn" type="button" onclick="toggleNotificationsMenu()" title="Consultas de los vendedores" aria-label="Ver consultas de los vendedores" style="font-size:0.9rem;padding:2px 8px;background:#22242e;color:#e0b46a;border:1px solid #3a3d4a;border-radius:6px;cursor:pointer;position:relative;">&#128276;<span id="notifBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:#f55b5b;color:#fff;font-size:0.55rem;font-weight:700;min-width:15px;height:15px;line-height:15px;border-radius:8px;padding:0 3px;text-align:center;">0</span></button>
+                <div id="notifDropdown" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:100000;width:320px;max-height:360px;overflow-y:auto;background:#12141c;border:1px solid #3a3d4a;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;padding:10px;">
+                    <div style="font-size:0.75rem;font-weight:700;color:#fff;margin-bottom:8px;">Consultas y sugerencias</div>
+                    <div id="notifMessagesContent" style="font-size:0.72rem;color:#cfd3dc;"></div>
+                </div>
+            </span>
+            {% endif %}
             <a href="/logout" class="btn-logout">Cerrar sesion</a>
         </div>
     </div>
@@ -2961,6 +2971,15 @@ HTML = """
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- ── Widget de Chat: consultas y sugerencias del vendedor ── -->
+        <div id="chatWidget" style="display:none;position:fixed;bottom:20px;right:20px;width:300px;z-index:99998;background:#12141c;border:1px solid #4a6cf7;border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,0.6);overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#1a2a4a;border-bottom:1px solid #2a3350;">
+                <span style="font-size:0.8rem;font-weight:700;color:#fff;">&#128172; Asistente</span>
+                <button type="button" onclick="toggleChatWidget()" aria-label="Cerrar chat" style="background:none;border:none;color:#9aa0b0;font-size:1.1rem;cursor:pointer;line-height:1;">&times;</button>
+            </div>
+            <div id="chatBody" style="padding:14px 12px;font-size:0.78rem;color:#cfd3dc;"></div>
         </div>
 
         <div class="btn-row">
@@ -8485,6 +8504,182 @@ async function submitFeedback() {
 // Keep loadHistory as no-op for backward compatibility
 function loadHistory() {}
 function toggleHistory() { toggleSimulator(); }
+
+// ═══════════════════════════════════════════════════════════════════════
+// Widget de Chat: consultas y sugerencias del vendedor -> administrador
+// Buzon guiado (sin IA). El usuario y el rol salen del backend, no se hardcodean.
+// ═══════════════════════════════════════════════════════════════════════
+var _chatStep = 'welcome';   // welcome | input | confirm | options_abc | send_ask | finish
+var _chatKind = 'ayuda';     // ayuda | sugerencia
+var _chatMessage = '';
+
+function _esc(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function toggleChatWidget() {
+    var w = document.getElementById('chatWidget');
+    if (!w) return;
+    var showing = w.style.display !== 'none';
+    w.style.display = showing ? 'none' : 'block';
+    if (!showing) { _chatStep = 'welcome'; _chatMessage = ''; renderChatStep(); }
+}
+
+function _chatBtnStyle(primary) {
+    return 'width:100%;margin:4px 0;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:0.75rem;'
+        + (primary
+            ? 'background:#4a6cf7;color:#fff;border:1px solid #4a6cf7;font-weight:700;'
+            : 'background:#1e2235;color:#cfd3dc;border:1px solid #3a3d4a;');
+}
+
+// Boton del chat con data-action/data-arg (SIN onclick inline con comillas: eso
+// rompe el JS al renderizar y lo prohiben los guards de regresion). Un unico
+// listener delegado maneja todos los clicks del cuerpo del chat.
+function _chatBtn(label, action, arg, primary) {
+    return '<button type="button" style="' + _chatBtnStyle(primary) + '" '
+        + 'data-chat-action="' + action + '" data-chat-arg="' + _esc(arg || '') + '">'
+        + _esc(label) + '</button>';
+}
+
+function renderChatStep() {
+    var body = document.getElementById('chatBody');
+    if (!body) return;
+    if (_chatStep === 'welcome') {
+        body.innerHTML =
+            '<div style="font-weight:700;color:#fff;margin-bottom:8px;">Que necesitas?</div>'
+            + _chatBtn('Necesito ayuda con el sistema', 'option', 'ayuda', false)
+            + _chatBtn('Tengo una sugerencia', 'option', 'sugerencia', false);
+    } else if (_chatStep === 'input') {
+        body.innerHTML =
+            '<div style="margin-bottom:6px;">Escribi tu ' + (_chatKind === 'sugerencia' ? 'sugerencia' : 'consulta') + ':</div>'
+            + '<textarea id="chatTextInput" rows="3" style="width:100%;background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:8px;font-size:0.75rem;font-family:inherit;box-sizing:border-box;resize:vertical;"></textarea>'
+            + _chatBtn('Siguiente', 'submit', '', true);
+        setTimeout(function () { var t = document.getElementById('chatTextInput'); if (t) t.focus(); }, 30);
+    } else if (_chatStep === 'confirm') {
+        body.innerHTML =
+            '<div style="margin-bottom:8px;">Vas a enviar:</div>'
+            + '<div style="background:#0d0f18;border:1px solid #2a2d3e;border-radius:6px;padding:8px;margin-bottom:8px;color:#aaccff;">' + _esc(_chatMessage) + '</div>'
+            + '<div>Es correcto?</div>'
+            + _chatBtn('Si, esta bien', 'confirm', 'yes', true)
+            + _chatBtn('No, elegir categoria', 'confirm', 'no', false);
+    } else if (_chatStep === 'options_abc') {
+        body.innerHTML =
+            '<div style="margin-bottom:6px;">Elegi una categoria:</div>'
+            + _chatBtn('A - Ajuste de permisos', 'abc', 'Ajuste de permisos', false)
+            + _chatBtn('B - Error de sistema', 'abc', 'Error de sistema', false)
+            + _chatBtn('C - Nueva sugerencia', 'abc', 'Nueva sugerencia', false);
+    } else if (_chatStep === 'send_ask') {
+        body.innerHTML =
+            '<div style="margin-bottom:8px;">Enviar esta ' + (_chatKind === 'sugerencia' ? 'sugerencia' : 'consulta') + ' al administrador?</div>'
+            + _chatBtn('Si, enviar', 'send', 'yes', true)
+            + _chatBtn('Volver al inicio', 'send', 'no', false);
+    } else if (_chatStep === 'finish') {
+        body.innerHTML = '<div style="color:#5bf5a3;font-weight:700;">Gracias por tu colaboracion.</div>';
+        setTimeout(function () { toggleChatWidget(); }, 2000);
+    }
+}
+
+// Listener delegado unico: traduce data-chat-action a la accion correspondiente.
+// Usa el helper _closest (los guards prohiben e.target.closest directo).
+document.addEventListener('click', function (e) {
+    var btn = _closest(e, '[data-chat-action]');
+    if (!btn) return;
+    var action = btn.getAttribute('data-chat-action');
+    var arg = btn.getAttribute('data-chat-arg') || '';
+    if (action === 'option') { _chatKind = arg; _chatStep = 'input'; renderChatStep(); }
+    else if (action === 'submit') { chatSubmitInput(); }
+    else if (action === 'confirm') { _chatStep = (arg === 'yes') ? 'send_ask' : 'options_abc'; renderChatStep(); }
+    else if (action === 'abc') { _chatMessage += ' [Categoria: ' + arg + ']'; _chatStep = 'send_ask'; renderChatStep(); }
+    else if (action === 'send') { chatSend(arg === 'yes'); }
+});
+
+function chatSubmitInput() {
+    var input = document.getElementById('chatTextInput');
+    if (input && input.value.trim() !== '') {
+        _chatMessage = input.value.trim();
+        _chatStep = 'confirm';
+        renderChatStep();
+    }
+}
+
+async function chatSend(shouldSend) {
+    if (shouldSend) {
+        try {
+            await fetch('/api/messages/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: _chatMessage, kind: _chatKind })
+            });
+        } catch (e) {}
+        _chatStep = 'finish';
+    } else {
+        _chatStep = 'welcome';
+        _chatMessage = '';
+    }
+    renderChatStep();
+}
+
+// ── Campana de notificaciones (solo admin) ──
+function toggleNotificationsMenu() {
+    var panel = document.getElementById('notifDropdown');
+    if (!panel) return;
+    var showing = panel.style.display !== 'none';
+    panel.style.display = showing ? 'none' : 'block';
+    if (!showing) fetchNotifications();
+}
+
+async function fetchNotifications() {
+    var badge = document.getElementById('notifBadge');
+    var container = document.getElementById('notifMessagesContent');
+    try {
+        var res = await fetch('/api/messages/admin-notifications', { cache: 'no-store' });
+        if (!res.ok) return;
+        var data = await res.json();
+        var msgs = (data && data.messages) ? data.messages : [];
+        if (badge) {
+            if (msgs.length > 0) { badge.textContent = msgs.length; badge.style.display = 'block'; }
+            else { badge.style.display = 'none'; }
+        }
+        if (container) {
+            if (msgs.length === 0) {
+                container.innerHTML = '<div style="color:#777;">No hay consultas pendientes.</div>';
+            } else {
+                container.innerHTML = msgs.map(function (m) {
+                    var tag = m.kind === 'sugerencia' ? 'Sugerencia' : 'Ayuda';
+                    return '<div style="border-bottom:1px solid #22242e;padding:7px 0;">'
+                        + '<div style="font-size:0.6rem;color:#e0b46a;text-transform:uppercase;letter-spacing:0.03em;">' + tag + ' &middot; ' + _esc((m.ts || '').slice(0, 10)) + '</div>'
+                        + '<div style="color:#fff;font-weight:600;">' + _esc(m.from_user) + '</div>'
+                        + '<div style="color:#cfd3dc;margin:2px 0 5px;">' + _esc(m.text) + '</div>'
+                        + '<button type="button" style="font-size:0.62rem;padding:2px 8px;background:#1e2235;color:#5bf5a3;border:1px solid #2a5a3a;border-radius:5px;cursor:pointer;" data-notif-resolve="' + m.id + '">Marcar resuelto</button>'
+                        + '</div>';
+                }).join('');
+            }
+        }
+    } catch (e) {}
+}
+
+async function resolveNotification(id) {
+    try {
+        await fetch('/api/messages/' + id + '/resolve', { method: 'POST' });
+    } catch (e) {}
+    fetchNotifications();
+}
+
+// Listener delegado para "Marcar resuelto" (sin onclick inline).
+document.addEventListener('click', function (e) {
+    var btn = _closest(e, '[data-notif-resolve]');
+    if (!btn) return;
+    var id = parseInt(btn.getAttribute('data-notif-resolve'), 10);
+    if (id) resolveNotification(id);
+});
+
+// Al cargar: si existe la campana (admin), traer el conteo inicial.
+document.addEventListener('DOMContentLoaded', function () {
+    if (document.getElementById('notifBellBtn')) {
+        try { fetchNotifications(); } catch (e) {}
+    }
+});
 </script>
 </body>
 </html>
@@ -9865,6 +10060,49 @@ def log_tool():
     detail = str(data.get("detail", ""))[:200]
     _log_activity("tool", tool=tool, entry_id=entry_id, detail=detail)
     return jsonify({"ok": True})
+
+
+# ── Buzon de mensajes vendedor -> administrador ────────────────────────────
+# Un vendedor envia una consulta o sugerencia; el admin de su empresa la ve como
+# notificacion. Aislado por tenant. No es un chatbot con IA: es un buzon.
+
+@app.route("/api/messages/send", methods=["POST"])
+def messages_send():
+    """El usuario logueado envia una consulta/sugerencia al admin de su empresa."""
+    if not session.get("username"):
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    text = str(data.get("text", "")).strip()
+    kind = str(data.get("kind", "ayuda")).strip().lower()
+    if not text:
+        return jsonify({"ok": False, "error": "mensaje vacio"}), 400
+    from src.users import message_store_pg
+    ok = message_store_pg.add_message(
+        from_user=session["username"], text=text, kind=kind,
+        tenant_id=_current_tenant(),
+    )
+    return jsonify({"ok": ok})
+
+
+@app.route("/api/messages/admin-notifications")
+def messages_admin_notifications():
+    """Mensajes sin resolver de la empresa del admin (para la campana)."""
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users import message_store_pg
+    msgs = message_store_pg.list_messages(
+        tenant_id=_current_tenant(), only_unresolved=True)
+    return jsonify({"ok": True, "count": len(msgs), "messages": msgs})
+
+
+@app.route("/api/messages/<int:message_id>/resolve", methods=["POST"])
+def messages_resolve(message_id):
+    """El admin marca un mensaje como resuelto (solo de su empresa)."""
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users import message_store_pg
+    ok = message_store_pg.mark_resolved(message_id, tenant_id=_current_tenant())
+    return jsonify({"ok": ok})
 
 
 # ── Dictionary overrides (user-contributed phrases) ────────────────────────
