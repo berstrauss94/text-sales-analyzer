@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v23.1{% if username == 'Berna.Strauss' %} &middot; chat no se corta en pantalla{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v23.2{% if username == 'Berna.Strauss' %} &middot; chat fijo a la pantalla en el scroll{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v23.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -8521,6 +8521,13 @@ function _esc(s) {
 function toggleChatWidget() {
     var w = document.getElementById('chatWidget');
     if (!w) return;
+    // CRITICO: position:fixed se ROMPE (se comporta como absolute y se mueve con
+    // el scroll) si un ancestro tiene transform/filter — el .container los tiene
+    // por las animaciones de entrada. Movemos el widget directo al <body> para
+    // que 'fixed' sea relativo al viewport REAL y quede pegado a la esquina de la
+    // PANTALLA en cualquier dispositivo, sin moverse al scrollear. (Mismo fix que
+    // el overlay del tutorial.)
+    if (w.parentElement !== document.body) document.body.appendChild(w);
     var showing = w.style.display !== 'none';
     // 'flex' (no 'block') para que el header quede fijo y el cuerpo scrollee
     // dentro del widget; asi nunca se corta contra el borde de la pantalla.
