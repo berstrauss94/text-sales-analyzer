@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v23.4{% if username == 'Berna.Strauss' %} &middot; tests de adjuntar foto{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v23.5{% if username == 'Berna.Strauss' %} &middot; chat solo vendedores + panel de notif. arreglado{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v23.3)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -2833,15 +2833,20 @@ HTML = """
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
             <button id="tutorialBtn" type="button" onclick="startTour()" disabled title="El tutorial se habilita cuando el sistema termina de cargar" aria-label="Iniciar tutorial guiado" style="font-size:0.75rem;padding:4px 10px;margin-right:6px;background:#22242e;color:#666;border:1px solid #3a3d4a;border-radius:6px;cursor:not-allowed;opacity:0.7;">&#127891; Cargando...</button>
             <button id="soundToggleBtn" type="button" onclick="toggleUISound()" title="Activar/silenciar sonidos de interfaz" aria-label="Activar o silenciar sonidos de interfaz" style="font-size:0.75rem;padding:4px 10px;margin-right:6px;background:#2a2d3a;color:#888;border:1px solid #3a3d4a;border-radius:6px;cursor:pointer;">&#128266; Sonido</button>
+            {% if username not in ['admin', 'Vanesa.Admin', 'Berna.Strauss', 'FedericoCeballos', 'MartinianoSosa'] %}
             <button id="chatBtn" type="button" onclick="toggleChatWidget()" title="Consultas y sugerencias" aria-label="Abrir chat de consultas y sugerencias" style="font-size:0.75rem;padding:4px 10px;margin-right:6px;background:#1a2a4a;color:#7b9cff;border:1px solid #4a6cf7;border-radius:6px;cursor:pointer;">&#128172; Chat</button>
+            {% endif %}
             {% if username in ['admin', 'Vanesa.Admin', 'Berna.Strauss', 'FedericoCeballos', 'MartinianoSosa'] %}
-            <span id="adminNotifWrapper" style="position:relative;display:inline-block;margin-right:6px;vertical-align:middle;">
+            <span id="adminNotifWrapper" style="display:inline-block;margin-right:6px;vertical-align:middle;">
                 <button id="notifBellBtn" type="button" onclick="toggleNotificationsMenu()" title="Consultas de los vendedores" aria-label="Ver consultas de los vendedores" style="font-size:0.9rem;padding:2px 8px;background:#22242e;color:#e0b46a;border:1px solid #3a3d4a;border-radius:6px;cursor:pointer;position:relative;">&#128276;<span id="notifBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:#f55b5b;color:#fff;font-size:0.55rem;font-weight:700;min-width:15px;height:15px;line-height:15px;border-radius:8px;padding:0 3px;text-align:center;">0</span></button>
-                <div id="notifDropdown" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:100000;width:320px;max-height:360px;overflow-y:auto;background:#12141c;border:1px solid #3a3d4a;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;padding:10px;">
-                    <div style="font-size:0.75rem;font-weight:700;color:#fff;margin-bottom:8px;">Consultas y sugerencias</div>
-                    <div id="notifMessagesContent" style="font-size:0.72rem;color:#cfd3dc;"></div>
-                </div>
             </span>
+            <!-- Panel de notificaciones: fuera del header y como hijo directo del
+                 flujo para poder posicionarlo FIXED desde JS (el transform del
+                 .container rompe position:absolute/fixed anidado). -->
+            <div id="notifDropdown" style="display:none;position:fixed;z-index:100000;width:320px;max-width:calc(100vw - 24px);max-height:70vh;overflow-y:auto;background:#12141c;border:1px solid #3a3d4a;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;padding:10px;">
+                <div style="font-size:0.75rem;font-weight:700;color:#fff;margin-bottom:8px;">Consultas y sugerencias</div>
+                <div id="notifMessagesContent" style="font-size:0.72rem;color:#cfd3dc;"></div>
+            </div>
             {% endif %}
             <a href="/logout" class="btn-logout">Cerrar sesion</a>
         </div>
@@ -8698,11 +8703,35 @@ async function chatSend(shouldSend) {
 // ── Campana de notificaciones (solo admin) ──
 function toggleNotificationsMenu() {
     var panel = document.getElementById('notifDropdown');
+    var bell = document.getElementById('notifBellBtn');
     if (!panel) return;
+    // Mover el panel al <body>: el transform del .container rompe position:fixed
+    // anidado (se descoloca/estira, como se veia arriba a la izquierda).
+    if (panel.parentElement !== document.body) document.body.appendChild(panel);
     var showing = panel.style.display !== 'none';
-    panel.style.display = showing ? 'none' : 'block';
-    if (!showing) fetchNotifications();
+    if (showing) { panel.style.display = 'none'; return; }
+    // Posicionar el panel justo debajo de la campana, alineado a su derecha,
+    // usando coordenadas del viewport (fixed). Clamp para no salirse.
+    panel.style.display = 'block';
+    if (bell) {
+        var r = bell.getBoundingClientRect();
+        var w = panel.offsetWidth || 320;
+        var left = r.right - w;
+        if (left < 12) left = 12;
+        var maxLeft = window.innerWidth - w - 12;
+        if (left > maxLeft) left = Math.max(12, maxLeft);
+        panel.style.top = (r.bottom + 6) + 'px';
+        panel.style.left = left + 'px';
+        panel.style.right = 'auto';
+    }
+    fetchNotifications();
 }
+
+// Reposicionar / cerrar el panel al hacer scroll o resize (sigue a la campana).
+window.addEventListener('resize', function () {
+    var p = document.getElementById('notifDropdown');
+    if (p && p.style.display !== 'none') { p.style.display = 'none'; }
+});
 
 async function fetchNotifications() {
     var badge = document.getElementById('notifBadge');
