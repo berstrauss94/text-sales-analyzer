@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v23.6{% if username == 'Berna.Strauss' %} &middot; notif. ancladas + historial + copiar{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v23.7{% if username == 'Berna.Strauss' %} &middot; chat reformula y confirma lo entendido{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v23.3)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -8581,11 +8581,23 @@ function renderChatStep() {
             + '</div>'
             + _chatBtn('Siguiente', 'submit', '', true);
         setTimeout(function () {
-            var t = document.getElementById('chatTextInput'); if (t) t.focus();
+            var t = document.getElementById('chatTextInput');
+            if (t) {
+                // Al volver a corregir/ampliar, precargar el texto anterior por
+                // valor (no en el HTML) para evitar problemas de escape.
+                if (_chatMessage) { t.value = _chatMessage; }
+                t.focus();
+            }
             var fi = document.getElementById('chatImageInput');
             if (fi) fi.addEventListener('change', chatOnImagePicked);
             _renderChatImagePreview();
         }, 30);
+    } else if (_chatStep === 'interpret') {
+        body.innerHTML =
+            _interpretacionHtml()
+            + '<div style="margin-bottom:6px;">Es correcto lo que entendi?</div>'
+            + _chatBtn('Si, se entendio', 'understood', '', true)
+            + _chatBtn('No, quiero corregir o ampliar', 'refine', '', false);
     } else if (_chatStep === 'confirm') {
         var imgPreview = _chatImage
             ? '<img src="' + _chatImage + '" alt="adjunto" style="max-width:100%;max-height:110px;border-radius:8px;border:1px solid #2a3350;display:block;margin-bottom:8px;">'
@@ -8623,6 +8635,8 @@ document.addEventListener('click', function (e) {
     var arg = btn.getAttribute('data-chat-arg') || '';
     if (action === 'option') { _chatKind = arg; _chatStep = 'input'; renderChatStep(); }
     else if (action === 'submit') { chatSubmitInput(); }
+    else if (action === 'understood') { _chatStep = 'send_ask'; renderChatStep(); }
+    else if (action === 'refine') { _chatStep = 'input'; renderChatStep(); }
     else if (action === 'confirm') { _chatStep = (arg === 'yes') ? 'send_ask' : 'options_abc'; renderChatStep(); }
     else if (action === 'abc') { _chatMessage += ' [Categoria: ' + arg + ']'; _chatStep = 'send_ask'; renderChatStep(); }
     else if (action === 'send') { chatSend(arg === 'yes'); }
@@ -8682,9 +8696,43 @@ function chatSubmitInput() {
     var input = document.getElementById('chatTextInput');
     if (input && input.value.trim() !== '') {
         _chatMessage = input.value.trim();
-        _chatStep = 'confirm';
+        // En vez de ir directo a confirmar, el bot primero REFORMULA lo que
+        // entendio para que el usuario valide o lo amolde.
+        _chatStep = 'interpret';
         renderChatStep();
     }
+}
+
+// Reformulacion ESTRUCTURADA (sin IA): clasifica el tema por palabras clave y
+// arma un "esto entendi" claro para que el usuario confirme o corrija. No finge
+// inteligencia: es un reflejo ordenado del mensaje.
+function _detectarTema(texto) {
+    var t = (texto || '').toLowerCase();
+    var temas = [
+        { clave: 'permiso', kw: ['permiso', 'acceso', 'no puedo entrar', 'no me deja', 'habilitar', 'rol'] },
+        { clave: 'un error o falla del sistema', kw: ['error', 'falla', 'no funciona', 'no carga', 'se cuelga', 'roto', 'bug', 'no anda'] },
+        { clave: 'los informes o estadisticas', kw: ['informe', 'estadistic', 'grafico', 'reporte', 'seguimiento', 'panel'] },
+        { clave: 'la carga o el analisis de textos', kw: ['texto', 'analiz', 'cargar', 'guardar', 'audio', 'transcrip'] },
+        { clave: 'el diccionario o los filtros', kw: ['diccionario', 'filtro', 'palabra', 'frase', 'categoria', 'resaltar'] },
+        { clave: 'una funcion nueva', kw: ['agregar', 'sumar', 'nueva', 'poder', 'se podria', 'seria bueno', 'propon'] }
+    ];
+    for (var i = 0; i < temas.length; i++) {
+        for (var j = 0; j < temas[i].kw.length; j++) {
+            if (t.indexOf(temas[i].kw[j]) !== -1) return temas[i].clave;
+        }
+    }
+    return '';
+}
+
+function _interpretacionHtml() {
+    var tipo = (_chatKind === 'sugerencia') ? 'una sugerencia' : 'un pedido de ayuda';
+    var tema = _detectarTema(_chatMessage);
+    var sobre = tema ? (' sobre <strong style="color:#aaccff;">' + _esc(tema) + '</strong>') : '';
+    return '<div style="margin-bottom:8px;">Esto es lo que entendi:</div>'
+        + '<div style="background:#0d0f18;border:1px solid #2a2d3e;border-radius:6px;padding:8px;margin-bottom:8px;">'
+        + '<div style="color:#e0b46a;font-size:0.7rem;margin-bottom:4px;">Es ' + tipo + sobre + '.</div>'
+        + '<div style="color:#cfd3dc;">&ldquo;' + _esc(_chatMessage) + '&rdquo;</div>'
+        + '</div>';
 }
 
 async function chatSend(shouldSend) {
