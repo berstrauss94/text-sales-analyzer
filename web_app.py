@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v23.0{% if username == 'Berna.Strauss' %} &middot; chat de consultas y sugerencias al admin{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v23.1{% if username == 'Berna.Strauss' %} &middot; chat no se corta en pantalla{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v23.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -2974,12 +2974,12 @@ HTML = """
         </div>
 
         <!-- ── Widget de Chat: consultas y sugerencias del vendedor ── -->
-        <div id="chatWidget" style="display:none;position:fixed;bottom:20px;right:20px;width:300px;z-index:99998;background:#12141c;border:1px solid #4a6cf7;border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,0.6);overflow:hidden;">
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#1a2a4a;border-bottom:1px solid #2a3350;">
+        <div id="chatWidget" style="display:none;position:fixed;bottom:20px;right:20px;width:300px;max-width:calc(100vw - 32px);max-height:calc(100vh - 40px);z-index:99998;background:#12141c;border:1px solid #4a6cf7;border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,0.6);overflow:hidden;display:none;flex-direction:column;">
+            <div style="flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#1a2a4a;border-bottom:1px solid #2a3350;">
                 <span style="font-size:0.8rem;font-weight:700;color:#fff;">&#128172; Asistente</span>
                 <button type="button" onclick="toggleChatWidget()" aria-label="Cerrar chat" style="background:none;border:none;color:#9aa0b0;font-size:1.1rem;cursor:pointer;line-height:1;">&times;</button>
             </div>
-            <div id="chatBody" style="padding:14px 12px;font-size:0.78rem;color:#cfd3dc;"></div>
+            <div id="chatBody" style="flex:1 1 auto;overflow-y:auto;padding:14px 12px;font-size:0.78rem;color:#cfd3dc;"></div>
         </div>
 
         <div class="btn-row">
@@ -8522,7 +8522,9 @@ function toggleChatWidget() {
     var w = document.getElementById('chatWidget');
     if (!w) return;
     var showing = w.style.display !== 'none';
-    w.style.display = showing ? 'none' : 'block';
+    // 'flex' (no 'block') para que el header quede fijo y el cuerpo scrollee
+    // dentro del widget; asi nunca se corta contra el borde de la pantalla.
+    w.style.display = showing ? 'none' : 'flex';
     if (!showing) { _chatStep = 'welcome'; _chatMessage = ''; renderChatStep(); }
 }
 
