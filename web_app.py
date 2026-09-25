@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v24.2{% if username == 'Berna.Strauss' %} &middot; Gemini modelo 2.5-flash{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v24.3{% if username == 'Berna.Strauss' %} &middot; Gemini modelo 3.5-flash{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v24.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -10307,10 +10307,13 @@ def _ai_client():
     gemini_key = (os.environ.get("GEMINI_API_KEY")
                   or os.environ.get("GOOGLE_API_KEY") or "").strip()
     if gemini_key:
-        # Modelo Gemini vigente. gemini-1.5-flash y 2.0-flash quedaron deprecados;
-        # 2.5-flash es el actual de mejor precio/rendimiento (ai.google.dev).
+        # Modelo Gemini vigente para claves NUEVAS. Google fue deprecando 1.5,
+        # 2.0 y 2.5 flash y les corta el acceso a cuentas nuevas; 3.5-flash es el
+        # que Google mismo indica usar (via error de la API). Configurable por
+        # env GEMINI_MODEL por si Google vuelve a cambiarlo.
+        model = (os.environ.get("GEMINI_MODEL") or "gemini-3.5-flash").strip()
         client = openai.OpenAI(api_key=gemini_key, base_url=_GEMINI_BASE_URL)
-        return client, "gemini-2.5-flash"
+        return client, model
     openai_key = (os.environ.get("OPENAI_API_KEY") or "").strip()
     if openai_key:
         client = openai.OpenAI(api_key=openai_key)
