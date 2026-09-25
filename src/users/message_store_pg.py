@@ -87,6 +87,24 @@ def _ensure_table(conn) -> None:
 _MAX_IMAGE_CHARS = 1_400_000
 
 
+def sanitize_image(image: str) -> str:
+    """
+    Valida y normaliza la imagen adjunta (data URL). Funcion PURA (sin PG), para
+    poder testearla de forma aislada. Devuelve la imagen si es valida, o '' si:
+      - esta vacia,
+      - no es un data URL de imagen ('data:image/...'),
+      - supera el tope de tamano (_MAX_IMAGE_CHARS).
+    """
+    image = (image or "").strip()
+    if not image:
+        return ""
+    if not image.startswith("data:image/"):
+        return ""
+    if len(image) > _MAX_IMAGE_CHARS:
+        return ""
+    return image
+
+
 def add_message(from_user: str, text: str, kind: str = "ayuda",
                 tenant_id: str = "__legacy__", image: str = "") -> bool:
     """
@@ -94,15 +112,12 @@ def add_message(from_user: str, text: str, kind: str = "ayuda",
     Best-effort: nunca lanza.
     """
     text = (text or "").strip()
-    image = (image or "").strip()
     if not from_user or not text or not is_available():
         return False
     if kind not in VALID_KINDS:
         kind = "ayuda"
     # Validar la imagen: solo data URLs de imagen y dentro del tope de tamano.
-    if image:
-        if not image.startswith("data:image/") or len(image) > _MAX_IMAGE_CHARS:
-            image = ""  # descartar silenciosamente algo invalido o demasiado grande
+    image = sanitize_image(image)
     conn = _conn()
     if conn is None:
         return False
