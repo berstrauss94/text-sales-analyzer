@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v24.3{% if username == 'Berna.Strauss' %} &middot; Gemini modelo 3.5-flash{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v24.4{% if username == 'Berna.Strauss' %} &middot; fix respuestas cortadas de la IA{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v24.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -10127,10 +10127,17 @@ def simulator_chat():
         response = client.chat.completions.create(
             model=_model,
             messages=openai_messages,
-            max_tokens=150,
+            # 800: Gemini 3.5 consume tokens en razonamiento interno ANTES de
+            # escribir la respuesta visible. Con 150 se quedaba sin presupuesto y
+            # cortaba la frase a la mitad ("Estoy buscando un lote para..."). La
+            # instruccion de "max 60 palabras" del prompt sigue acotando el largo
+            # real; este tope solo evita el truncado.
+            max_tokens=800,
             temperature=0.8,
         )
-        reply = response.choices[0].message.content.strip()
+        reply = (response.choices[0].message.content or "").strip()
+        if not reply:
+            reply = "Disculpa, no te escuche bien. Me lo repetis?"
         return jsonify({"response": reply, "ended": False})
     except Exception as exc:
         app.logger.error(f"Simulator error: {exc}")
@@ -10501,7 +10508,9 @@ def messages_interpret():
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": text},
             ],
-            max_tokens=120,
+            # 500: margen para el razonamiento interno de Gemini 3.5 (con 120 la
+            # interpretacion podia salir cortada). El prompt ya pide max 60 palabras.
+            max_tokens=500,
             temperature=0.4,
         )
         interpretacion = (response.choices[0].message.content or "").strip()
