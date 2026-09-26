@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v24.6{% if username == 'Berna.Strauss' %} &middot; IA con reintento (menos fallos en movil){% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v24.7{% if username == 'Berna.Strauss' %} &middot; ayuda la responde la IA (no notifica){% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v24.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -8572,7 +8572,7 @@ function toggleChatWidget() {
     // 'flex' (no 'block') para que el header quede fijo y el cuerpo scrollee
     // dentro del widget; asi nunca se corta contra el borde de la pantalla.
     w.style.display = showing ? 'none' : 'flex';
-    if (!showing) { _chatStep = 'welcome'; _chatMessage = ''; _chatImage = ''; _chatInterpretacion = ''; renderChatStep(); }
+    if (!showing) { _chatStep = 'welcome'; _chatMessage = ''; _chatImage = ''; _chatInterpretacion = ''; _helpHistory = []; _helpLoading = false; renderChatStep(); }
 }
 
 function _chatBtnStyle(primary) {
@@ -8599,6 +8599,35 @@ function renderChatStep() {
             '<div style="font-weight:700;color:#fff;margin-bottom:8px;">Que necesitas?</div>'
             + _chatBtn('Necesito ayuda con el sistema', 'option', 'ayuda', false)
             + _chatBtn('Tengo una sugerencia', 'option', 'sugerencia', false);
+    } else if (_chatStep === 'help_chat') {
+        // Conversacion de AYUDA con la IA (no notifica al admin). Muestra el
+        // historial y un campo para seguir preguntando.
+        var hist = _helpHistory.map(function (m) {
+            var esUser = (m.role === 'user');
+            var col = esUser ? '#1a2a4a' : '#0d0f18';
+            var bord = esUser ? '#2a3a5a' : '#2a2d3e';
+            var quien = esUser ? 'Vos' : 'Asistente';
+            var colq = esUser ? '#7b9cff' : '#5bd4f5';
+            return '<div style="background:' + col + ';border:1px solid ' + bord + ';border-radius:8px;padding:7px 9px;margin-bottom:6px;">'
+                + '<div style="font-size:0.58rem;color:' + colq + ';font-weight:700;margin-bottom:2px;">' + quien + '</div>'
+                + '<div style="color:#cfd3dc;white-space:pre-wrap;">' + _esc(m.text) + '</div></div>';
+        }).join('');
+        var loading = _helpLoading ? '<div style="color:#9aa0b0;margin-bottom:6px;">El asistente esta escribiendo...</div>' : '';
+        body.innerHTML =
+            '<div style="font-weight:700;color:#fff;margin-bottom:8px;">Asistente de ayuda</div>'
+            + (hist || '<div style="color:#9aa0b0;margin-bottom:6px;">Contame tu duda sobre el sistema y te ayudo.</div>')
+            + loading
+            + '<textarea id="chatHelpInput" rows="2" placeholder="Escribi tu duda..." style="width:100%;background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:8px;font-size:0.75rem;font-family:inherit;box-sizing:border-box;resize:vertical;margin-top:4px;"></textarea>'
+            + '<div style="display:flex;gap:6px;margin-top:6px;">'
+            + _chatBtn('Enviar', 'helpsend', '', true)
+            + _chatBtn('Volver', 'back', '', false)
+            + '</div>';
+        setTimeout(function () {
+            var t = document.getElementById('chatHelpInput');
+            if (t) t.focus();
+            var c = document.getElementById('chatBody');
+            if (c) c.scrollTop = c.scrollHeight;
+        }, 30);
     } else if (_chatStep === 'input') {
         body.innerHTML =
             '<div style="margin-bottom:6px;">Escribi tu ' + (_chatKind === 'sugerencia' ? 'sugerencia' : 'consulta') + ':</div>'
@@ -8661,17 +8690,58 @@ document.addEventListener('click', function (e) {
     if (!btn) return;
     var action = btn.getAttribute('data-chat-action');
     var arg = btn.getAttribute('data-chat-arg') || '';
-    if (action === 'option') { _chatKind = arg; _chatStep = 'input'; renderChatStep(); }
+    if (action === 'option') {
+        _chatKind = arg;
+        if (arg === 'ayuda') {
+            // AYUDA: la IA responde en el chat, NO se notifica al admin.
+            _helpHistory = [];
+            _chatStep = 'help_chat';
+        } else {
+            // SUGERENCIA: flujo que termina enviando al admin.
+            _chatStep = 'input';
+        }
+        renderChatStep();
+    }
     else if (action === 'submit') { chatSubmitInput(); }
+    else if (action === 'helpsend') { chatHelpSend(); }
     else if (action === 'understood') { _chatStep = 'send_ask'; renderChatStep(); }
     else if (action === 'refine') { _chatStep = 'input'; renderChatStep(); }
     else if (action === 'confirm') { _chatStep = (arg === 'yes') ? 'send_ask' : 'options_abc'; renderChatStep(); }
     else if (action === 'abc') { _chatMessage += ' [Categoria: ' + arg + ']'; _chatStep = 'send_ask'; renderChatStep(); }
     else if (action === 'send') { chatSend(arg === 'yes'); }
     else if (action === 'rmimg') { _chatImage = ''; _renderChatImagePreview(); }
+    else if (action === 'back') { _chatStep = 'welcome'; _chatMessage = ''; _chatImage = ''; _helpHistory = []; renderChatStep(); }
 });
 
 var _chatImage = '';   // data URL de la foto adjunta (opcional)
+var _helpHistory = []; // conversacion de ayuda con la IA [{role:'user'|'bot', text}]
+var _helpLoading = false;
+
+// Enviar una duda al asistente de AYUDA (IA responde en el chat, no notifica).
+async function chatHelpSend() {
+    var input = document.getElementById('chatHelpInput');
+    if (!input) return;
+    var text = input.value.trim();
+    if (!text || _helpLoading) return;
+    _helpHistory.push({ role: 'user', text: text });
+    _helpLoading = true;
+    renderChatStep();
+    try {
+        var res = await fetch('/api/messages/help', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text, history: _helpHistory })
+        });
+        var data = await res.json();
+        var reply = (data && data.reply) ? data.reply : 'No pude responder esta vez. Proba de nuevo.';
+        _helpHistory.push({ role: 'bot', text: reply });
+    } catch (e) {
+        _helpHistory.push({ role: 'bot', text: 'Hubo un problema de conexion. Proba de nuevo.' });
+    }
+    _helpLoading = false;
+    if (_chatStep === 'help_chat') renderChatStep();
+}
+
 
 // Comprime y redimensiona la imagen elegida EN EL NAVEGADOR antes de enviarla,
 // para no inflar la base ni la red. Max ~1000px de lado, JPEG calidad 0.7.
@@ -10593,6 +10663,58 @@ def messages_interpret():
         app.logger.warning(f"messages_interpret IA no disponible, uso reglas: {exc}")
         return jsonify({"ok": True, "interpretation": _interpret_por_reglas(text, kind),
                         "source": "reglas"})
+
+
+@app.route("/api/messages/help", methods=["POST"])
+def messages_help():
+    """
+    Asistente de AYUDA: la IA le responde la duda al vendedor DIRECTAMENTE, en el
+    chat. NO notifica al administrador (a diferencia de las sugerencias). Maneja
+    conversacion con historial para poder repreguntar.
+    """
+    if not session.get("username"):
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    text = str(data.get("text", "")).strip()
+    history = data.get("history", [])
+    if not text:
+        return jsonify({"ok": False, "error": "mensaje vacio"}), 400
+
+    system_prompt = (
+        "Sos el asistente de ayuda de un sistema web de analisis de conversaciones "
+        "de venta inmobiliaria. Los usuarios son vendedores. El sistema permite: "
+        "pegar/analizar textos de conversaciones (intencion, sentimiento, nivel de "
+        "riesgo de perder la venta, conceptos), guardar textos por fecha, ver "
+        "informes y estadisticas, un diccionario de palabras ('Resaltar y definir'), "
+        "un simulador de ventas con IA, y este chat. Respondes dudas de USO del "
+        "sistema de forma clara, concreta y amable, en espanol rioplatense, en "
+        "pocas frases (max 90 palabras). Si la duda excede el uso del sistema o "
+        "requiere que un administrador actue (dar permisos, crear usuarios, "
+        "cambiar datos), decilo y sugeri usar la opcion 'Tengo una sugerencia' "
+        "para avisar al administrador. No inventes funciones que no existen."
+    )
+    mensajes = [{"role": "system", "content": system_prompt}]
+    for m in (history or [])[-8:]:
+        rol = m.get("role")
+        cont = str(m.get("text", "")).strip()
+        if not cont:
+            continue
+        if rol == "user":
+            mensajes.append({"role": "user", "content": cont})
+        elif rol == "bot":
+            mensajes.append({"role": "assistant", "content": cont})
+    mensajes.append({"role": "user", "content": text})
+
+    try:
+        reply = _ai_chat(mensajes, max_tokens=600, temperature=0.5)
+        if not reply:
+            raise ValueError("respuesta vacia")
+        return jsonify({"ok": True, "reply": reply})
+    except Exception as exc:
+        app.logger.warning(f"messages_help IA fallo: {exc}")
+        return jsonify({"ok": True, "reply": "El asistente no pudo responder esta vez. "
+                        "Proba de nuevo, o si necesitas que intervenga un administrador, "
+                        "usa la opcion 'Tengo una sugerencia'."})
 
 
 # ── Dictionary overrides (user-contributed phrases) ────────────────────────
