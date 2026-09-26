@@ -2819,13 +2819,13 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v24.7{% if username == 'Berna.Strauss' %} &middot; ayuda la responde la IA (no notifica){% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v25.0{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v24.0)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v25.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    El <strong style="color:#5bd4f5;">Chat</strong> ahora usa <strong style="color:#5bf5a3;">inteligencia artificial</strong>: cuando escribís tu consulta o sugerencia, te devuelve "esto entendí..." con lo que quisiste decir, en palabras claras.
-                    <div style="margin-top:8px;">Si está bien, confirmás y se envía. Si no, corregís o ampliás y lo vuelve a interpretar, hasta que quede justo. Al administrador le llega el mensaje junto a la interpretación, para entenderlo de una.</div>
-                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Seguís pudiendo adjuntar una foto. Si la IA no está disponible, el chat sigue funcionando igual.</div>
+                    Nueva seccion <strong style="color:#f5a35b;">CRM y Lead del cliente</strong>, abajo de Analizar/Limpiar (se abre con el triangulo naranja).
+                    <div style="margin-top:8px;">Tiene una casilla de <strong style="color:#f5a35b;">CRM</strong> para volcar info del cliente, y una ficha de <strong style="color:#f5a35b;">Lead</strong> (nombre, contacto, operacion, presupuesto, zona, estado, notas). Todo se <strong style="color:#5bf5a3;">guarda</strong> y queda disponible cada vez que entras.</div>
+                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Es independiente del texto de analisis y esta separado por empresa.</div>
                 </div>
             </div>
         </div>
@@ -3004,6 +3004,55 @@ HTML = """
             <button class="btn-save" onclick="saveEntry()">&#128190; Guardar</button>
             {% endif %}
         </div>
+
+        <!-- ── Paneles CRM / Lead (persistentes por vendedor) ── -->
+        <!-- Boton triangular NARANJA, doble tamano, para abrir/cerrar la seccion -->
+        <div style="margin-top:12px;">
+            <button type="button" id="crmLeadToggle" data-crmlead-toggle="1"
+                style="display:flex;align-items:center;gap:8px;background:#2a1c0d;color:#f5a35b;border:1px solid #6a4a2a;border-radius:8px;padding:8px 14px;font-size:0.9rem;font-weight:700;cursor:pointer;">
+                <span id="crmLeadArrow" style="font-size:1.4rem;line-height:1;transition:transform 0.2s;">&#9658;</span>
+                CRM y Lead del cliente
+            </button>
+        </div>
+
+        <div id="crmLeadPanel" style="display:none;margin-top:10px;border:1px solid #6a4a2a;border-radius:10px;padding:14px;background:#140f08;">
+            <!-- CRM -->
+            <div style="margin-bottom:16px;">
+                <div style="font-size:0.8rem;font-weight:700;color:#f5a35b;margin-bottom:6px;">&#128203; CRM &mdash; informacion del cliente</div>
+                <textarea id="crmText" rows="4" placeholder="Escribi aca la informacion del cliente para el CRM (contacto, contexto, seguimiento)..."
+                    style="width:100%;background:#0d0f18;color:#e0e0e0;border:1px solid #3a2d1e;border-radius:6px;padding:10px;font-size:0.82rem;font-family:inherit;box-sizing:border-box;resize:vertical;"></textarea>
+            </div>
+
+            <!-- LEAD -->
+            <div style="border-top:1px solid #3a2d1e;padding-top:12px;">
+                <div style="font-size:0.8rem;font-weight:700;color:#f5a35b;margin-bottom:8px;">&#127919; Lead &mdash; ficha del prospecto</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <input type="text" id="leadNombre" placeholder="Nombre del cliente" style="background:#0d0f18;color:#e0e0e0;border:1px solid #3a2d1e;border-radius:6px;padding:8px;font-size:0.8rem;box-sizing:border-box;">
+                    <input type="text" id="leadContacto" placeholder="Contacto (tel / email)" style="background:#0d0f18;color:#e0e0e0;border:1px solid #3a2d1e;border-radius:6px;padding:8px;font-size:0.8rem;box-sizing:border-box;">
+                    <select id="leadOperacion" style="background:#0d0f18;color:#e0e0e0;border:1px solid #3a2d1e;border-radius:6px;padding:8px;font-size:0.8rem;box-sizing:border-box;">
+                        <option value="">Tipo de operacion...</option>
+                        <option value="venta">Venta</option>
+                        <option value="alquiler">Alquiler</option>
+                        <option value="inversion">Inversion</option>
+                    </select>
+                    <input type="text" id="leadPresupuesto" placeholder="Presupuesto / rango" style="background:#0d0f18;color:#e0e0e0;border:1px solid #3a2d1e;border-radius:6px;padding:8px;font-size:0.8rem;box-sizing:border-box;">
+                    <input type="text" id="leadZona" placeholder="Zona / interes" style="background:#0d0f18;color:#e0e0e0;border:1px solid #3a2d1e;border-radius:6px;padding:8px;font-size:0.8rem;box-sizing:border-box;">
+                    <select id="leadEstado" style="background:#0d0f18;color:#e0e0e0;border:1px solid #3a2d1e;border-radius:6px;padding:8px;font-size:0.8rem;box-sizing:border-box;">
+                        <option value="nuevo">Nuevo</option>
+                        <option value="seguimiento">En seguimiento</option>
+                        <option value="cerrado">Cerrado</option>
+                        <option value="perdido">Perdido</option>
+                    </select>
+                </div>
+                <textarea id="leadNotas" rows="2" placeholder="Notas del lead..." style="width:100%;margin-top:8px;background:#0d0f18;color:#e0e0e0;border:1px solid #3a2d1e;border-radius:6px;padding:8px;font-size:0.8rem;font-family:inherit;box-sizing:border-box;resize:vertical;"></textarea>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:10px;margin-top:12px;">
+                <button type="button" data-crmlead-save="1" style="background:#f5a35b;color:#1a1206;border:none;border-radius:7px;padding:8px 18px;font-size:0.82rem;font-weight:700;cursor:pointer;">Guardar CRM / Lead</button>
+                <span id="crmLeadStatus" style="font-size:0.72rem;color:#9aa0b0;"></span>
+            </div>
+        </div>
+
         <div class="loading" id="loading" style="margin-top:10px;">Analizando texto...</div>
     </div>
 
@@ -8546,6 +8595,78 @@ function loadHistory() {}
 function toggleHistory() { toggleSimulator(); }
 
 // ═══════════════════════════════════════════════════════════════════════
+// Paneles CRM / Lead (persistentes por vendedor)
+// ═══════════════════════════════════════════════════════════════════════
+var _crmLeadLoaded = false;
+
+// Abrir/cerrar el panel (boton triangular naranja). Carga la ficha la 1ra vez.
+document.addEventListener('click', function (e) {
+    if (!_closest(e, '[data-crmlead-toggle]')) return;
+    var panel = document.getElementById('crmLeadPanel');
+    var arrow = document.getElementById('crmLeadArrow');
+    if (!panel) return;
+    var abrir = panel.style.display === 'none';
+    panel.style.display = abrir ? 'block' : 'none';
+    if (arrow) arrow.style.transform = abrir ? 'rotate(90deg)' : 'rotate(0deg)';
+    if (abrir && !_crmLeadLoaded) { loadCrmLead(); }
+});
+
+// Guardar CRM / Lead.
+document.addEventListener('click', function (e) {
+    if (!_closest(e, '[data-crmlead-save]')) return;
+    saveCrmLead();
+});
+
+async function loadCrmLead() {
+    try {
+        var res = await fetch('/api/lead/get', { cache: 'no-store' });
+        if (!res.ok) return;
+        var data = await res.json();
+        var f = (data && data.ficha) ? data.ficha : {};
+        var set = function (id, val) { var el = document.getElementById(id); if (el) el.value = val || ''; };
+        set('crmText', f.crm_text);
+        set('leadNombre', f.lead_nombre);
+        set('leadContacto', f.lead_contacto);
+        set('leadOperacion', f.lead_operacion);
+        set('leadPresupuesto', f.lead_presupuesto);
+        set('leadZona', f.lead_zona);
+        set('leadEstado', f.lead_estado || 'nuevo');
+        set('leadNotas', f.lead_notas);
+        _crmLeadLoaded = true;
+    } catch (e) {}
+}
+
+async function saveCrmLead() {
+    var val = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
+    var status = document.getElementById('crmLeadStatus');
+    if (status) { status.textContent = 'Guardando...'; status.style.color = '#9aa0b0'; }
+    try {
+        var res = await fetch('/api/lead/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                crm_text: val('crmText'),
+                lead_nombre: val('leadNombre'),
+                lead_contacto: val('leadContacto'),
+                lead_operacion: val('leadOperacion'),
+                lead_presupuesto: val('leadPresupuesto'),
+                lead_zona: val('leadZona'),
+                lead_estado: val('leadEstado'),
+                lead_notas: val('leadNotas')
+            })
+        });
+        var data = await res.json();
+        if (status) {
+            if (data && data.ok) { status.textContent = 'Guardado.'; status.style.color = '#5bf5a3'; }
+            else { status.textContent = 'No se pudo guardar (revisa la conexion).'; status.style.color = '#f5a35b'; }
+        }
+        try { UISound.click(); } catch (e) {}
+    } catch (e) {
+        if (status) { status.textContent = 'Error de conexion.'; status.style.color = '#f55b5b'; }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // Widget de Chat: consultas y sugerencias del vendedor -> administrador
 // Buzon guiado (sin IA). El usuario y el rol salen del backend, no se hardcodean.
 // ═══════════════════════════════════════════════════════════════════════
@@ -10715,6 +10836,49 @@ def messages_help():
         return jsonify({"ok": True, "reply": "El asistente no pudo responder esta vez. "
                         "Proba de nuevo, o si necesitas que intervenga un administrador, "
                         "usa la opcion 'Tengo una sugerencia'."})
+
+
+# ── Fichas CRM / Lead (persistentes por vendedor) ──────────────────────────
+
+@app.route("/api/lead/get")
+def lead_get():
+    """Devuelve la ficha CRM/Lead del vendedor logueado (persistente)."""
+    if not session.get("username"):
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    from src.users import lead_store_pg
+    ficha = lead_store_pg.get_ficha(session["username"], tenant_id=_current_tenant())
+    return jsonify({"ok": True, "ficha": ficha})
+
+
+@app.route("/api/lead/save", methods=["POST"])
+def lead_save():
+    """Guarda (upsert) la ficha CRM/Lead del vendedor logueado."""
+    if not session.get("username"):
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    ficha = {
+        "crm_text": data.get("crm_text", ""),
+        "lead_nombre": data.get("lead_nombre", ""),
+        "lead_contacto": data.get("lead_contacto", ""),
+        "lead_operacion": data.get("lead_operacion", ""),
+        "lead_presupuesto": data.get("lead_presupuesto", ""),
+        "lead_zona": data.get("lead_zona", ""),
+        "lead_estado": data.get("lead_estado", "nuevo"),
+        "lead_notas": data.get("lead_notas", ""),
+    }
+    from src.users import lead_store_pg
+    ok = lead_store_pg.save_ficha(session["username"], ficha, tenant_id=_current_tenant())
+    return jsonify({"ok": ok})
+
+
+@app.route("/api/lead/list")
+def lead_list():
+    """Lista las fichas de todos los vendedores del tenant (admin only)."""
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users import lead_store_pg
+    fichas = lead_store_pg.list_fichas(tenant_id=_current_tenant())
+    return jsonify({"ok": True, "fichas": fichas})
 
 
 # ── Dictionary overrides (user-contributed phrases) ────────────────────────
