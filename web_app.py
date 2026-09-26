@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v24.5{% if username == 'Berna.Strauss' %} &middot; simulador con respuestas sugeridas{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v24.6{% if username == 'Berna.Strauss' %} &middot; IA con reintento (menos fallos en movil){% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v24.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -10162,19 +10162,11 @@ def simulator_chat():
         openai_messages.append({"role": "user", "content": "Hola, buenas tardes."})
 
     try:
-        client, _model = _ai_client()
-        response = client.chat.completions.create(
-            model=_model,
-            messages=openai_messages,
-            # 800: Gemini 3.5 consume tokens en razonamiento interno ANTES de
-            # escribir la respuesta visible. Con 150 se quedaba sin presupuesto y
-            # cortaba la frase a la mitad ("Estoy buscando un lote para..."). La
-            # instruccion de "max 60 palabras" del prompt sigue acotando el largo
-            # real; este tope solo evita el truncado.
-            max_tokens=800,
-            temperature=0.8,
-        )
-        raw = (response.choices[0].message.content or "").strip()
+        # _ai_chat reintenta ante fallos transitorios (timeout/red), comunes en
+        # conexiones moviles donde el simulador fallaba esporadicamente.
+        # max_tokens 800: Gemini 3.5 gasta tokens en razonamiento interno antes de
+        # la respuesta visible; el largo real lo acota el prompt (max 60 palabras).
+        raw = _ai_chat(openai_messages, max_tokens=800, temperature=0.8)
         # La IA deberia devolver JSON {response, suggestions}. Puede venir con
         # cercos de markdown (```json ... ```): los limpiamos antes de parsear.
         reply = raw
@@ -10196,7 +10188,9 @@ def simulator_chat():
         return jsonify({"response": reply, "suggestions": suggestions, "ended": False})
     except Exception as exc:
         app.logger.error(f"Simulator error: {exc}")
-        return jsonify({"response": "Lo siento, no pude generar una respuesta. Verifica que la clave de IA (GEMINI_API_KEY) este configurada.", "ended": False})
+        # Mensaje HONESTO: no culpar a la clave (ya sabemos que suele estar OK).
+        # El fallo aca es de la llamada puntual (servicio lento/timeout).
+        return jsonify({"response": "El servicio de IA tardo o no respondio esta vez. Proba enviar tu mensaje de nuevo.", "ended": False})
 
 
 @app.route("/api/simulator/feedback", methods=["POST"])
@@ -10383,6 +10377,32 @@ def _ai_client():
     raise RuntimeError("No hay clave de IA configurada (GEMINI_API_KEY/OPENAI_API_KEY).")
 
 
+def _ai_chat(messages, max_tokens=800, temperature=0.7, retries=2, timeout=30):
+    """
+    Llama a la IA con REINTENTO ante fallos transitorios (timeouts, cortes de
+    red — comunes en conexiones moviles, donde el simulador fallaba esporadico).
+    Devuelve el texto de la respuesta. Lanza la ultima excepcion si agota los
+    reintentos. Distingue el fallo real: NO es que falte la clave (eso se ve en
+    _ai_client), es que la llamada puntual no completo.
+    """
+    client, model = _ai_client()
+    last_exc = None
+    for intento in range(retries):
+        try:
+            resp = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                timeout=timeout,
+            )
+            return (resp.choices[0].message.content or "").strip()
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            app.logger.warning(f"IA intento {intento + 1}/{retries} fallo: {exc}")
+    raise last_exc if last_exc else RuntimeError("IA sin respuesta")
+
+
 def _log_activity(event_type, tool="", entry_id="", detail="", username=None):
     """
     Best-effort activity logging. Never raises, never blocks the caller's action.
@@ -10556,19 +10576,16 @@ def messages_interpret():
     )
 
     try:
-        client, _model = _ai_client()
-        response = client.chat.completions.create(
-            model=_model,
-            messages=[
+        # _ai_chat reintenta ante fallos transitorios. 500: margen para el
+        # razonamiento interno de Gemini 3.5 (el prompt ya pide max 60 palabras).
+        interpretacion = _ai_chat(
+            [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": text},
             ],
-            # 500: margen para el razonamiento interno de Gemini 3.5 (con 120 la
-            # interpretacion podia salir cortada). El prompt ya pide max 60 palabras.
             max_tokens=500,
             temperature=0.4,
         )
-        interpretacion = (response.choices[0].message.content or "").strip()
         if not interpretacion:
             raise ValueError("respuesta vacia de la IA")
         return jsonify({"ok": True, "interpretation": interpretacion, "source": "ia"})
