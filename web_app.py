@@ -2848,7 +2848,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v27.0{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v27.1{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v27.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -10794,13 +10794,17 @@ def _ai_refine_analysis(text, analysis_dict, tenant_id="__legacy__"):
         f"DEBE ser una de {_AI_REFINE_INTENTS} y el sentimiento una de "
         f"{_AI_REFINE_SENTIMENTS}.\n"
         "2) REDACTAR, para CADA filtro (intencion y sentimiento), cuatro "
-        "apartados explicativos ESPECIFICOS a este texto (no genericos). Cada "
-        "apartado debe tener entre 3 y 5 renglones (minimo 3). Los apartados son:\n"
-        "   - meaning: 'Que significa para la venta'.\n"
-        "   - seller: 'Para el vendedor' (consejo accionable).\n"
+        "apartados explicativos ESPECIFICOS a este texto (no genericos, NO "
+        "plantillas). Cada apartado (salvo tips) debe tener entre 3 y 5 oraciones "
+        "COMPLETAS y sustanciosas, citando pistas concretas del texto (que dijo el "
+        "cliente, precios, plazos, objeciones). Los apartados son:\n"
+        "   - meaning: 'Que significa para la venta' (3-5 oraciones).\n"
+        "   - seller: 'Para el vendedor', consejo accionable (3-5 oraciones).\n"
         "   - tips: lista de 3 a 4 tips practicos y concretos.\n"
         "   - next: 'Siguiente paso' concreto (para intencion) / 'Nivel de riesgo' "
-        "explicado (para sentimiento).\n"
+        "explicado (para sentimiento), 3-5 oraciones.\n"
+        "IMPORTANTE: prioriza SIEMPRE cerrar el JSON completo y valido por sobre "
+        "alargar un apartado. Se sustancioso pero conciso para que entre todo.\n"
         + avoid_block +
         "Responde SOLO un objeto JSON valido, sin markdown ni texto extra, con "
         "esta forma exacta:\n"
@@ -10823,7 +10827,7 @@ def _ai_refine_analysis(text, analysis_dict, tenant_id="__legacy__"):
         raw = _ai_chat(
             [{"role": "system", "content": system},
              {"role": "user", "content": user}],
-            max_tokens=1400, temperature=0.3, retries=2, timeout=45,
+            max_tokens=2200, temperature=0.3, retries=2, timeout=60,
         )
     except Exception as exc:  # noqa: BLE001
         app.logger.warning(f"_ai_refine_analysis: IA no disponible: {exc}")
@@ -10854,8 +10858,9 @@ def _ai_refine_analysis(text, analysis_dict, tenant_id="__legacy__"):
     # Apartados largos generados por la IA. Van SOLO en la traza (no se guardan).
     meta["intent_sections"] = _sanitize_sections(parsed.get("intent_sections"))
     meta["sentiment_sections"] = _sanitize_sections(parsed.get("sentiment_sections"))
+    meta["has_sections"] = bool(meta["intent_sections"]) or bool(meta["sentiment_sections"])
     if not meta["reason"]:
-        meta["reason"] = "ok"
+        meta["reason"] = "ok" if meta["has_sections"] else "sin apartados (JSON incompleto)"
     # Re-alinear el riesgo comercial con el sentimiento afinado (misma regla
     # que ya usa el pipeline). NO cambia densidad ni keywords del diccionario.
     if isinstance(refined.get("commercial"), dict):
@@ -10866,7 +10871,12 @@ def _ai_refine_analysis(text, analysis_dict, tenant_id="__legacy__"):
 
 
 def _extract_json_object(raw):
-    """Extrae el primer objeto JSON de una respuesta de IA. None si no hay."""
+    """
+    Extrae el primer objeto JSON de una respuesta de IA. Si el JSON viene
+    TRUNCADO (Gemini se quedo sin tokens, caso comun con respuestas largas),
+    intenta REPARARLO cerrando strings y llaves abiertas para rescatar lo que
+    ya redacto, en vez de descartar todo. None si no hay nada aprovechable.
+    """
     if not raw:
         return None
     import json as _json
@@ -10878,14 +10888,75 @@ def _extract_json_object(raw):
         if nl != -1:
             txt = txt[nl + 1:]
     start = txt.find("{")
+    if start == -1:
+        return None
+    # 1) Intento directo con el recorte hasta la ultima llave de cierre.
     end = txt.rfind("}")
-    if start == -1 or end == -1 or end <= start:
+    if end > start:
+        try:
+            obj = _json.loads(txt[start:end + 1])
+            if isinstance(obj, dict):
+                return obj
+        except Exception:  # noqa: BLE001
+            pass
+    # 2) Reparacion de JSON truncado: recorrer desde start balanceando llaves y
+    # comillas; al final cerrar lo que quedo abierto.
+    frag = txt[start:]
+    repaired = _repair_truncated_json(frag)
+    if repaired is None:
         return None
     try:
-        obj = _json.loads(txt[start:end + 1])
+        obj = _json.loads(repaired)
         return obj if isinstance(obj, dict) else None
     except Exception:  # noqa: BLE001
         return None
+
+
+def _repair_truncated_json(frag):
+    """
+    Intenta cerrar un objeto JSON truncado. Recorre el texto respetando strings
+    y escapes; al terminar, cierra la comilla abierta (si la hay) y agrega las
+    llaves/corchetes que falten. Devuelve la cadena reparada o None.
+    """
+    if not frag or frag[0] != "{":
+        return None
+    out = []
+    stack = []          # pila de '{' y '['
+    in_str = False
+    escaped = False
+    for ch in frag:
+        if in_str:
+            out.append(ch)
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+            out.append(ch)
+        elif ch in "{[":
+            stack.append(ch)
+            out.append(ch)
+        elif ch in "}]":
+            if stack:
+                stack.pop()
+            out.append(ch)
+        else:
+            out.append(ch)
+    # Cerrar string abierto.
+    if in_str:
+        out.append('"')
+    # Quitar una posible coma colgante antes de cerrar.
+    s = "".join(out).rstrip()
+    if s.endswith(","):
+        s = s[:-1]
+    # Cerrar contenedores abiertos en orden inverso.
+    for opener in reversed(stack):
+        s += "}" if opener == "{" else "]"
+    return s
 
 
 def _coerce_confidence(value):
