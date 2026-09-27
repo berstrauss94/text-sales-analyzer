@@ -2819,7 +2819,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v26.1{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v26.2{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v26.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -9970,7 +9970,11 @@ def analyze():
     refined_dict = _ai_refine_analysis(clean_text, analysis_dict)
     # Lo que se persiste: por defecto el original (Opcion A pura, cero impacto en
     # informes). Con AI_REFINE_PERSIST activo, se persiste el afinado (Opcion B).
-    persist_dict = refined_dict if _ai_refine_persist_enabled() else analysis_dict
+    # La traza _ai_refine NUNCA se guarda: es solo diagnostico de la respuesta.
+    if _ai_refine_persist_enabled():
+        persist_dict = {k: v for k, v in refined_dict.items() if k != "_ai_refine"}
+    else:
+        persist_dict = analysis_dict
 
     # Save to history
     year = data.get("year")
@@ -10259,7 +10263,10 @@ def upload_audio():
     # IA: afinar calidad de filtros existentes (misma logica que /analyze de texto).
     # Opcion A siempre en la respuesta; Opcion B (opt-in) tambien en lo guardado.
     refined_dict = _ai_refine_analysis(transcribed_text, analysis_dict)
-    persist_dict = refined_dict if _ai_refine_persist_enabled() else analysis_dict
+    if _ai_refine_persist_enabled():
+        persist_dict = {k: v for k, v in refined_dict.items() if k != "_ai_refine"}
+    else:
+        persist_dict = analysis_dict
 
     # Save to history
     add_entry(
@@ -10627,8 +10634,13 @@ def _ai_refine_analysis(text, analysis_dict):
     """
     import copy as _copy
     refined = _copy.deepcopy(analysis_dict)
+    # Traza de diagnostico (se adjunta a la respuesta HTTP, NO se guarda). Permite
+    # VER si la IA corrio y que cambio, sin adivinar por el fallback silencioso.
+    meta = {"ran": False, "changed": False, "reason": "", "raw_len": 0}
+    refined["_ai_refine"] = meta
     clean = (text or "").strip()
     if len(clean) < 3:
+        meta["reason"] = "texto muy corto"
         return refined
     cur_intent = str(analysis_dict.get("intent") or "UNKNOWN")
     cur_sent = str(analysis_dict.get("sentiment") or "NEUTRAL")
@@ -10648,29 +10660,42 @@ def _ai_refine_analysis(text, analysis_dict):
         "Confirma o corrige y devuelve el JSON."
     )
     try:
+        # max_tokens 800: Gemini 3.5 gasta tokens en razonamiento interno antes
+        # de emitir el JSON visible; con 300 salia vacio y caia al fallback
+        # silencioso (mismo problema que ya vimos en el simulador).
         raw = _ai_chat(
             [{"role": "system", "content": system},
              {"role": "user", "content": user}],
-            max_tokens=300, temperature=0.0, retries=2, timeout=30,
+            max_tokens=800, temperature=0.0, retries=2, timeout=30,
         )
     except Exception as exc:  # noqa: BLE001
         app.logger.warning(f"_ai_refine_analysis: IA no disponible: {exc}")
+        meta["reason"] = f"IA no disponible: {exc}"
         return refined
+    meta["ran"] = True
+    meta["raw_len"] = len(raw or "")
     parsed = _extract_json_object(raw)
     if not parsed:
+        meta["reason"] = "IA respondio pero sin JSON parseable"
         return refined
     new_intent = str(parsed.get("intent") or "").upper().strip()
     if new_intent in _AI_REFINE_INTENTS:
+        if new_intent != cur_intent:
+            meta["changed"] = True
         refined["intent"] = new_intent
         conf = _coerce_confidence(parsed.get("intent_confidence"))
         if conf is not None:
             refined["intent_confidence"] = conf
     new_sent = str(parsed.get("sentiment") or "").upper().strip()
     if new_sent in _AI_REFINE_SENTIMENTS:
+        if new_sent != cur_sent:
+            meta["changed"] = True
         refined["sentiment"] = new_sent
         conf = _coerce_confidence(parsed.get("sentiment_confidence"))
         if conf is not None:
             refined["sentiment_confidence"] = conf
+    if not meta["reason"]:
+        meta["reason"] = "ok"
     # Re-alinear el riesgo comercial con el sentimiento afinado (misma regla
     # que ya usa el pipeline). NO cambia densidad ni keywords del diccionario.
     if isinstance(refined.get("commercial"), dict):
