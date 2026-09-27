@@ -31,10 +31,17 @@ logger = logging.getLogger(__name__)
 
 _table_ready = False
 
-# Filtros y apartados validos (deben coincidir con el frontend).
-VALID_FILTERS = {"intent", "sentiment"}
-VALID_SECTIONS = {"meaning", "seller", "tips", "next", "risk"}
+# Filtros validos (deben coincidir con el frontend). Ahora cubren TODOS los
+# filtros del panel, no solo intencion/sentimiento.
+VALID_FILTERS = {"intent", "sentiment", "sales", "re", "commercial"}
 VALID_VOTES = {"up", "down"}
+
+# Los apartados (section_key) varian por filtro: intencion/sentimiento usan
+# meaning/seller/tips/next/risk; conceptos usan la clave del concepto
+# (price, location, ...); comercial usa funnel/urgencia/etc. Como el conjunto es
+# abierto, NO se valida contra una lista fija: se acepta cualquier section_key
+# corto y no vacio (se sanitiza el largo al guardar).
+_MAX_SECTION_LEN = 40
 
 
 def _conn():
@@ -104,9 +111,9 @@ def record_vote(username: str, filter_key: str, section_key: str, vote: str,
     permitidas; si no son validos, no guarda y devuelve False (sin romper).
     """
     fk = str(filter_key or "").strip().lower()
-    sk = str(section_key or "").strip().lower()
+    sk = str(section_key or "").strip().lower()[:_MAX_SECTION_LEN]
     v = str(vote or "").strip().lower()
-    if fk not in VALID_FILTERS or sk not in VALID_SECTIONS or v not in VALID_VOTES:
+    if fk not in VALID_FILTERS or not sk or v not in VALID_VOTES:
         return False
     if not is_available():
         return False
@@ -139,6 +146,49 @@ def record_vote(username: str, filter_key: str, section_key: str, vote: str,
             pass
         _release(conn, close=True)
         return False
+
+
+def recent_negative_any(filter_key: str, tenant_id: str = "__legacy__",
+                        limit: int = 3) -> list[dict]:
+    """
+    Como recent_negative pero SIN fijar el apartado: trae los votos negativos
+    recientes de un filtro cualquiera sea su section_key. Util para conceptos y
+    comercial, cuyas secciones son claves dinamicas. Incluye section_key en cada
+    resultado. Lista vacia si PG no esta o no hay votos.
+    """
+    fk = str(filter_key or "").strip().lower()
+    if fk not in VALID_FILTERS or not is_available():
+        return []
+    conn = _conn()
+    if conn is None:
+        return []
+    try:
+        _ensure_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT section_key, text_excerpt, section_text, created_at "
+                "FROM filter_feedback "
+                "WHERE tenant_id = %s AND filter_key = %s "
+                "AND vote = 'down' AND section_text <> '' "
+                "ORDER BY created_at DESC LIMIT %s",
+                (tenant_id or "__legacy__", fk, int(limit)),
+            )
+            rows = cur.fetchall()
+        _release(conn)
+        return [
+            {"section_key": r[0] or "", "text_excerpt": r[1] or "",
+             "section_text": r[2] or "",
+             "created_at": r[3].isoformat() if hasattr(r[3], "isoformat") else str(r[3])}
+            for r in rows
+        ]
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"filter_feedback recent_negative_any error: {exc}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        _release(conn, close=True)
+        return []
 
 
 def stats(tenant_id: str = "__legacy__") -> dict:
@@ -188,8 +238,8 @@ def recent_negative(filter_key: str, section_key: str, tenant_id: str = "__legac
     no esta disponible o no hay votos.
     """
     fk = str(filter_key or "").strip().lower()
-    sk = str(section_key or "").strip().lower()
-    if fk not in VALID_FILTERS or sk not in VALID_SECTIONS or not is_available():
+    sk = str(section_key or "").strip().lower()[:_MAX_SECTION_LEN]
+    if fk not in VALID_FILTERS or not sk or not is_available():
         return []
     conn = _conn()
     if conn is None:
