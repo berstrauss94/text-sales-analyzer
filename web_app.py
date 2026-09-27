@@ -2848,12 +2848,12 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v27.1{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v27.2{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v27.0)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v27.2)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    Los filtros de <strong style="color:#f5a35b;">intencion</strong> y <strong style="color:#f5a35b;">sentimiento</strong> ahora traen explicaciones <strong style="color:#5bf5a3;">mas completas y a medida</strong> de cada texto, escritas por la IA (que significa, para el vendedor, tips y siguiente paso).
-                    <div style="margin-top:8px;">Ademas, en cada apartado hay una perilla <strong style="color:#5bf5a3;">&#10003;</strong> / <strong style="color:#f55b5b;">&#10007;</strong> para que marques si te resulto acertado. Tus votos ayudan a que el sistema y la IA mejoren con el tiempo.</div>
+                    Ahora <strong style="color:#5bf5a3;">TODOS los filtros</strong> traen explicaciones a medida escritas por la IA: intencion, sentimiento, <strong style="color:#f5a35b;">conceptos de ventas y de bienes raices</strong>, y el <strong style="color:#f5a35b;">analisis comercial</strong> (funnel, urgencia, compromiso, operacion, financiamiento).
+                    <div style="margin-top:8px;">Cada apartado tiene su perilla <strong style="color:#5bf5a3;">&#10003;</strong> / <strong style="color:#f55b5b;">&#10007;</strong> para marcar si te resulto acertado. Tus votos guian a la IA para mejorar las proximas explicaciones.</div>
                     <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Si la IA no esta disponible en ese momento, ves el analisis normal, sin cambios.</div>
                 </div>
             </div>
@@ -3659,11 +3659,18 @@ function renderResults(data, inputText) {
             }
         };
 
-        const fd = funnelDetail[c.etapa_funnel] || funnelDetail['AWARENESS'];
-        const ud = urgenciaDetail[c.urgencia] || urgenciaDetail['BAJA'];
-        const cd = compromisoDetail[c.nivel_compromiso] || compromisoDetail['BAJO'];
-        const od = operacionDetail[c.tipo_operacion] || operacionDetail['INDEFINIDO'];
-        const fid = financDetail[c.financiamiento] || financDetail['NO_DETECTADO'];
+        // Override de IA para los sub-bloques comerciales (desc/action a medida).
+        // Fallback total a la plantilla fija si la IA no genero ese bloque.
+        const comAI = (data._ai_refine && data._ai_refine.commercial) || {};
+        const _merge = (base, ai) => Object.assign({}, base, {
+            desc: (ai && ai.desc) || base.desc,
+            action: (ai && ai.action) || base.action
+        });
+        const fd = _merge(funnelDetail[c.etapa_funnel] || funnelDetail['AWARENESS'], comAI.funnel);
+        const ud = _merge(urgenciaDetail[c.urgencia] || urgenciaDetail['BAJA'], comAI.urgencia);
+        const cd = _merge(compromisoDetail[c.nivel_compromiso] || compromisoDetail['BAJO'], comAI.compromiso);
+        const od = _merge(operacionDetail[c.tipo_operacion] || operacionDetail['INDEFINIDO'], comAI.operacion);
+        const fid = _merge(financDetail[c.financiamiento] || financDetail['NO_DETECTADO'], comAI.financiamiento);
 
         extDataHtml = `
             <div class="ext-data-grid">
@@ -3707,6 +3714,7 @@ function renderResults(data, inputText) {
                     <div class="ext-detail-desc">${fd.desc}</div>
                     <div class="ext-detail-item"><strong>Senales detectadas:</strong> ${fd.signals}</div>
                     <div class="ext-detail-item"><strong>Que hacer:</strong> ${fd.action}</div>
+                    ${feedbackToggle('commercial', 'funnel', c.etapa_funnel || '')}
                 </div>
             </div>
 
@@ -3717,6 +3725,7 @@ function renderResults(data, inputText) {
                     <div class="ext-detail-desc">${ud.desc}</div>
                     <div class="ext-detail-item"><strong>Senales detectadas:</strong> ${ud.signals}</div>
                     <div class="ext-detail-item"><strong>Que hacer:</strong> ${ud.action}</div>
+                    ${feedbackToggle('commercial', 'urgencia', c.urgencia || '')}
                 </div>
             </div>
 
@@ -3727,6 +3736,7 @@ function renderResults(data, inputText) {
                     <div class="ext-detail-desc">${cd.desc}</div>
                     <div class="ext-detail-item"><strong>Senales detectadas:</strong> ${cd.signals}</div>
                     <div class="ext-detail-item"><strong>Que hacer:</strong> ${cd.action}</div>
+                    ${feedbackToggle('commercial', 'compromiso', c.nivel_compromiso || '')}
                 </div>
             </div>
 
@@ -3736,6 +3746,7 @@ function renderResults(data, inputText) {
                     <div class="ext-detail-desc">${od.desc}</div>
                     <div class="ext-detail-item"><strong>Senales detectadas:</strong> ${od.signals}</div>
                     <div class="ext-detail-item"><strong>Que hacer:</strong> ${od.action}</div>
+                    ${feedbackToggle('commercial', 'operacion', c.tipo_operacion || '')}
                 </div>
             </div>
 
@@ -3745,6 +3756,7 @@ function renderResults(data, inputText) {
                     <div class="ext-detail-desc">${fid.desc}</div>
                     <div class="ext-detail-item"><strong>Senales detectadas:</strong> ${fid.signals}</div>
                     <div class="ext-detail-item"><strong>Que hacer:</strong> ${fid.action}</div>
+                    ${feedbackToggle('commercial', 'financiamiento', c.financiamiento || '')}
                 </div>
             </div>
         `;
@@ -4012,7 +4024,7 @@ function renderResults(data, inputText) {
                 </div>
                 <div class="card-collapsible-content closed" id="ventas-content">
                     ${salesHtml}
-                    ${renderSalesConceptsDetail(data.sales_concepts)}
+                    ${renderSalesConceptsDetail(data.sales_concepts, (data._ai_refine && data._ai_refine.sales_concepts) || {})}
                 </div>
             </div>
             <div class="card">
@@ -4023,7 +4035,7 @@ function renderResults(data, inputText) {
                 </div>
                 <div class="card-collapsible-content closed" id="bienes-raices-content">
                     ${reHtml}
-                    ${renderRealEstateConceptsDetail(data.real_estate_concepts)}
+                    ${renderRealEstateConceptsDetail(data.real_estate_concepts, (data._ai_refine && data._ai_refine.re_concepts) || {})}
                 </div>
             </div>
             <div class="card full-width">
@@ -5329,8 +5341,9 @@ function renderSentimentDetail(sentiment, aiSections) {
     `;
 }
 
-function renderSalesConceptsDetail(concepts) {
+function renderSalesConceptsDetail(concepts, aiMap) {
     if (!concepts || concepts.length === 0) return '';
+    const ai = aiMap || {};
     const conceptInfo = {
         'offer': { icon: '🏷️', label: 'Oferta', desc: 'Se detecto una oferta comercial activa.', tip: 'Asegurate de que la oferta sea clara, con precio y condiciones. Facilita el siguiente paso.' },
         'discount': { icon: '🔖', label: 'Descuento', desc: 'Se menciona un descuento o reduccion de precio.', tip: 'Los descuentos crean urgencia. Establece un plazo limite para maximizar el efecto.' },
@@ -5341,27 +5354,12 @@ function renderSalesConceptsDetail(concepts) {
         'follow_up': { icon: '📞', label: 'Seguimiento', desc: 'Se menciona seguimiento o contacto futuro.', tip: 'El seguimiento es clave. Programa recordatorios y cumple siempre lo prometido.' },
         'negotiation': { icon: '⚖️', label: 'Negociacion', desc: 'Se estan negociando terminos o condiciones.', tip: 'Negocia con margen. Ten claro tu precio minimo y ofrece valor en vez de solo bajar precio.' }
     };
-    let html = '<div class="concepts-detail-panel">';
-    html += '<div class="concepts-detail-title">Detalle de conceptos detectados</div>';
-    concepts.forEach(c => {
-        const info = conceptInfo[c.concept] || { icon: '📎', label: c.concept, desc: 'Concepto detectado.', tip: 'Evaluar en contexto.' };
-        const confPct = (c.confidence * 100).toFixed(0);
-        html += `<div class="concept-detail-item">
-            <div class="concept-detail-head">
-                <span>${info.icon} <strong>${info.label}</strong></span>
-                <span class="concept-conf">${confPct}%</span>
-            </div>
-            <div class="concept-detail-desc">${info.desc}</div>
-            <div class="concept-detail-source">${c.source_text ? c.source_text.split(' /// ').map(f => '<div class="phrase-chip" data-word="' + f.replace(/"/g, '&quot;') + '" data-group="intent" style="margin:3px 0; padding:3px 8px; background:#0a0c14; border-left:2px solid #7b5bf5; border-radius:3px; cursor:pointer; transition:background 0.15s;"><em>"' + f + '"</em></div>').join('') : '<em>Sin fragmento</em>'}</div>
-            <div class="concept-detail-tip">💡 ${info.tip}</div>
-        </div>`;
-    });
-    html += '</div>';
-    return html;
+    return _renderConceptsList(concepts, conceptInfo, ai, 'sales');
 }
 
-function renderRealEstateConceptsDetail(concepts) {
+function renderRealEstateConceptsDetail(concepts, aiMap) {
     if (!concepts || concepts.length === 0) return '';
+    const ai = aiMap || {};
     const conceptInfo = {
         'property_type': { icon: '🏠', label: 'Tipo de propiedad', desc: 'Se identifica el tipo de inmueble.', tip: 'Adapta tu discurso al tipo de propiedad. Un apartamento se vende diferente a un terreno.' },
         'price': { icon: '💰', label: 'Precio', desc: 'Se menciona precio o valor del inmueble.', tip: 'Justifica el precio con comparables del mercado. Ten datos listos para respaldar.' },
@@ -5373,19 +5371,29 @@ function renderRealEstateConceptsDetail(concepts) {
         'zoning': { icon: '📋', label: 'Zonificacion', desc: 'Se menciona zonificacion o uso de suelo.', tip: 'La zonificacion define el potencial. Comercial = mas valor. Verifica restricciones.' },
         'condition': { icon: '🔧', label: 'Estado', desc: 'Se menciona el estado o condicion del inmueble.', tip: 'Se honesto con el estado. Si necesita arreglos, presenta presupuesto y descuenta del precio.' }
     };
+    return _renderConceptsList(concepts, conceptInfo, ai, 're');
+}
+
+// Render comun de la lista de conceptos. Usa desc/tip de IA por concepto si
+// vinieron (ai[c.concept]), con fallback a la plantilla fija. Agrega perilla ✓/✗.
+function _renderConceptsList(concepts, conceptInfo, ai, filterKey) {
     let html = '<div class="concepts-detail-panel">';
     html += '<div class="concepts-detail-title">Detalle de conceptos detectados</div>';
     concepts.forEach(c => {
         const info = conceptInfo[c.concept] || { icon: '📎', label: c.concept, desc: 'Concepto detectado.', tip: 'Evaluar en contexto.' };
+        const aiEntry = ai[c.concept] || {};
+        const desc = aiEntry.desc || info.desc;
+        const tip = aiEntry.tip || info.tip;
         const confPct = (c.confidence * 100).toFixed(0);
         html += `<div class="concept-detail-item">
             <div class="concept-detail-head">
                 <span>${info.icon} <strong>${info.label}</strong></span>
                 <span class="concept-conf">${confPct}%</span>
             </div>
-            <div class="concept-detail-desc">${info.desc}</div>
+            <div class="concept-detail-desc">${desc}</div>
             <div class="concept-detail-source">${c.source_text ? c.source_text.split(' /// ').map(f => '<div class="phrase-chip" data-word="' + f.replace(/"/g, '&quot;') + '" data-group="intent" style="margin:3px 0; padding:3px 8px; background:#0a0c14; border-left:2px solid #7b5bf5; border-radius:3px; cursor:pointer; transition:background 0.15s;"><em>"' + f + '"</em></div>').join('') : '<em>Sin fragmento</em>'}</div>
-            <div class="concept-detail-tip">💡 ${info.tip}</div>
+            <div class="concept-detail-tip">💡 ${tip}</div>
+            ${feedbackToggle(filterKey, c.concept, c.concept)}
         </div>`;
     });
     html += '</div>';
@@ -10737,15 +10745,18 @@ def _ai_refine_avoid_examples(tenant_id):
     try:
         from src.users import filter_feedback
         ejemplos = []
-        for fk in ("intent", "sentiment"):
-            for sk in ("meaning", "seller", "tips", "next", "risk"):
-                for neg in filter_feedback.recent_negative(fk, sk, tenant_id, limit=2):
-                    txt = (neg.get("section_text") or "").strip()
-                    if txt:
-                        ejemplos.append(f"- ({fk}/{sk}) {txt[:200]}")
+        # Cubre TODOS los filtros (intencion, sentimiento, conceptos, comercial).
+        # recent_negative_any no fija la seccion (los conceptos usan claves
+        # dinamicas como price/location).
+        for fk in ("intent", "sentiment", "sales", "re", "commercial"):
+            for neg in filter_feedback.recent_negative_any(fk, tenant_id, limit=2):
+                txt = (neg.get("section_text") or "").strip()
+                sk = (neg.get("section_key") or "").strip()
+                if txt:
+                    ejemplos.append(f"- ({fk}/{sk}) {txt[:200]}")
         if not ejemplos:
             return ""
-        bloque = "\n".join(ejemplos[:6])
+        bloque = "\n".join(ejemplos[:8])
         return (
             "ATENCION: vendedores marcaron como POCO ACERTADAS estas explicaciones "
             "previas. Evita redactar algo similar; mejora el enfoque:\n"
@@ -10785,40 +10796,67 @@ def _ai_refine_analysis(text, analysis_dict, tenant_id="__legacy__"):
     # Few-shot: si hay votos negativos recientes de vendedores, se los damos a la
     # IA como ejemplos "a evitar". Best-effort: si falla, seguimos sin ellos.
     avoid_block = _ai_refine_avoid_examples(tenant_id)
+    # Conceptos y valores YA detectados por el ML: la IA solo los DESCRIBE mejor,
+    # NO inventa ni cambia la deteccion.
+    sales_keys = [str(c.get("concept")) for c in (analysis_dict.get("sales_concepts") or []) if c.get("concept")]
+    re_keys = [str(c.get("concept")) for c in (analysis_dict.get("real_estate_concepts") or []) if c.get("concept")]
+    com = analysis_dict.get("commercial") or {}
+    com_vals = {
+        "etapa_funnel": com.get("etapa_funnel", ""),
+        "urgencia": com.get("urgencia", ""),
+        "nivel_compromiso": com.get("nivel_compromiso", ""),
+        "tipo_operacion": com.get("tipo_operacion", ""),
+        "financiamiento": com.get("financiamiento", ""),
+    }
     system = (
         "Sos un analista experto de conversaciones de ventas inmobiliarias en "
         "espanol de Argentina (tono rioplatense, trato de 'vos'). Recibis un "
-        "texto y dos etiquetas ya calculadas por otro modelo (intencion y "
-        "sentimiento). Tu tarea tiene DOS partes:\n"
-        "1) VALIDAR/CORREGIR las etiquetas. NO inventes categorias: la intencion "
-        f"DEBE ser una de {_AI_REFINE_INTENTS} y el sentimiento una de "
-        f"{_AI_REFINE_SENTIMENTS}.\n"
-        "2) REDACTAR, para CADA filtro (intencion y sentimiento), cuatro "
-        "apartados explicativos ESPECIFICOS a este texto (no genericos, NO "
-        "plantillas). Cada apartado (salvo tips) debe tener entre 3 y 5 oraciones "
-        "COMPLETAS y sustanciosas, citando pistas concretas del texto (que dijo el "
-        "cliente, precios, plazos, objeciones). Los apartados son:\n"
-        "   - meaning: 'Que significa para la venta' (3-5 oraciones).\n"
-        "   - seller: 'Para el vendedor', consejo accionable (3-5 oraciones).\n"
-        "   - tips: lista de 3 a 4 tips practicos y concretos.\n"
-        "   - next: 'Siguiente paso' concreto (para intencion) / 'Nivel de riesgo' "
-        "explicado (para sentimiento), 3-5 oraciones.\n"
+        "texto y varias etiquetas/valores ya calculados por otro modelo. Tu "
+        "tarea: VALIDAR/CORREGIR intencion y sentimiento, y REDACTAR "
+        "explicaciones ESPECIFICAS a este texto (no genericas, no plantillas) "
+        "para TODOS los filtros. Cita pistas concretas del texto (lo que dijo el "
+        "cliente, precios, plazos, objeciones).\n"
+        f"Intencion DEBE ser una de {_AI_REFINE_INTENTS}; sentimiento una de "
+        f"{_AI_REFINE_SENTIMENTS}. NO inventes conceptos ni valores nuevos: solo "
+        "describi los que te paso el usuario.\n"
+        "Apartados para intencion y sentimiento: meaning (3-5 oraciones), seller "
+        "(3-5 oraciones), tips (lista de 3-4), next (3-5 oraciones; para "
+        "sentimiento es el nivel de riesgo explicado).\n"
+        "Para cada concepto de ventas y de bienes raices detectado: una 'desc' "
+        "(2-3 oraciones, que significa en ESTE texto) y un 'tip' (1-2 oraciones "
+        "accionables).\n"
+        "Para el bloque comercial, por cada valor presente (funnel, urgencia, "
+        "compromiso, operacion, financiamiento): 'desc' (2-3 oraciones) y "
+        "'action' (1-2 oraciones, que hacer).\n"
         "IMPORTANTE: prioriza SIEMPRE cerrar el JSON completo y valido por sobre "
-        "alargar un apartado. Se sustancioso pero conciso para que entre todo.\n"
+        "alargar un texto. Se sustancioso pero conciso.\n"
         + avoid_block +
         "Responde SOLO un objeto JSON valido, sin markdown ni texto extra, con "
-        "esta forma exacta:\n"
+        "esta forma exacta (usa como claves de concepts/commercial EXACTAMENTE "
+        "las que te paso el usuario):\n"
         "{\"intent\":\"...\",\"intent_confidence\":0.0,"
         "\"sentiment\":\"...\",\"sentiment_confidence\":0.0,"
         "\"intent_sections\":{\"meaning\":\"...\",\"seller\":\"...\","
-        "\"tips\":[\"...\",\"...\"],\"next\":\"...\"},"
+        "\"tips\":[\"...\"],\"next\":\"...\"},"
         "\"sentiment_sections\":{\"meaning\":\"...\",\"seller\":\"...\","
-        "\"tips\":[\"...\",\"...\"],\"next\":\"...\"}}"
+        "\"tips\":[\"...\"],\"next\":\"...\"},"
+        "\"sales_concepts\":{\"<clave>\":{\"desc\":\"...\",\"tip\":\"...\"}},"
+        "\"re_concepts\":{\"<clave>\":{\"desc\":\"...\",\"tip\":\"...\"}},"
+        "\"commercial\":{\"funnel\":{\"desc\":\"...\",\"action\":\"...\"},"
+        "\"urgencia\":{\"desc\":\"...\",\"action\":\"...\"},"
+        "\"compromiso\":{\"desc\":\"...\",\"action\":\"...\"},"
+        "\"operacion\":{\"desc\":\"...\",\"action\":\"...\"},"
+        "\"financiamiento\":{\"desc\":\"...\",\"action\":\"...\"}}}"
     )
     user = (
         f"Texto:\n{clean[:4000]}\n\n"
         f"Etiquetas actuales -> intent={cur_intent}, sentiment={cur_sent}.\n"
-        "Confirma o corrige las etiquetas y redacta los apartados. Devolve el JSON."
+        f"Conceptos de ventas detectados (claves): {sales_keys or 'ninguno'}.\n"
+        f"Conceptos de bienes raices detectados (claves): {re_keys or 'ninguno'}.\n"
+        f"Valores comerciales: {com_vals}.\n"
+        "Redacta las explicaciones a medida y devolve el JSON. Para conceptos y "
+        "commercial, incluye SOLO las claves que te pase (si una lista esta "
+        "vacia, devolve {} para ese bloque)."
     )
     try:
         # max_tokens 800: Gemini 3.5 gasta tokens en razonamiento interno antes
@@ -10827,7 +10865,7 @@ def _ai_refine_analysis(text, analysis_dict, tenant_id="__legacy__"):
         raw = _ai_chat(
             [{"role": "system", "content": system},
              {"role": "user", "content": user}],
-            max_tokens=2200, temperature=0.3, retries=2, timeout=60,
+            max_tokens=3000, temperature=0.3, retries=2, timeout=75,
         )
     except Exception as exc:  # noqa: BLE001
         app.logger.warning(f"_ai_refine_analysis: IA no disponible: {exc}")
@@ -10858,6 +10896,11 @@ def _ai_refine_analysis(text, analysis_dict, tenant_id="__legacy__"):
     # Apartados largos generados por la IA. Van SOLO en la traza (no se guardan).
     meta["intent_sections"] = _sanitize_sections(parsed.get("intent_sections"))
     meta["sentiment_sections"] = _sanitize_sections(parsed.get("sentiment_sections"))
+    # Conceptos (ventas + bienes raices): {clave: {desc, tip}}.
+    meta["sales_concepts"] = _sanitize_concept_map(parsed.get("sales_concepts"))
+    meta["re_concepts"] = _sanitize_concept_map(parsed.get("re_concepts"))
+    # Bloque comercial: {funnel|urgencia|compromiso|operacion|financiamiento: {desc, action}}.
+    meta["commercial"] = _sanitize_commercial_map(parsed.get("commercial"))
     meta["has_sections"] = bool(meta["intent_sections"]) or bool(meta["sentiment_sections"])
     if not meta["reason"]:
         meta["reason"] = "ok" if meta["has_sections"] else "sin apartados (JSON incompleto)"
@@ -10991,6 +11034,54 @@ def _sanitize_sections(sections):
         clean_tips = [str(t).strip()[:300] for t in tips if str(t).strip()]
         if clean_tips:
             out["tips"] = clean_tips[:5]
+    return out
+
+
+def _sanitize_concept_map(m):
+    """
+    Normaliza el mapa de conceptos generado por IA: {clave: {desc, tip}}.
+    Devuelve {} si no es valido. Recorta largos.
+    """
+    if not isinstance(m, dict):
+        return {}
+    out = {}
+    for key, val in m.items():
+        if not isinstance(val, dict):
+            continue
+        entry = {}
+        desc = val.get("desc")
+        tip = val.get("tip")
+        if isinstance(desc, str) and desc.strip():
+            entry["desc"] = desc.strip()[:600]
+        if isinstance(tip, str) and tip.strip():
+            entry["tip"] = tip.strip()[:400]
+        if entry:
+            out[str(key).strip()[:40]] = entry
+    return out
+
+
+def _sanitize_commercial_map(m):
+    """
+    Normaliza el mapa comercial de IA: {funnel|urgencia|compromiso|operacion|
+    financiamiento: {desc, action}}. Solo acepta esas claves. {} si invalido.
+    """
+    if not isinstance(m, dict):
+        return {}
+    allowed = {"funnel", "urgencia", "compromiso", "operacion", "financiamiento"}
+    out = {}
+    for key, val in m.items():
+        k = str(key).strip().lower()
+        if k not in allowed or not isinstance(val, dict):
+            continue
+        entry = {}
+        desc = val.get("desc")
+        action = val.get("action")
+        if isinstance(desc, str) and desc.strip():
+            entry["desc"] = desc.strip()[:600]
+        if isinstance(action, str) and action.strip():
+            entry["action"] = action.strip()[:400]
+        if entry:
+            out[k] = entry
     return out
 
 
