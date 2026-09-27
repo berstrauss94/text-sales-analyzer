@@ -1950,6 +1950,35 @@ HTML = """
             line-height: 1.5;
             margin-bottom: 12px;
         }
+        /* Perilla de feedback ✓/✗ de cada apartado */
+        .fb-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+            padding-top: 6px;
+            border-top: 1px dashed #1a1d2e;
+        }
+        .fb-q {
+            font-size: 0.66rem;
+            color: #777;
+            margin-right: auto;
+        }
+        .fb-btn {
+            cursor: pointer;
+            border: 1px solid #2a2d3a;
+            background: #12141c;
+            color: #9aa0b0;
+            border-radius: 6px;
+            width: 26px;
+            height: 22px;
+            font-size: 0.8rem;
+            line-height: 1;
+            padding: 0;
+        }
+        .fb-btn:hover { border-color: #4a6cf7; }
+        .fb-up.fb-active { background: #12321f; color: #5bf5a3; border-color: #5bf5a3; }
+        .fb-down.fb-active { background: #331414; color: #f55b5b; border-color: #f55b5b; }
         .intent-detail-section {
             margin-bottom: 10px;
             padding: 10px;
@@ -2819,12 +2848,12 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v26.2{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v27.0{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v26.0)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v27.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    Los mismos filtros de siempre, ahora con <strong style="color:#f5a35b;">inteligencia artificial</strong>.
-                    <div style="margin-top:8px;">Cuando analizas un texto, la IA <strong style="color:#5bf5a3;">valida y afina</strong> la <strong style="color:#f5a35b;">intencion</strong> y el <strong style="color:#f5a35b;">sentimiento</strong> detectados, para que el resultado que ves sea mas preciso. No se agrego ningun filtro nuevo: se mejoro la calidad de los que ya conoces.</div>
+                    Los filtros de <strong style="color:#f5a35b;">intencion</strong> y <strong style="color:#f5a35b;">sentimiento</strong> ahora traen explicaciones <strong style="color:#5bf5a3;">mas completas y a medida</strong> de cada texto, escritas por la IA (que significa, para el vendedor, tips y siguiente paso).
+                    <div style="margin-top:8px;">Ademas, en cada apartado hay una perilla <strong style="color:#5bf5a3;">&#10003;</strong> / <strong style="color:#f55b5b;">&#10007;</strong> para que marques si te resulto acertado. Tus votos ayudan a que el sistema y la IA mejoren con el tiempo.</div>
                     <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Si la IA no esta disponible en ese momento, ves el analisis normal, sin cambios.</div>
                 </div>
             </div>
@@ -3890,7 +3919,16 @@ function renderResults(data, inputText) {
         }
     };
 
-    const iDetail = intentDetail[data.intent] || intentDetail['UNKNOWN'];
+    const iDetailBase = intentDetail[data.intent] || intentDetail['UNKNOWN'];
+    // Si la IA genero apartados a medida (mas largos y especificos), se usan en
+    // lugar de la plantilla fija. Fallback total a la plantilla si no vinieron.
+    const iAI = (data._ai_refine && data._ai_refine.intent_sections) || {};
+    const iDetail = Object.assign({}, iDetailBase, {
+        meaning: iAI.meaning || iDetailBase.meaning,
+        forSeller: iAI.seller || iDetailBase.forSeller,
+        tips: (Array.isArray(iAI.tips) && iAI.tips.length) ? iAI.tips : iDetailBase.tips,
+        nextStep: iAI.next || iDetailBase.nextStep
+    });
 
     // Get the title: from input field (admin), from selected dropdown option, or from global var
     const entryNameInputEl = document.getElementById('entryNameInput');
@@ -3926,12 +3964,14 @@ function renderResults(data, inputText) {
                             <div class="intent-section-text">${iDetail.meaning}</div>
                             <div class="src-toggle-inline" data-section="meaning">▼</div>
                             <div class="src-fragment-inline" style="display:none;"></div>
+                            ${feedbackToggle('intent', 'meaning', data.intent)}
                         </div>
                         <div class="intent-detail-section intent-seller-box">
                             <div class="intent-section-title">👤 Para el vendedor</div>
                             <div class="intent-section-text">${iDetail.forSeller}</div>
                             <div class="src-toggle-inline" data-section="seller">▼</div>
                             <div class="src-fragment-inline" style="display:none;"></div>
+                            ${feedbackToggle('intent', 'seller', data.intent)}
                         </div>
                         <div class="intent-detail-section">
                             <div class="intent-section-title">💡 Tips practicos</div>
@@ -3940,12 +3980,14 @@ function renderResults(data, inputText) {
                             </ul>
                             <div class="src-toggle-inline" data-section="tips">▼</div>
                             <div class="src-fragment-inline" style="display:none;"></div>
+                            ${feedbackToggle('intent', 'tips', data.intent)}
                         </div>
                         <div class="intent-detail-section intent-next-step">
                             <div class="intent-section-title">▶️ Siguiente paso</div>
                             <div class="intent-section-text">${iDetail.nextStep}</div>
                             <div class="src-toggle-inline" data-section="next">▼</div>
                             <div class="src-fragment-inline" style="display:none;"></div>
+                            ${feedbackToggle('intent', 'next', data.intent)}
                         </div>
                     </div>
                 </div>
@@ -3959,7 +4001,7 @@ function renderResults(data, inputText) {
                 <div class="card-collapsible-content closed" id="sentimiento-content">
                     <span class="badge badge-${data.sentiment}">${sentimentEs}</span>
                     ${confBar(data.sentiment_confidence)}
-                    ${renderSentimentDetail(data.sentiment)}
+                    ${renderSentimentDetail(data.sentiment, (data._ai_refine && data._ai_refine.sentiment_sections) || {})}
                 </div>
             </div>
             <div class="card">
@@ -5212,7 +5254,8 @@ function getRelevantFragments(section) {
     return [allMatches[0], allMatches[step], allMatches[step*2], allMatches[step*3], allMatches[allMatches.length-1]];
 }
 
-function renderSentimentDetail(sentiment) {
+function renderSentimentDetail(sentiment, aiSections) {
+    const sAI = aiSections || {};
     const details = {
         'POSITIVE': {
             icon: '😊',
@@ -5239,7 +5282,15 @@ function renderSentimentDetail(sentiment) {
             risk: 'Alto. Riesgo de perder al cliente si no se maneja bien.'
         }
     };
-    const d = details[sentiment] || details['NEUTRAL'];
+    const dBase = details[sentiment] || details['NEUTRAL'];
+    // Apartados generados por IA (mas largos/especificos) reemplazan la plantilla
+    // fija si vinieron. El apartado "next" alimenta el bloque de Nivel de riesgo.
+    const d = Object.assign({}, dBase, {
+        meaning: sAI.meaning || dBase.meaning,
+        forSeller: sAI.seller || dBase.forSeller,
+        tips: (Array.isArray(sAI.tips) && sAI.tips.length) ? sAI.tips : dBase.tips,
+        risk: sAI.next || dBase.risk
+    });
     return `
         <div class="intent-detail-panel">
             <div class="intent-detail-header">${d.icon} Sentimiento: ${sentiment}</div>
@@ -5249,12 +5300,14 @@ function renderSentimentDetail(sentiment) {
                 <div class="intent-section-text">${d.meaning}</div>
                 <div class="src-toggle-inline" data-section="meaning">▼</div>
                 <div class="src-fragment-inline" style="display:none;"></div>
+                ${feedbackToggle('sentiment', 'meaning', sentiment)}
             </div>
             <div class="intent-detail-section intent-seller-box">
                 <div class="intent-section-title">👤 Para el vendedor</div>
                 <div class="intent-section-text">${d.forSeller}</div>
                 <div class="src-toggle-inline" data-section="seller">▼</div>
                 <div class="src-fragment-inline" style="display:none;"></div>
+                ${feedbackToggle('sentiment', 'seller', sentiment)}
             </div>
             <div class="intent-detail-section">
                 <div class="intent-section-title">💡 Tips practicos</div>
@@ -5263,12 +5316,14 @@ function renderSentimentDetail(sentiment) {
                 </ul>
                 <div class="src-toggle-inline" data-section="tips">▼</div>
                 <div class="src-fragment-inline" style="display:none;"></div>
+                ${feedbackToggle('sentiment', 'tips', sentiment)}
             </div>
             <div class="intent-detail-section" style="border-left:3px solid ${sentiment === 'NEGATIVE' ? '#f55b5b' : sentiment === 'POSITIVE' ? '#5bf5a3' : '#f5a35b'}">
                 <div class="intent-section-title">⚠️ Nivel de riesgo</div>
                 <div class="intent-section-text">${d.risk}</div>
                 <div class="src-toggle-inline" data-section="tips">▼</div>
                 <div class="src-fragment-inline" style="display:none;"></div>
+                ${feedbackToggle('sentiment', 'risk', sentiment)}
             </div>
         </div>
     `;
@@ -5743,6 +5798,21 @@ function _closest(e, selector) {
     if (t && t.nodeType === 3) t = t.parentElement;  // text node -> parent element
     if (!t || typeof t.closest !== 'function') return null;
     return t.closest(selector);
+}
+
+// Perilla de feedback ✓/✗ para cada apartado de un filtro. El vendedor marca si
+// el apartado le parecio acertado; el voto se guarda y alimenta a la IA (few-shot
+// a futuro). Usa data-* (SIN onclick con comillas escapadas: lo prohiben los
+// guards). El texto del apartado se lee del DOM en el listener delegado.
+function feedbackToggle(filterKey, sectionKey, label) {
+    var fk = String(filterKey || '');
+    var sk = String(sectionKey || '');
+    var lb = String(label || '');
+    return '<div class="fb-toggle" data-fb-filter="' + fk + '" data-fb-section="' + sk + '" data-fb-label="' + lb + '">'
+        + '<span class="fb-q">¿Acertado?</span>'
+        + '<button type="button" class="fb-btn fb-up" data-fb-vote="up" title="Si, acertado">&#10003;</button>'
+        + '<button type="button" class="fb-btn fb-down" data-fb-vote="down" title="No, poco acertado">&#10007;</button>'
+        + '</div>';
 }
 
 // ── Tutorial guiado (recorrido animado que ilumina cada funcionalidad) ──
@@ -9142,6 +9212,43 @@ document.addEventListener('click', function (e) {
     fetchNotifications();
 });
 
+// Perilla de feedback ✓/✗ de los apartados de los filtros. Listener delegado
+// (los guards prohiben e.target.closest directo). Guarda el voto y marca visual.
+document.addEventListener('click', function (e) {
+    var btn = _closest(e, '.fb-btn');
+    if (!btn) return;
+    var box = _closest(e, '.fb-toggle');
+    if (!box) return;
+    var vote = btn.getAttribute('data-fb-vote');
+    var filterKey = box.getAttribute('data-fb-filter');
+    var sectionKey = box.getAttribute('data-fb-section');
+    var label = box.getAttribute('data-fb-label') || '';
+    // Texto del apartado: el .intent-section-text (o la lista de tips) hermano.
+    var sectionEl = box.parentElement;
+    var sectionText = '';
+    if (sectionEl) {
+        var txtEl = sectionEl.querySelector('.intent-section-text');
+        if (txtEl) sectionText = txtEl.textContent || '';
+        else {
+            var listEl = sectionEl.querySelector('.intent-tips-list');
+            if (listEl) sectionText = listEl.textContent || '';
+        }
+    }
+    // Marca visual: resaltar el elegido, apagar el otro.
+    box.querySelectorAll('.fb-btn').forEach(function (b) { b.classList.remove('fb-active'); });
+    btn.classList.add('fb-active');
+    // Enviar al backend (best-effort: si falla, la marca visual queda igual).
+    fetch('/api/filter-feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            filter_key: filterKey, section_key: sectionKey, vote: vote,
+            label: label, section_text: sectionText,
+            text_excerpt: (window._lastInputText || '').slice(0, 400)
+        })
+    }).catch(function () {});
+});
+
 // Boton Copiar de un mensaje.
 document.addEventListener('click', function (e) {
     var btn = _closest(e, '[data-notif-copy]');
@@ -9967,7 +10074,7 @@ def analyze():
     # Opcion A (siempre): la respuesta MOSTRADA usa la version afinada.
     # Opcion B (opt-in AI_REFINE_PERSIST): lo GUARDADO tambien, SOLO en textos
     # nuevos. Nunca reinterpreta entradas historicas ni toca resolve_entry_date.
-    refined_dict = _ai_refine_analysis(clean_text, analysis_dict)
+    refined_dict = _ai_refine_analysis(clean_text, analysis_dict, _current_tenant())
     # Lo que se persiste: por defecto el original (Opcion A pura, cero impacto en
     # informes). Con AI_REFINE_PERSIST activo, se persiste el afinado (Opcion B).
     # La traza _ai_refine NUNCA se guarda: es solo diagnostico de la respuesta.
@@ -10262,7 +10369,7 @@ def upload_audio():
 
     # IA: afinar calidad de filtros existentes (misma logica que /analyze de texto).
     # Opcion A siempre en la respuesta; Opcion B (opt-in) tambien en lo guardado.
-    refined_dict = _ai_refine_analysis(transcribed_text, analysis_dict)
+    refined_dict = _ai_refine_analysis(transcribed_text, analysis_dict, _current_tenant())
     if _ai_refine_persist_enabled():
         persist_dict = {k: v for k, v in refined_dict.items() if k != "_ai_refine"}
     else:
@@ -10621,16 +10728,47 @@ _AI_REFINE_INTENTS = ["OFFER", "INQUIRY", "NEGOTIATION", "CLOSING", "DESCRIPTION
 _AI_REFINE_SENTIMENTS = ["POSITIVE", "NEUTRAL", "NEGATIVE"]
 
 
-def _ai_refine_analysis(text, analysis_dict):
+def _ai_refine_avoid_examples(tenant_id):
+    """
+    Few-shot: arma un bloque de texto con los apartados que los vendedores
+    marcaron como NO acertados (votos 'down'), para que la IA los evite. Best-
+    effort: si no hay votos o falla, devuelve "". No rompe el analisis.
+    """
+    try:
+        from src.users import filter_feedback
+        ejemplos = []
+        for fk in ("intent", "sentiment"):
+            for sk in ("meaning", "seller", "tips", "next", "risk"):
+                for neg in filter_feedback.recent_negative(fk, sk, tenant_id, limit=2):
+                    txt = (neg.get("section_text") or "").strip()
+                    if txt:
+                        ejemplos.append(f"- ({fk}/{sk}) {txt[:200]}")
+        if not ejemplos:
+            return ""
+        bloque = "\n".join(ejemplos[:6])
+        return (
+            "ATENCION: vendedores marcaron como POCO ACERTADAS estas explicaciones "
+            "previas. Evita redactar algo similar; mejora el enfoque:\n"
+            + bloque + "\n"
+        )
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _ai_refine_analysis(text, analysis_dict, tenant_id="__legacy__"):
     """
     Afina la CALIDAD de los filtros YA EXISTENTES (intencion + sentimiento) con
-    IA, SIN agregar campos nuevos ni tocar diccionarios. La IA solo puede:
-      - Confirmar o corregir la intencion eligiendo entre _AI_REFINE_INTENTS.
-      - Confirmar o corregir el sentimiento eligiendo entre _AI_REFINE_SENTIMENTS.
-      - Ajustar las confianzas [0..1] de esos dos filtros.
-    Devuelve un dict NUEVO con los mismos campos (copia afinada); NUNCA muta el
-    dict recibido. Si la IA falla o no esta configurada, devuelve el original
-    intacto (fallback silencioso). Cero impacto si no hay clave de IA.
+    IA en UNA sola llamada (single-pass), SIN agregar campos nuevos ni tocar
+    diccionarios. La IA:
+      - Confirma o corrige intencion (entre _AI_REFINE_INTENTS) y sentimiento
+        (entre _AI_REFINE_SENTIMENTS), ajustando sus confianzas [0..1].
+      - Redacta apartados explicativos largos (3-5 renglones) especificos al
+        texto, en refined["_ai_refine"]["intent_sections"] y ["sentiment_sections"].
+    Devuelve un dict NUEVO (copia afinada); NUNCA muta el recibido. Si la IA
+    falla o no hay clave, devuelve el original intacto (fallback silencioso).
+    Los apartados van SOLO en la traza _ai_refine (que no se persiste): las
+    etiquetas si pueden persistirse con Opcion B, pero los textos son de la
+    respuesta mostrada.
     """
     import copy as _copy
     refined = _copy.deepcopy(analysis_dict)
@@ -10644,20 +10782,39 @@ def _ai_refine_analysis(text, analysis_dict):
         return refined
     cur_intent = str(analysis_dict.get("intent") or "UNKNOWN")
     cur_sent = str(analysis_dict.get("sentiment") or "NEUTRAL")
+    # Few-shot: si hay votos negativos recientes de vendedores, se los damos a la
+    # IA como ejemplos "a evitar". Best-effort: si falla, seguimos sin ellos.
+    avoid_block = _ai_refine_avoid_examples(tenant_id)
     system = (
-        "Sos un clasificador experto de conversaciones de ventas inmobiliarias "
-        "en espanol de Argentina. Tu unica tarea es VALIDAR y AFINAR dos "
-        "etiquetas ya calculadas por otro modelo: intencion y sentimiento. "
-        "NO inventes categorias: la intencion DEBE ser una de "
-        f"{_AI_REFINE_INTENTS} y el sentimiento una de {_AI_REFINE_SENTIMENTS}. "
-        "Responde SOLO un objeto JSON valido, sin texto adicional, con las "
-        "claves: intent, intent_confidence, sentiment, sentiment_confidence. "
-        "Las confidencias son numeros entre 0 y 1."
+        "Sos un analista experto de conversaciones de ventas inmobiliarias en "
+        "espanol de Argentina (tono rioplatense, trato de 'vos'). Recibis un "
+        "texto y dos etiquetas ya calculadas por otro modelo (intencion y "
+        "sentimiento). Tu tarea tiene DOS partes:\n"
+        "1) VALIDAR/CORREGIR las etiquetas. NO inventes categorias: la intencion "
+        f"DEBE ser una de {_AI_REFINE_INTENTS} y el sentimiento una de "
+        f"{_AI_REFINE_SENTIMENTS}.\n"
+        "2) REDACTAR, para CADA filtro (intencion y sentimiento), cuatro "
+        "apartados explicativos ESPECIFICOS a este texto (no genericos). Cada "
+        "apartado debe tener entre 3 y 5 renglones (minimo 3). Los apartados son:\n"
+        "   - meaning: 'Que significa para la venta'.\n"
+        "   - seller: 'Para el vendedor' (consejo accionable).\n"
+        "   - tips: lista de 3 a 4 tips practicos y concretos.\n"
+        "   - next: 'Siguiente paso' concreto (para intencion) / 'Nivel de riesgo' "
+        "explicado (para sentimiento).\n"
+        + avoid_block +
+        "Responde SOLO un objeto JSON valido, sin markdown ni texto extra, con "
+        "esta forma exacta:\n"
+        "{\"intent\":\"...\",\"intent_confidence\":0.0,"
+        "\"sentiment\":\"...\",\"sentiment_confidence\":0.0,"
+        "\"intent_sections\":{\"meaning\":\"...\",\"seller\":\"...\","
+        "\"tips\":[\"...\",\"...\"],\"next\":\"...\"},"
+        "\"sentiment_sections\":{\"meaning\":\"...\",\"seller\":\"...\","
+        "\"tips\":[\"...\",\"...\"],\"next\":\"...\"}}"
     )
     user = (
         f"Texto:\n{clean[:4000]}\n\n"
         f"Etiquetas actuales -> intent={cur_intent}, sentiment={cur_sent}.\n"
-        "Confirma o corrige y devuelve el JSON."
+        "Confirma o corrige las etiquetas y redacta los apartados. Devolve el JSON."
     )
     try:
         # max_tokens 800: Gemini 3.5 gasta tokens en razonamiento interno antes
@@ -10666,7 +10823,7 @@ def _ai_refine_analysis(text, analysis_dict):
         raw = _ai_chat(
             [{"role": "system", "content": system},
              {"role": "user", "content": user}],
-            max_tokens=800, temperature=0.0, retries=2, timeout=30,
+            max_tokens=1400, temperature=0.3, retries=2, timeout=45,
         )
     except Exception as exc:  # noqa: BLE001
         app.logger.warning(f"_ai_refine_analysis: IA no disponible: {exc}")
@@ -10694,6 +10851,9 @@ def _ai_refine_analysis(text, analysis_dict):
         conf = _coerce_confidence(parsed.get("sentiment_confidence"))
         if conf is not None:
             refined["sentiment_confidence"] = conf
+    # Apartados largos generados por la IA. Van SOLO en la traza (no se guardan).
+    meta["intent_sections"] = _sanitize_sections(parsed.get("intent_sections"))
+    meta["sentiment_sections"] = _sanitize_sections(parsed.get("sentiment_sections"))
     if not meta["reason"]:
         meta["reason"] = "ok"
     # Re-alinear el riesgo comercial con el sentimiento afinado (misma regla
@@ -10742,6 +10902,27 @@ def _coerce_confidence(value):
     return round(f, 4)
 
 
+def _sanitize_sections(sections):
+    """
+    Normaliza los apartados generados por la IA a una forma segura para el
+    frontend: {meaning: str, seller: str, tips: [str], next: str}. Devuelve {}
+    si no es un dict valido. Recorta largos para evitar respuestas gigantes.
+    """
+    if not isinstance(sections, dict):
+        return {}
+    out = {}
+    for key in ("meaning", "seller", "next"):
+        val = sections.get(key)
+        if isinstance(val, str) and val.strip():
+            out[key] = val.strip()[:900]
+    tips = sections.get("tips")
+    if isinstance(tips, list):
+        clean_tips = [str(t).strip()[:300] for t in tips if str(t).strip()]
+        if clean_tips:
+            out["tips"] = clean_tips[:5]
+    return out
+
+
 def _ai_refine_persist_enabled():
     """
     Opcion B: refinar TAMBIEN lo que se guarda, SOLO en textos NUEVOS. Apagado
@@ -10749,6 +10930,46 @@ def _ai_refine_persist_enabled():
     poder medir /admin/full-diag antes y despues (regla de guardado y backups).
     """
     return (os.environ.get("AI_REFINE_PERSIST") or "").strip() in ("1", "true", "True", "yes")
+
+
+@app.route("/api/filter-feedback", methods=["POST"])
+def api_filter_feedback():
+    """
+    Registra el voto ✓/✗ de un vendedor sobre un apartado de un filtro. Guarda
+    en la tabla separada filter_feedback (nunca toca analysis_history). Best-
+    effort: si PG no esta o falla, devuelve ok:false sin romper nada.
+    """
+    if not session.get("username"):
+        return jsonify({"ok": False}), 401
+    data = request.get_json(silent=True) or {}
+    try:
+        from src.users import filter_feedback
+        ok = filter_feedback.record_vote(
+            username=session["username"],
+            filter_key=str(data.get("filter_key", "")),
+            section_key=str(data.get("section_key", "")),
+            vote=str(data.get("vote", "")),
+            label=str(data.get("label", "")),
+            text_excerpt=str(data.get("text_excerpt", "")),
+            section_text=str(data.get("section_text", "")),
+            tenant_id=_current_tenant(),
+        )
+        return jsonify({"ok": bool(ok)})
+    except Exception as exc:  # noqa: BLE001
+        app.logger.warning(f"api_filter_feedback error: {exc}")
+        return jsonify({"ok": False})
+
+
+@app.route("/admin/filter-feedback-stats")
+def admin_filter_feedback_stats():
+    """Resumen de votos por filtro/apartado (admin). Solo lectura."""
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    try:
+        from src.users import filter_feedback
+        return jsonify({"ok": True, "stats": filter_feedback.stats(_current_tenant())})
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"ok": False, "error": str(exc)})
 
 
 def _log_activity(event_type, tool="", entry_id="", detail="", username=None):
