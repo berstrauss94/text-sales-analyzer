@@ -129,7 +129,11 @@ def test_upload_audio_add_entry_has_required_args():
     assert "text=transcribed_text" in func_body, (
         "add_entry() in upload_audio is missing text= — audio analysis won't be saved"
     )
-    assert "analysis=analysis_dict" in func_body, (
+    # analysis= debe recibir el dict de analisis (analysis_dict) o su version
+    # afinada por IA (persist_dict, que SIEMPRE deriva de analysis_dict). Lo que
+    # importa es que NO se guarde vacio.
+    assert ("analysis=analysis_dict" in func_body
+            or "analysis=persist_dict" in func_body), (
         "add_entry() in upload_audio is missing analysis= — audio analysis won't be saved"
     )
 

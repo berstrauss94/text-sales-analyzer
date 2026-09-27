@@ -2819,13 +2819,13 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v25.0{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v26.0{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v25.0)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v26.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    Nueva seccion <strong style="color:#f5a35b;">CRM y Lead del cliente</strong>, abajo de Analizar/Limpiar (se abre con el triangulo naranja).
-                    <div style="margin-top:8px;">Tiene una casilla de <strong style="color:#f5a35b;">CRM</strong> para volcar info del cliente, y una ficha de <strong style="color:#f5a35b;">Lead</strong> (nombre, contacto, operacion, presupuesto, zona, estado, notas). Todo se <strong style="color:#5bf5a3;">guarda</strong> y queda disponible cada vez que entras.</div>
-                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Es independiente del texto de analisis y esta separado por empresa.</div>
+                    Los mismos filtros de siempre, ahora con <strong style="color:#f5a35b;">inteligencia artificial</strong>.
+                    <div style="margin-top:8px;">Cuando analizas un texto, la IA <strong style="color:#5bf5a3;">valida y afina</strong> la <strong style="color:#f5a35b;">intencion</strong> y el <strong style="color:#f5a35b;">sentimiento</strong> detectados, para que el resultado que ves sea mas preciso. No se agrego ningun filtro nuevo: se mejoro la calidad de los que ya conoces.</div>
+                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Si la IA no esta disponible en ese momento, ves el analisis normal, sin cambios.</div>
                 </div>
             </div>
         </div>
@@ -9963,6 +9963,15 @@ def analyze():
     analysis_dict["commercial"]["nivel_riesgo"] = _adjust_risk_with_sentiment(
         analysis_dict["commercial"].get("nivel_riesgo", "LOW"), result.sentiment)
 
+    # --- IA: afinar la CALIDAD de los filtros existentes (intencion/sentimiento).
+    # Opcion A (siempre): la respuesta MOSTRADA usa la version afinada.
+    # Opcion B (opt-in AI_REFINE_PERSIST): lo GUARDADO tambien, SOLO en textos
+    # nuevos. Nunca reinterpreta entradas historicas ni toca resolve_entry_date.
+    refined_dict = _ai_refine_analysis(clean_text, analysis_dict)
+    # Lo que se persiste: por defecto el original (Opcion A pura, cero impacto en
+    # informes). Con AI_REFINE_PERSIST activo, se persiste el afinado (Opcion B).
+    persist_dict = refined_dict if _ai_refine_persist_enabled() else analysis_dict
+
     # Save to history
     year = data.get("year")
     month = data.get("month")
@@ -9994,7 +10003,7 @@ def analyze():
         add_entry(
             username=target_user,
             text=clean_text,
-            analysis=analysis_dict,
+            analysis=persist_dict,
             source="text",
             audio_filename=entry_name,
             year=year,
@@ -10017,7 +10026,7 @@ def analyze():
         "analyzed_at": result.analyzed_at,
         "year": year,
         "month": month,
-        **analysis_dict,
+        **refined_dict,
     })
 
 
@@ -10247,11 +10256,16 @@ def upload_audio():
     analysis_dict["commercial"]["nivel_riesgo"] = _adjust_risk_with_sentiment(
         analysis_dict["commercial"].get("nivel_riesgo", "LOW"), result.sentiment)
 
+    # IA: afinar calidad de filtros existentes (misma logica que /analyze de texto).
+    # Opcion A siempre en la respuesta; Opcion B (opt-in) tambien en lo guardado.
+    refined_dict = _ai_refine_analysis(transcribed_text, analysis_dict)
+    persist_dict = refined_dict if _ai_refine_persist_enabled() else analysis_dict
+
     # Save to history
     add_entry(
         username=session["username"],
         text=transcribed_text,
-        analysis=analysis_dict,
+        analysis=persist_dict,
         source="audio",
         audio_filename=original_name,
     )
@@ -10264,7 +10278,7 @@ def upload_audio():
         "language": detected_language,
         "audio_filename": original_name,
         "analyzed_at": result.analyzed_at,
-        **analysis_dict,
+        **refined_dict,
     })
 
 
@@ -10592,6 +10606,124 @@ def _ai_chat(messages, max_tokens=800, temperature=0.7, retries=2, timeout=30):
             last_exc = exc
             app.logger.warning(f"IA intento {intento + 1}/{retries} fallo: {exc}")
     raise last_exc if last_exc else RuntimeError("IA sin respuesta")
+
+
+# Etiquetas VALIDAS del sistema. La IA solo puede elegir entre estas: NO inventa
+# categorias nuevas ni agrega nada a ningun diccionario. Solo afina/valida.
+_AI_REFINE_INTENTS = ["OFFER", "INQUIRY", "NEGOTIATION", "CLOSING", "DESCRIPTION", "UNKNOWN"]
+_AI_REFINE_SENTIMENTS = ["POSITIVE", "NEUTRAL", "NEGATIVE"]
+
+
+def _ai_refine_analysis(text, analysis_dict):
+    """
+    Afina la CALIDAD de los filtros YA EXISTENTES (intencion + sentimiento) con
+    IA, SIN agregar campos nuevos ni tocar diccionarios. La IA solo puede:
+      - Confirmar o corregir la intencion eligiendo entre _AI_REFINE_INTENTS.
+      - Confirmar o corregir el sentimiento eligiendo entre _AI_REFINE_SENTIMENTS.
+      - Ajustar las confianzas [0..1] de esos dos filtros.
+    Devuelve un dict NUEVO con los mismos campos (copia afinada); NUNCA muta el
+    dict recibido. Si la IA falla o no esta configurada, devuelve el original
+    intacto (fallback silencioso). Cero impacto si no hay clave de IA.
+    """
+    import copy as _copy
+    refined = _copy.deepcopy(analysis_dict)
+    clean = (text or "").strip()
+    if len(clean) < 3:
+        return refined
+    cur_intent = str(analysis_dict.get("intent") or "UNKNOWN")
+    cur_sent = str(analysis_dict.get("sentiment") or "NEUTRAL")
+    system = (
+        "Sos un clasificador experto de conversaciones de ventas inmobiliarias "
+        "en espanol de Argentina. Tu unica tarea es VALIDAR y AFINAR dos "
+        "etiquetas ya calculadas por otro modelo: intencion y sentimiento. "
+        "NO inventes categorias: la intencion DEBE ser una de "
+        f"{_AI_REFINE_INTENTS} y el sentimiento una de {_AI_REFINE_SENTIMENTS}. "
+        "Responde SOLO un objeto JSON valido, sin texto adicional, con las "
+        "claves: intent, intent_confidence, sentiment, sentiment_confidence. "
+        "Las confidencias son numeros entre 0 y 1."
+    )
+    user = (
+        f"Texto:\n{clean[:4000]}\n\n"
+        f"Etiquetas actuales -> intent={cur_intent}, sentiment={cur_sent}.\n"
+        "Confirma o corrige y devuelve el JSON."
+    )
+    try:
+        raw = _ai_chat(
+            [{"role": "system", "content": system},
+             {"role": "user", "content": user}],
+            max_tokens=300, temperature=0.0, retries=2, timeout=30,
+        )
+    except Exception as exc:  # noqa: BLE001
+        app.logger.warning(f"_ai_refine_analysis: IA no disponible: {exc}")
+        return refined
+    parsed = _extract_json_object(raw)
+    if not parsed:
+        return refined
+    new_intent = str(parsed.get("intent") or "").upper().strip()
+    if new_intent in _AI_REFINE_INTENTS:
+        refined["intent"] = new_intent
+        conf = _coerce_confidence(parsed.get("intent_confidence"))
+        if conf is not None:
+            refined["intent_confidence"] = conf
+    new_sent = str(parsed.get("sentiment") or "").upper().strip()
+    if new_sent in _AI_REFINE_SENTIMENTS:
+        refined["sentiment"] = new_sent
+        conf = _coerce_confidence(parsed.get("sentiment_confidence"))
+        if conf is not None:
+            refined["sentiment_confidence"] = conf
+    # Re-alinear el riesgo comercial con el sentimiento afinado (misma regla
+    # que ya usa el pipeline). NO cambia densidad ni keywords del diccionario.
+    if isinstance(refined.get("commercial"), dict):
+        base = refined["commercial"].get("nivel_riesgo", "LOW")
+        refined["commercial"]["nivel_riesgo"] = _adjust_risk_with_sentiment(
+            base, refined.get("sentiment", "NEUTRAL"))
+    return refined
+
+
+def _extract_json_object(raw):
+    """Extrae el primer objeto JSON de una respuesta de IA. None si no hay."""
+    if not raw:
+        return None
+    import json as _json
+    txt = raw.strip()
+    # Quitar cercos de codigo ```json ... ```
+    if txt.startswith("```"):
+        txt = txt.strip("`")
+        nl = txt.find("\n")
+        if nl != -1:
+            txt = txt[nl + 1:]
+    start = txt.find("{")
+    end = txt.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return None
+    try:
+        obj = _json.loads(txt[start:end + 1])
+        return obj if isinstance(obj, dict) else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _coerce_confidence(value):
+    """Convierte a float en [0,1]; None si no es un numero valido."""
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    if f < 0:
+        f = 0.0
+    if f > 1:
+        # Aceptar 0-100 y normalizar.
+        f = f / 100.0 if f <= 100 else 1.0
+    return round(f, 4)
+
+
+def _ai_refine_persist_enabled():
+    """
+    Opcion B: refinar TAMBIEN lo que se guarda, SOLO en textos NUEVOS. Apagado
+    por defecto; se activa con env AI_REFINE_PERSIST=1. Se documenta aparte para
+    poder medir /admin/full-diag antes y despues (regla de guardado y backups).
+    """
+    return (os.environ.get("AI_REFINE_PERSIST") or "").strip() in ("1", "true", "True", "yes")
 
 
 def _log_activity(event_type, tool="", entry_id="", detail="", username=None):
