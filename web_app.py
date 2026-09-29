@@ -2876,13 +2876,12 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.0{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.1{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v31.0)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v31.1)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    El sistema da un paso hacia plataforma:
-                    <div style="margin-top:6px;">&#128241; <strong style="color:#5bf5a3;">App instalable</strong>: podes agregar el sistema a la pantalla de tu celular como una app (desde el menu del navegador, "Agregar a inicio").</div>
-                    <div style="margin-top:4px;">&#128279; <strong style="color:#8fa8ff;">API de integracion</strong>: otros sistemas (CRM, bots) pueden enviar textos a analizar mediante una clave de API, con el analisis aislado por empresa.</div>
+                    Todas las herramientas nuevas ahora tienen su <strong style="color:#5bf5a3;">icono de ayuda (!)</strong>: CRM/Lead, buscador, leads sin seguimiento, feedback de filtros y exportar informe. Pasa el cursor por el (!) para ver que hace cada una.
+                    <div style="margin-top:8px;">Ademas, el <strong style="color:#f5a35b;">tutorial guiado</strong> ahora las incluye en el recorrido.</div>
                 </div>
             </div>
         </div>
@@ -3064,12 +3063,14 @@ HTML = """
 
         <!-- ── Paneles CRM / Lead (persistentes por vendedor) ── -->
         <!-- Boton triangular NARANJA, doble tamano, para abrir/cerrar la seccion -->
-        <div style="margin-top:12px;">
+        <div style="margin-top:12px;display:flex;align-items:center;gap:8px;position:relative;">
             <button type="button" id="crmLeadToggle" data-crmlead-toggle="1"
                 style="display:flex;align-items:center;gap:8px;background:#2a1c0d;color:#f5a35b;border:1px solid #6a4a2a;border-radius:8px;padding:8px 14px;font-size:0.9rem;font-weight:700;cursor:pointer;">
                 <span id="crmLeadArrow" style="font-size:1.4rem;line-height:1;transition:transform 0.2s;">&#9658;</span>
                 CRM y Lead del cliente
             </button>
+            <span class="card-info-icon" id="infoIconCrmLead" onclick="event.stopPropagation()" style="position:static;font-size:0.62rem;width:16px;height:16px;line-height:16px;text-align:center;">!</span>
+            <div class="card-info-tooltip" style="top:38px;left:0;right:auto;min-width:250px;max-width:330px;font-size:0.72rem;">Dos casillas persistentes del cliente que quedan guardadas y disponibles al volver a entrar: CRM (texto libre de seguimiento) y Lead (ficha con nombre, contacto, operacion, presupuesto, zona, estado, notas y etiquetas).</div>
         </div>
 
         <div id="crmLeadPanel" style="display:none;margin-top:10px;border:1px solid #6a4a2a;border-radius:10px;padding:14px;background:#140f08;">
@@ -3126,7 +3127,10 @@ HTML = """
     <!-- ── BUSCADOR GLOBAL (ADMIN) ── -->
     <div class="input-section" id="buscadorPanel" style="margin-top:20px;">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <div style="font-size:0.85rem;font-weight:600;color:#5bd4f5;white-space:nowrap;">&#128269; Buscador</div>
+            <div style="font-size:0.85rem;font-weight:600;color:#5bd4f5;white-space:nowrap;position:relative;">&#128269; Buscador
+                <span class="card-info-icon" onclick="event.stopPropagation()" style="position:static;font-size:0.62rem;width:16px;height:16px;line-height:16px;text-align:center;">!</span>
+                <div class="card-info-tooltip" style="top:22px;left:0;right:auto;min-width:240px;max-width:300px;font-size:0.72rem;">Busca una palabra o frase en los textos analizados (contenido y titulo) y en las fichas de lead (nombre, contacto, zona, notas, etiquetas). Escribi y toca Buscar o Enter.</div>
+            </div>
             <input type="text" id="buscadorInput" placeholder="Buscar en textos y leads (nombre, zona, contenido...)" style="flex:1;min-width:200px;background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:8px 12px;font-size:0.8rem;box-sizing:border-box;">
             <button type="button" id="buscadorBtn" onclick="doBuscarGlobal()" style="background:#101c2a;color:#5bd4f5;border:1px solid #2a3a4a;border-radius:6px;padding:8px 14px;font-size:0.78rem;cursor:pointer;">Buscar</button>
         </div>
@@ -3136,7 +3140,10 @@ HTML = """
     <!-- ── ADMIN STATS PANEL ── -->
     <div class="input-section" id="adminStatsPanel" style="margin-top:20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-            <div id="adminStatsTitulo" style="font-size:0.85rem;font-weight:600;color:#b38bff;">📊 Panel de Seguimiento (Admin) &nbsp;<a href="/admin/feedback" target="_blank" style="font-size:0.7rem;font-weight:600;color:#4da3ff;text-decoration:none;border:1px solid #2a3d6a;border-radius:6px;padding:2px 8px;">&#9733; Feedback de filtros</a></div>
+            <div id="adminStatsTitulo" style="font-size:0.85rem;font-weight:600;color:#b38bff;position:relative;">📊 Panel de Seguimiento (Admin) &nbsp;<a href="/admin/feedback" target="_blank" style="font-size:0.7rem;font-weight:600;color:#4da3ff;text-decoration:none;border:1px solid #2a3d6a;border-radius:6px;padding:2px 8px;">&#9733; Feedback de filtros</a>
+                <span class="card-info-icon" onclick="event.stopPropagation()" style="position:static;font-size:0.62rem;width:16px;height:16px;line-height:16px;text-align:center;">!</span>
+                <div class="card-info-tooltip" style="top:22px;left:0;right:auto;min-width:250px;max-width:320px;font-size:0.72rem;">Tendencias por vendedor, cumplimiento de metas y uso del sistema. El enlace "Feedback de filtros" abre un panel que muestra como califican los vendedores las explicaciones de la IA (tasa de acierto por filtro).</div>
+            </div>
             <div id="statsFilters" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                 <select id="statsVendor" onchange="loadAdminStats()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.8rem;">
                     <option value="_all">General (todos)</option>
@@ -3177,7 +3184,10 @@ HTML = """
     <!-- ── ALERTAS DE LEADS SIN SEGUIMIENTO ── -->
     <div class="input-section" id="leadAlertasPanel" style="margin-top:20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-            <div style="font-size:0.85rem;font-weight:600;color:#f5a35b;">&#128276; Leads sin seguimiento</div>
+            <div style="font-size:0.85rem;font-weight:600;color:#f5a35b;position:relative;">&#128276; Leads sin seguimiento
+                <span class="card-info-icon" onclick="event.stopPropagation()" style="position:static;font-size:0.62rem;width:16px;height:16px;line-height:16px;text-align:center;">!</span>
+                <div class="card-info-tooltip" style="top:22px;left:0;right:auto;min-width:250px;max-width:320px;font-size:0.72rem;">Avisa que leads activos (nuevo o en seguimiento) llevan varios dias sin actualizarse, para que no se enfrien. Ordenados por urgencia. Ajusta el umbral de dias con el selector. Cada lead tiene un boton de Resumen IA.</div>
+            </div>
             <div style="display:flex;gap:8px;align-items:center;">
                 <label for="leadAlertaDias" style="font-size:0.72rem;color:#9aa0b0;">Alertar tras</label>
                 <select id="leadAlertaDias" onchange="loadLeadAlertas()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.8rem;">
@@ -3235,6 +3245,10 @@ HTML = """
                 </select>
                 <button id="btnPrintInforme" onclick="printInforme()" style="background:#1a2a3a;color:#5bd4f5;border:1px solid #2a3a4a;border-radius:6px;padding:6px 12px;font-size:0.75rem;cursor:pointer;" title="Imprimir informe">&#128424; Imprimir</button>
                 <button id="btnExportInforme" onclick="exportInformeCsv()" style="background:#1a3a24;color:#5bf5a3;border:1px solid #2a4a34;border-radius:6px;padding:6px 12px;font-size:0.75rem;cursor:pointer;" title="Exportar a Excel/CSV">&#128190; Exportar</button>
+                <span style="position:relative;display:inline-flex;align-items:center;">
+                    <span class="card-info-icon" onclick="event.stopPropagation()" style="position:static;font-size:0.62rem;width:16px;height:16px;line-height:16px;text-align:center;">!</span>
+                    <div class="card-info-tooltip" style="top:24px;right:0;left:auto;min-width:240px;max-width:300px;font-size:0.72rem;">Descarga el informe a Excel/CSV con los mismos filtros que estas viendo (año, mes, semana, vendedor): la tabla de cargas por vendedor y mes con sus totales.</div>
+                </span>
             </div>
         </div>
         <div id="informeContent" style="font-size:0.78rem;color:#aaa;">Cargando informe...</div>
@@ -5990,7 +6004,10 @@ var TOUR_STEPS = [
     { sel: '.btn-primary', title: 'Analizar', text: 'Con un clic, el sistema analiza el texto: intención, sentimiento, conceptos y el nivel de riesgo de perder la venta.' },
     { sel: '#btnClear', title: 'Limpiar', text: 'Borra el texto y los resultados para empezar de cero con una nueva conversación.' },
     { sel: '.btn-save', title: 'Guardar', text: 'Guarda el texto analizado para poder consultarlo y compararlo más adelante.' },
-    { sel: '#adminStatsTitulo', title: 'Panel de seguimiento', text: 'El panel de administración: tendencias por vendedor, cumplimiento de metas y el seguimiento de uso del sistema.' },
+    { sel: '#crmLeadToggle', title: 'CRM y Lead del cliente', text: 'Dos casillas que quedan guardadas: CRM (seguimiento libre del cliente) y la ficha de Lead (nombre, contacto, operación, presupuesto, zona, estado, notas y etiquetas). Se abre con el triángulo naranja.' },
+    { sel: '#buscadorPanel', title: 'Buscador', text: 'Buscá una palabra en los textos analizados y en las fichas de lead (nombre, zona, notas, etiquetas) para encontrar rápido lo que necesitás.' },
+    { sel: '#leadAlertasPanel', title: 'Leads sin seguimiento', text: 'Avisa qué leads activos llevan varios días sin tocarse, para que no se enfríen. Podés pedir un Resumen IA del estado de cada cliente.' },
+    { sel: '#adminStatsTitulo', title: 'Panel de seguimiento', text: 'El panel de administración: tendencias por vendedor, cumplimiento de metas y el seguimiento de uso del sistema. El enlace “Feedback de filtros” muestra cómo califican los vendedores las explicaciones de la IA.' },
     { sel: '#statsFilters', title: 'Filtros del panel', text: 'Filtrá el panel por vendedor, mes y período (mensual, trimestral, anual...) para ver justo lo que necesitás.' },
     { sel: '#statsPieChart', title: 'Distribución de indicadores', text: 'La torta muestra el peso de cada indicador comercial (positivas, cierre, objeciones, etc.) en el período elegido.' },
     { sel: '#informeTitulo', title: 'Informe de seguimiento', text: 'El informe completo del equipo. Podés filtrarlo por período, año, mes, semana y vendedor, e imprimirlo.' },
@@ -6000,6 +6017,7 @@ var TOUR_STEPS = [
     { sel: '#informeWeek', title: 'Filtro de semana', text: 'Acota el informe a una semana específica del mes seleccionado.' },
     { sel: '#informeSeller', title: 'Filtro por vendedor', text: 'Muestra el informe de todo el equipo o de un vendedor puntual.' },
     { sel: '#btnPrintInforme', title: 'Imprimir informe', text: 'Genera el informe formal en hoja blanca, listo para presentar o entregar en físico.' },
+    { sel: '#btnExportInforme', title: 'Exportar a Excel', text: 'Descarga el informe a Excel/CSV con los mismos filtros que estás viendo, para trabajarlo en planillas.' },
     { sel: '.seller-table-frame', title: 'Tabla por vendedor', text: 'Los textos cargados por cada vendedor, mes a mes, con su total. Los colores indican el nivel de cumplimiento de la meta.' },
     { sel: '#trendChartBlock', title: 'Gráfico de tendencia', text: 'La evolución de las cargas en el tiempo. Alterna entre una línea por vendedor (multi-línea) o el total del equipo (línea única).' },
     { sel: '#piesRow', title: 'Distribución', text: 'Dos gráficos de torta: el reparto de la actividad por mes y por vendedor.' },
