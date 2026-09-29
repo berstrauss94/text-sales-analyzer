@@ -25,6 +25,7 @@ from src.components.audio_transcriber import AudioTranscriber
 from src.models.data_models import AnalysisReport, AnalysisError
 from src.users.user_manager import UserManager
 from src.users.history_manager import add_entry, get_history, get_flat_entries
+from src.utils import rate_limiter
 
 app = Flask(__name__)
 
@@ -2867,15 +2868,14 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v29.0{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v30.0{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v29.0)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v30.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    Cuatro herramientas nuevas para admins:
-                    <div style="margin-top:6px;">&#128276; <strong style="color:#f5a35b;">Leads sin seguimiento</strong>: avisa que leads activos llevan dias sin tocarse.</div>
-                    <div style="margin-top:4px;">&#129504; <strong style="color:#8fa8ff;">Resumen IA del lead</strong>: la IA resume el estado del cliente y el proximo paso.</div>
-                    <div style="margin-top:4px;">&#128200; <strong style="color:#5bf5a3;">Comparativa</strong> mes vs mes anterior en el informe.</div>
-                    <div style="margin-top:4px;">&#128269; <strong style="color:#5bd4f5;">Buscador global</strong> de textos y leads.</div>
+                    Mejoras de robustez y organizacion:
+                    <div style="margin-top:6px;">&#128274; <strong style="color:#5bf5a3;">Mas seguridad</strong>: proteccion contra abuso en el acceso y en las funciones con IA.</div>
+                    <div style="margin-top:4px;">&#127991; <strong style="color:#f5c06a;">Etiquetas en los leads</strong>: clasifica cada cliente (urgente, referido, credito...) y encontralos por etiqueta.</div>
+                    <div style="margin-top:4px;">&#127970; <strong style="color:#8fa8ff;">Modo rubro</strong>: el sistema puede adaptar la IA a distintos tipos de negocio, no solo inmobiliaria.</div>
                 </div>
             </div>
         </div>
@@ -3095,6 +3095,8 @@ HTML = """
                     </select>
                 </div>
                 <textarea id="leadNotas" rows="2" placeholder="Notas del lead..." style="width:100%;margin-top:8px;background:#0d0f18;color:#e0e0e0;border:1px solid #3a2d1e;border-radius:6px;padding:8px;font-size:0.8rem;font-family:inherit;box-sizing:border-box;resize:vertical;"></textarea>
+                <input type="text" id="leadTags" placeholder="Etiquetas (separadas por coma): urgente, referido, credito..." style="width:100%;margin-top:8px;background:#0d0f18;color:#e0e0e0;border:1px solid #3a2d1e;border-radius:6px;padding:8px;font-size:0.8rem;box-sizing:border-box;" title="Etiquetas libres para segmentar y buscar el lead">
+                <div id="leadTagsChips" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;"></div>
             </div>
 
             <div style="display:flex;align-items:center;gap:10px;margin-top:12px;">
@@ -8883,6 +8885,24 @@ document.addEventListener('click', function (e) {
     saveCrmLead();
 });
 
+// Muestra las etiquetas del lead como "chips" visuales debajo del input.
+function renderLeadTagChips(raw) {
+    var cont = document.getElementById('leadTagsChips');
+    if (!cont) return;
+    var tags = String(raw || '').split(',').map(function (t) { return t.trim(); })
+        .filter(function (t) { return t; });
+    if (tags.length === 0) { cont.innerHTML = ''; return; }
+    cont.innerHTML = tags.map(function (t) {
+        return '<span style="background:#2a2416;color:#f5c06a;border:1px solid #4a3d1e;'
+            + 'border-radius:10px;padding:2px 9px;font-size:0.68rem;">' + _esc(t) + '</span>';
+    }).join('');
+}
+
+// Actualizar los chips en vivo mientras se escribe en el input de tags.
+document.addEventListener('input', function (e) {
+    if (e.target && e.target.id === 'leadTags') renderLeadTagChips(e.target.value);
+});
+
 async function loadCrmLead() {
     try {
         var res = await fetch('/api/lead/get', { cache: 'no-store' });
@@ -8898,6 +8918,8 @@ async function loadCrmLead() {
         set('leadZona', f.lead_zona);
         set('leadEstado', f.lead_estado || 'nuevo');
         set('leadNotas', f.lead_notas);
+        set('leadTags', f.lead_tags);
+        renderLeadTagChips(f.lead_tags || '');
         _crmLeadLoaded = true;
     } catch (e) {}
 }
@@ -8918,7 +8940,8 @@ async function saveCrmLead() {
                 lead_presupuesto: val('leadPresupuesto'),
                 lead_zona: val('leadZona'),
                 lead_estado: val('leadEstado'),
-                lead_notas: val('leadNotas')
+                lead_notas: val('leadNotas'),
+                lead_tags: val('leadTags')
             })
         });
         var data = await res.json();
@@ -10170,7 +10193,17 @@ def login_page():
         if action == "login":
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "")
-            result = user_manager.login(username, password)
+            # Rate limit anti fuerza-bruta: por IP, 10 intentos por minuto. Si se
+            # excede, no se verifica la clave y se muestra el aviso en la pagina.
+            _lg_ok, _lg_retry = rate_limiter.check(
+                f"login:{_client_ip()}", limit=10, window_seconds=60)
+            if not _lg_ok:
+                error = (f"Demasiados intentos de acceso. Espera {_lg_retry} "
+                         "segundos e intenta de nuevo.")
+                saved_username = username
+                result = {"ok": False, "error": error}
+            else:
+                result = user_manager.login(username, password)
             if result["ok"]:
                 # Multi-tenant Fase 3: cargar tenant_id y rol de la cuenta en la
                 # sesion. Salen SIEMPRE de la base (app_users), nunca del request.
@@ -10274,6 +10307,11 @@ def analyze():
     if not session.get("username"):
         return jsonify({"error": True, "error_code": "UNAUTHORIZED",
                         "error_message": "Sesion no iniciada"}), 401
+    # Rate limit: analisis llama a la IA (costo). 30 por minuto por usuario es
+    # holgado para uso real y frena abuso/scripts.
+    _rl = _rate_limited("analyze", limit=30, window_seconds=60)
+    if _rl:
+        return _rl
 
     data = request.get_json()
     if not data or "text" not in data:
@@ -10555,6 +10593,10 @@ def upload_audio():
     if not session.get("username"):
         return jsonify({"error": True, "error_code": "UNAUTHORIZED",
                         "error_message": "Sesion no iniciada"}), 401
+    # Rate limit: transcripcion + analisis es costoso. 15 por minuto por usuario.
+    _rl = _rate_limited("upload-audio", limit=15, window_seconds=60)
+    if _rl:
+        return _rl
 
     if "audio" not in request.files:
         return jsonify({"error": True, "error_code": "NO_FILE",
@@ -10696,6 +10738,11 @@ def simulator_chat():
     """Handle chat messages for the AI sales simulator."""
     if not session.get("username"):
         return jsonify({"error": "unauthorized"}), 401
+    # Rate limit: cada turno del simulador llama a la IA. 40 por minuto por
+    # usuario permite una conversacion fluida y frena abuso.
+    _rl = _rate_limited("simulator", limit=40, window_seconds=60)
+    if _rl:
+        return _rl
 
     data = request.get_json()
     message = data.get("message", "")
@@ -10922,6 +10969,39 @@ def _current_tenant():
     return session.get("tenant_id") or _DEFAULT_TENANT
 
 
+def _client_ip():
+    """
+    IP del cliente para el rate limiting. Respeta X-Forwarded-For (Railway pone
+    un proxy delante), tomando la primera IP de la cadena. Fallback a remote_addr.
+    """
+    xff = request.headers.get("X-Forwarded-For", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.remote_addr or "unknown"
+
+
+def _rate_limited(bucket, limit, window_seconds):
+    """
+    Aplica rate limiting al request actual para un `bucket` logico (ej. "login").
+    La clave combina bucket + usuario logueado (si hay) o IP. Devuelve una
+    respuesta HTTP 429 lista para retornar si se excedio el limite, o None si
+    esta permitido. Uso: `blocked = _rate_limited(...); if blocked: return blocked`.
+    """
+    who = session.get("username") or _client_ip()
+    key = f"{bucket}:{who}"
+    ok, retry = rate_limiter.check(key, limit, window_seconds)
+    if ok:
+        return None
+    resp = jsonify({
+        "error": True,
+        "error_code": "RATE_LIMITED",
+        "error_message": f"Demasiadas solicitudes. Intenta de nuevo en {retry} segundos.",
+    })
+    resp.status_code = 429
+    resp.headers["Retry-After"] = str(retry)
+    return resp
+
+
 # Endpoint compatible con OpenAI de la API de Gemini (Google). Permite usar la
 # libreria `openai` ya instalada apuntando a Gemini, cambiando solo base_url,
 # key y modelo (segun la doc oficial ai.google.dev/gemini-api/docs/openai).
@@ -11076,8 +11156,15 @@ def _ai_refine_analysis(text, analysis_dict, tenant_id="__legacy__"):
     except Exception as exc:  # noqa: BLE001
         app.logger.warning(f"_ai_refine_analysis cache lookup fallo: {exc}")
         _cache_key = None
+    # Modo rubro: adapta el contexto de la IA al negocio del tenant. Default
+    # 'inmobiliaria' => mismo texto de siempre (comportamiento intacto).
+    try:
+        from src.users import tenant_config
+        _rubro_ctx = tenant_config.rubro_contexto(tenant_config.get_rubro(tenant_id))
+    except Exception:  # noqa: BLE001
+        _rubro_ctx = "conversaciones de ventas inmobiliarias (bienes raices)"
     system = (
-        "Sos un analista experto de conversaciones de ventas inmobiliarias en "
+        f"Sos un analista experto de {_rubro_ctx} en "
         "espanol de Argentina (tono rioplatense, trato de 'vos'). Recibis un "
         "texto y varias etiquetas/valores ya calculados por otro modelo. Tu "
         "tarea: VALIDAR/CORREGIR intencion y sentimiento, y REDACTAR "
@@ -11608,6 +11695,9 @@ def messages_send():
     """El usuario logueado envia una consulta/sugerencia al admin de su empresa."""
     if not session.get("username"):
         return jsonify({"ok": False, "error": "unauthorized"}), 401
+    _rl = _rate_limited("msg-send", limit=20, window_seconds=60)
+    if _rl:
+        return _rl
     data = request.get_json(silent=True) or {}
     text = str(data.get("text", "")).strip()
     kind = str(data.get("kind", "ayuda")).strip().lower()
@@ -11722,6 +11812,9 @@ def messages_interpret():
     """
     if not session.get("username"):
         return jsonify({"ok": False, "error": "unauthorized"}), 401
+    _rl = _rate_limited("msg-interpret", limit=30, window_seconds=60)
+    if _rl:
+        return _rl
     data = request.get_json(silent=True) or {}
     text = str(data.get("text", "")).strip()
     kind = str(data.get("kind", "ayuda")).strip().lower()
@@ -11768,6 +11861,9 @@ def messages_help():
     """
     if not session.get("username"):
         return jsonify({"ok": False, "error": "unauthorized"}), 401
+    _rl = _rate_limited("msg-help", limit=30, window_seconds=60)
+    if _rl:
+        return _rl
     data = request.get_json(silent=True) or {}
     text = str(data.get("text", "")).strip()
     history = data.get("history", [])
@@ -11838,6 +11934,7 @@ def lead_save():
         "lead_zona": data.get("lead_zona", ""),
         "lead_estado": data.get("lead_estado", "nuevo"),
         "lead_notas": data.get("lead_notas", ""),
+        "lead_tags": data.get("lead_tags", ""),
     }
     from src.users import lead_store_pg
     ok = lead_store_pg.save_ficha(session["username"], ficha, tenant_id=_current_tenant())
@@ -12030,7 +12127,7 @@ def admin_buscar():
             f.get("lead_nombre", ""), f.get("lead_contacto", ""),
             f.get("lead_zona", ""), f.get("lead_operacion", ""),
             f.get("lead_notas", ""), f.get("crm_text", ""),
-            f.get("username", ""),
+            f.get("lead_tags", ""), f.get("username", ""),
         ]).lower()
         if ql in campos:
             leads.append({
@@ -12042,6 +12139,35 @@ def admin_buscar():
             })
     return jsonify({"ok": True, "q": q, "textos": textos, "leads": leads,
                     "total": len(textos) + len(leads)})
+
+
+@app.route("/admin/rubro", methods=["GET", "POST"])
+def admin_rubro():
+    """
+    Modo rubro: consultar (GET) o configurar (POST) el rubro del tenant, que
+    adapta el contexto de la IA al negocio (inmobiliaria, autos, seguros...).
+    Configurar requiere superadmin; consultar, admin. No reentrena el modelo:
+    solo cambia como redacta la IA. Default 'inmobiliaria'.
+    GET  -> {ok, config:{rubro, descripcion}, rubros:{clave:label}}
+    POST -> body {rubro, descripcion} (superadmin) -> {ok}
+    """
+    from src.users import tenant_config
+    tenant = _current_tenant()
+    if request.method == "GET":
+        if not _is_admin():
+            return jsonify({"error": "unauthorized"}), 403
+        return jsonify({
+            "ok": True,
+            "config": tenant_config.get_config(tenant),
+            "rubros": tenant_config.RUBROS_CONOCIDOS,
+        })
+    # POST: solo superadmin puede cambiar el rubro de la empresa.
+    if not _is_superadmin():
+        return jsonify({"ok": False, "error": "solo superadmin"}), 403
+    data = request.get_json(silent=True) or {}
+    ok = tenant_config.set_config(
+        tenant, str(data.get("rubro", "")), str(data.get("descripcion", "")))
+    return jsonify({"ok": bool(ok)})
 
 
 # ── Dictionary overrides (user-contributed phrases) ────────────────────────
