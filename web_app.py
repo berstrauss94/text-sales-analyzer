@@ -1448,6 +1448,12 @@ HTML = """
         .card-info-tooltip:hover {
             display: block;
         }
+        /* Envoltorio para los iconos de ayuda de las herramientas nuevas, donde
+           el icono y el tooltip estan dentro de un mismo contenedor (no como
+           hermanos adyacentes). Al pasar el cursor por el envoltorio, se muestra
+           el tooltip que contiene. Cubre el caso que el selector '+' no alcanza. */
+        .info-wrap { position: relative; display: inline-flex; align-items: center; }
+        .info-wrap:hover .card-info-tooltip { display: block; }
         /* The card and its title must not clip the tooltip, and the hovered
            card must sit above its siblings so the tooltip is fully visible
            even while the section is collapsed. */
@@ -2880,7 +2886,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.4{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.5{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v31.1)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -3073,7 +3079,7 @@ HTML = """
                 <span id="crmLeadArrow" style="font-size:1.4rem;line-height:1;transition:transform 0.2s;">&#9658;</span>
                 CRM y Lead del cliente
             </button>
-            <span style="position:relative;display:inline-flex;align-items:center;">
+            <span class="info-wrap">
                 <span class="card-info-icon" id="infoIconCrmLead" onclick="event.stopPropagation()" style="position:static;font-size:0.62rem;width:16px;height:16px;line-height:16px;text-align:center;">!</span>
                 <div class="card-info-tooltip" style="top:26px;left:0;right:auto;min-width:250px;max-width:330px;font-size:0.72rem;white-space:normal;">Dos casillas persistentes del cliente que quedan guardadas y disponibles al volver a entrar: CRM (texto libre de seguimiento) y Lead (ficha con nombre, contacto, operacion, presupuesto, zona, estado, notas y etiquetas).</div>
             </span>
@@ -3134,7 +3140,7 @@ HTML = """
     <div class="input-section" id="buscadorPanel" style="margin-top:20px;">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <div style="font-size:0.85rem;font-weight:600;color:#5bd4f5;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;">&#128269; Buscador
-                <span style="position:relative;display:inline-flex;align-items:center;">
+                <span class="info-wrap">
                     <span class="card-info-icon" onclick="event.stopPropagation()" style="position:static;font-size:0.62rem;width:16px;height:16px;line-height:16px;text-align:center;">!</span>
                     <div class="card-info-tooltip" style="top:22px;left:0;right:auto;min-width:240px;max-width:300px;font-size:0.72rem;white-space:normal;">Busca una palabra o frase en los textos analizados (contenido y titulo) y en las fichas de lead (nombre, contacto, zona, notas, etiquetas). Escribi y toca Buscar o Enter.</div>
                 </span>
@@ -3149,7 +3155,7 @@ HTML = """
     <div class="input-section" id="adminStatsPanel" style="margin-top:20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
             <div id="adminStatsTitulo" style="font-size:0.85rem;font-weight:600;color:#b38bff;display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;">📊 Panel de Seguimiento (Admin) <a href="/admin/feedback" target="_blank" style="font-size:0.7rem;font-weight:600;color:#4da3ff;text-decoration:none;border:1px solid #2a3d6a;border-radius:6px;padding:2px 8px;">&#9733; Feedback de filtros</a>
-                <span style="position:relative;display:inline-flex;align-items:center;">
+                <span class="info-wrap">
                     <span class="card-info-icon" onclick="event.stopPropagation()" style="position:static;font-size:0.62rem;width:16px;height:16px;line-height:16px;text-align:center;">!</span>
                     <div class="card-info-tooltip" style="top:22px;left:0;right:auto;min-width:250px;max-width:320px;font-size:0.72rem;white-space:normal;">Tendencias por vendedor, cumplimiento de metas y uso del sistema. El enlace "Feedback de filtros" abre un panel que muestra como califican los vendedores las explicaciones de la IA (tasa de acierto por filtro).</div>
                 </span>
@@ -3195,7 +3201,7 @@ HTML = """
     <div class="input-section" id="leadAlertasPanel" style="margin-top:20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
             <div style="font-size:0.85rem;font-weight:600;color:#f5a35b;display:inline-flex;align-items:center;gap:6px;">&#128276; Leads sin seguimiento
-                <span style="position:relative;display:inline-flex;align-items:center;">
+                <span class="info-wrap">
                     <span class="card-info-icon" onclick="event.stopPropagation()" style="position:static;font-size:0.62rem;width:16px;height:16px;line-height:16px;text-align:center;">!</span>
                     <div class="card-info-tooltip" style="top:22px;left:0;right:auto;min-width:250px;max-width:320px;font-size:0.72rem;white-space:normal;">Avisa que leads activos (nuevo o en seguimiento) llevan varios dias sin actualizarse, para que no se enfrien. Ordenados por urgencia. Ajusta el umbral de dias con el selector. Cada lead tiene un boton de Resumen IA.</div>
                 </span>
@@ -3257,7 +3263,7 @@ HTML = """
                 </select>
                 <button id="btnPrintInforme" onclick="printInforme()" style="background:#1a2a3a;color:#5bd4f5;border:1px solid #2a3a4a;border-radius:6px;padding:6px 12px;font-size:0.75rem;cursor:pointer;" title="Imprimir informe">&#128424; Imprimir</button>
                 <button id="btnExportInforme" onclick="exportInformeCsv()" style="background:#1a3a24;color:#5bf5a3;border:1px solid #2a4a34;border-radius:6px;padding:6px 12px;font-size:0.75rem;cursor:pointer;" title="Exportar a Excel/CSV">&#128190; Exportar</button>
-                <span style="position:relative;display:inline-flex;align-items:center;">
+                <span class="info-wrap">
                     <span class="card-info-icon" onclick="event.stopPropagation()" style="position:static;font-size:0.62rem;width:16px;height:16px;line-height:16px;text-align:center;">!</span>
                     <div class="card-info-tooltip" style="top:24px;right:0;left:auto;min-width:240px;max-width:300px;font-size:0.72rem;">Descarga el informe a Excel/CSV con los mismos filtros que estas viendo (año, mes, semana, vendedor): la tabla de cargas por vendedor y mes con sus totales.</div>
                 </span>
