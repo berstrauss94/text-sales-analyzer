@@ -136,6 +136,93 @@ Los votos negativos se reutilizan como ejemplos "a evitar" en el prompt de la IA
 
 ---
 
+## 7-bis. Catálogo exacto de filtros (definiciones precisas)
+
+Esta sección detalla, con las definiciones y umbrales reales del sistema, qué significa cada valor de cada filtro. Es la referencia para responder con exactitud.
+
+### Intención del texto
+Clasifica la etapa/propósito principal de la conversación. Valores posibles:
+- **OFERTA (OFFER)**: se presenta una propiedad o servicio a la venta (precio, condiciones, disponibilidad).
+- **CONSULTA (INQUIRY)**: hay preguntas o pedidos de información; el interlocutor evalúa y necesita más datos.
+- **NEGOCIACIÓN (NEGOTIATION)**: se discuten términos, precios o condiciones. Señal de interés real y cercanía al cierre.
+- **CIERRE (CLOSING)**: hay acuerdo o pasos finales (firma, confirmación).
+- **DESCRIPCIÓN (DESCRIPTION)**: texto factual que detalla características de un inmueble/situación.
+- **DESCONOCIDA (UNKNOWN)**: no hay intención comercial clara (texto ambiguo, corto o incompleto).
+
+Cada intención viene acompañada de una **confianza** (0–100%) y de los apartados explicativos (qué significa, para el vendedor, tips, siguiente paso).
+
+### Sentimiento
+Tono emocional del texto:
+- **POSITIVO (POSITIVE)**: satisfacción, entusiasmo, aprobación. Buen momento para avanzar.
+- **NEUTRAL**: sin emociones fuertes; evaluación fría o comunicación profesional.
+- **NEGATIVO (NEGATIVE)**: insatisfacción, preocupación o rechazo; probable objeción o mala experiencia.
+
+El sentimiento también ajusta el **nivel de riesgo** comercial del texto.
+
+### Conceptos de ventas detectados
+Menciones comerciales que el sistema reconoce: **oferta, descuento, comisión, cierre, prospecto, objeción, seguimiento, negociación**. Cada concepto aparece con su confianza y con los fragmentos reales del texto donde fue detectado.
+
+### Conceptos de bienes raíces detectados
+Menciones propias del inmueble: **tipo de propiedad, precio, metraje (m²), habitaciones, baños, ubicación, amenities, zonificación, estado**. Igual que arriba: confianza + fragmentos citados del texto.
+
+### Datos extraídos del texto
+Valores concretos que el sistema extrae y agrupa: **precios, superficies, fechas, horarios, porcentajes, contactos, roles, acciones**. Se muestran como "chips" que resaltan la mención en el texto original.
+
+### Bloque comercial (dentro de Datos extraídos)
+- **Etapa del funnel**: `AWARENESS` (conocimiento inicial) → `CONSIDERATION` (evaluación activa) → `DECISION` (cerca de decidir) → `CLOSED` (cerrado/muy avanzado). Se determina por los indicios de cierre, respuestas afirmativas y probabilidad.
+- **Urgencia**: `BAJA` | `MEDIA` | `ALTA` | `CRITICA`, según señales de tiempo/inmediatez.
+- **Nivel de compromiso**: `BAJO` | `MEDIO` | `ALTO`, según confirmaciones vs. evasivas.
+- **Tipo de operación**: `VENTA` | `ALQUILER` | `INVERSION` | `INDEFINIDO`.
+- **Financiamiento**: `CONTADO` | `CREDITO` | `FINANCIAMIENTO_DIRECTO` | `NO_DETECTADO`.
+- Además: señales de compra, objeciones específicas, técnicas de persuasión, preguntas abiertas, keywords, alertas para el vendedor, co-decisores, rango presupuestario y aviso de revisión del coordinador.
+
+### Análisis comercial inmobiliario
+Diagnóstico de cierre, con umbrales reales del sistema:
+- **Probabilidad de cierre**: puntaje 0–100 calculado a partir de indicios de cierre, respuestas afirmativas, objeciones, señales de compra, compromiso, urgencia y prospección.
+- **Tipo de lead**: `CALIENTE` (probabilidad > 60), `TIBIO` (> 30), `FRIO` (≤ 30).
+- **Nivel de interés**: `ALTO` / `MEDIO` / `BAJO`, según la densidad comercial del texto.
+- **Tendencia de cierre**: `FUERTE` (prob > 70), `MODERADA` (> 30), `DEBIL` (≤ 30).
+- **Nivel de riesgo**: combina probabilidad de cierre y objeciones, y se ajusta con el sentimiento (un tono negativo eleva el riesgo).
+- **Recomendación** y **acción siguiente**: sugerencias concretas según la etapa del funnel y las objeciones detectadas.
+
+> Todos estos valores los calcula el modelo/analizador; la IA solo redacta la explicación a medida de cada uno. La lógica de clasificación no cambia por la IA ni por el feedback.
+
+---
+
+## 7-ter. Visión de producto: una herramienta factible para empresas de ventas en general
+
+Aunque el sistema nació para inmobiliarias, su arquitectura y su propuesta de valor son **trasladables a cualquier empresa de ventas**. La razón es que el núcleo no es "inmobiliario": es un **motor de análisis de conversaciones de venta + seguimiento de equipo + mejora continua**.
+
+**Qué lo hace factible para ventas en general:**
+- **El diccionario y los conceptos son configurables**: cada empresa enseña su propio vocabulario (con "Resaltar y definir" y el editor de diccionario). Lo que hoy son conceptos inmobiliarios (precio, ubicación, metraje) puede ser el vocabulario de cualquier rubro.
+- **Los filtros son universales del proceso de venta**: intención, sentimiento, etapa del funnel, urgencia, compromiso, probabilidad de cierre y tipo de lead existen en toda venta consultiva, no solo en inmuebles.
+- **Arquitectura multi-empresa (multi-tenant)**: ya está preparada para dar servicio a varias organizaciones con datos totalmente aislados. Es la base de un producto SaaS vendible a múltiples clientes.
+- **La IA explica en el idioma del negocio**: al generar textos a medida, adapta el consejo al contenido real de cada conversación, sea del rubro que sea.
+
+**Propuesta de valor para una empresa de ventas:**
+- Convierte conversaciones dispersas en **datos comparables y accionables**.
+- Da a cada vendedor un **coach en tiempo real** (qué significa, qué hacer, siguiente paso).
+- Da a la coordinación **visibilidad del proceso** (tendencias, metas, uso real del equipo).
+- **Mejora sola con el uso**, gracias al feedback del propio equipo.
+
+Este es el sentido "Empresa 4.0": no una herramienta que solo informa, sino una que **participa del proceso comercial y lo hace mejorar con el tiempo**.
+
+---
+
+## 7-quater. Ciclo de retroalimentación (cómo mejora el sistema con el feedback)
+
+El feedback de los usuarios es parte del diseño, no un agregado. El ciclo es:
+
+1. **La IA explica** cada filtro a medida del texto.
+2. **El vendedor califica** cada apartado con la perilla ✓ / ✗ (en dos pasos: elige y confirma con "Aceptar", para no votar por error).
+3. **El voto se guarda** en una tabla dedicada (`filter_feedback`), separada del historial de análisis, sin afectar los informes.
+4. **La IA aprende del feedback**: los apartados marcados como poco acertados se reinyectan en su prompt como ejemplos "a evitar" (técnica de few-shot / aprendizaje en contexto). Así, las próximas explicaciones evitan repetir lo que el equipo señaló como débil.
+5. **La coordinación mide**: un panel de diagnóstico resume los votos ✓/✗ por filtro y apartado, revelando qué explicaciones funcionan y cuáles conviene mejorar.
+
+Importante sobre los límites reales: el sistema **no reentrena el modelo de IA en caliente**. La mejora se logra por *aprendizaje en contexto* (inyectar ejemplos y guía en el prompt) y por la medición humana, que es la forma robusta y de bajo costo de capitalizar el feedback sin infraestructura de entrenamiento.
+
+---
+
 ## 8. Regla de oro sobre los datos
 
 Cualquier cambio que mejore cómo se muestran o explican los análisis **nunca** debe alterar los textos históricos ni su fecha. Se distingue siempre entre:
@@ -158,4 +245,4 @@ El sistema está preparado para servir a **varias inmobiliarias** manteniendo lo
 
 ---
 
-*Documento generado como contexto integral del proyecto. Versión del sistema: v27.3.*
+*Documento generado como contexto integral del proyecto, con catálogo exacto de filtros, visión de producto para ventas en general y ciclo de retroalimentación. Versión del sistema: v27.3.*
