@@ -68,10 +68,16 @@ def _ensure_table(conn) -> None:
                 lead_zona       TEXT        NOT NULL DEFAULT '',
                 lead_estado     TEXT        NOT NULL DEFAULT 'nuevo',
                 lead_notas      TEXT        NOT NULL DEFAULT '',
+                lead_tags       TEXT        NOT NULL DEFAULT '',
                 updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
                 PRIMARY KEY (tenant_id, username)
             )
             """
+        )
+        # Tags libres (agregado despues): ADD COLUMN IF NOT EXISTS es seguro sobre
+        # la tabla ya existente en produccion; deja las filas actuales con ''.
+        cur.execute(
+            "ALTER TABLE lead_fichas ADD COLUMN IF NOT EXISTS lead_tags TEXT NOT NULL DEFAULT ''"
         )
     conn.commit()
     _table_ready = True
@@ -82,7 +88,7 @@ def get_ficha(username: str, tenant_id: str = "__legacy__") -> dict:
     vacia = {
         "crm_text": "", "lead_nombre": "", "lead_contacto": "",
         "lead_operacion": "", "lead_presupuesto": "", "lead_zona": "",
-        "lead_estado": "nuevo", "lead_notas": "",
+        "lead_estado": "nuevo", "lead_notas": "", "lead_tags": "",
     }
     if not username or not is_available():
         return vacia
@@ -94,7 +100,7 @@ def get_ficha(username: str, tenant_id: str = "__legacy__") -> dict:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT crm_text, lead_nombre, lead_contacto, lead_operacion, "
-                "lead_presupuesto, lead_zona, lead_estado, lead_notas "
+                "lead_presupuesto, lead_zona, lead_estado, lead_notas, lead_tags "
                 "FROM lead_fichas WHERE tenant_id = %s AND username = %s LIMIT 1",
                 (tenant_id or "__legacy__", username),
             )
@@ -107,6 +113,7 @@ def get_ficha(username: str, tenant_id: str = "__legacy__") -> dict:
             "lead_contacto": row[2] or "", "lead_operacion": row[3] or "",
             "lead_presupuesto": row[4] or "", "lead_zona": row[5] or "",
             "lead_estado": row[6] or "nuevo", "lead_notas": row[7] or "",
+            "lead_tags": row[8] or "",
         }
     except Exception as exc:
         logger.error(f"lead_fichas get error: {exc}")
@@ -144,8 +151,8 @@ def save_ficha(username: str, ficha: dict, tenant_id: str = "__legacy__") -> boo
                 INSERT INTO lead_fichas
                     (tenant_id, username, crm_text, lead_nombre, lead_contacto,
                      lead_operacion, lead_presupuesto, lead_zona, lead_estado,
-                     lead_notas, updated_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, now())
+                     lead_notas, lead_tags, updated_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, now())
                 ON CONFLICT (tenant_id, username) DO UPDATE SET
                     crm_text        = EXCLUDED.crm_text,
                     lead_nombre     = EXCLUDED.lead_nombre,
@@ -155,13 +162,14 @@ def save_ficha(username: str, ficha: dict, tenant_id: str = "__legacy__") -> boo
                     lead_zona       = EXCLUDED.lead_zona,
                     lead_estado     = EXCLUDED.lead_estado,
                     lead_notas      = EXCLUDED.lead_notas,
+                    lead_tags       = EXCLUDED.lead_tags,
                     updated_at      = now()
                 """,
                 (tenant_id or "__legacy__", username,
                  _s("crm_text", 8000), _s("lead_nombre", 200),
                  _s("lead_contacto", 200), _s("lead_operacion", 60),
                  _s("lead_presupuesto", 100), _s("lead_zona", 200),
-                 estado, _s("lead_notas", 4000)),
+                 estado, _s("lead_notas", 4000), _s("lead_tags", 300)),
             )
         conn.commit()
         _release(conn)
@@ -191,7 +199,7 @@ def list_fichas(tenant_id: str = "__legacy__", limit: int = 500) -> list[dict]:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT username, lead_nombre, lead_contacto, lead_operacion, "
-                "lead_presupuesto, lead_zona, lead_estado, lead_notas, crm_text, updated_at "
+                "lead_presupuesto, lead_zona, lead_estado, lead_notas, crm_text, lead_tags, updated_at "
                 "FROM lead_fichas WHERE tenant_id = %s "
                 "ORDER BY updated_at DESC LIMIT %s",
                 (tenant_id or "__legacy__", int(limit)),
@@ -205,7 +213,8 @@ def list_fichas(tenant_id: str = "__legacy__", limit: int = 500) -> list[dict]:
                 "lead_operacion": r[3] or "", "lead_presupuesto": r[4] or "",
                 "lead_zona": r[5] or "", "lead_estado": r[6] or "nuevo",
                 "lead_notas": r[7] or "", "crm_text": r[8] or "",
-                "updated_at": r[9].isoformat() if hasattr(r[9], "isoformat") else str(r[9]),
+                "lead_tags": r[9] or "",
+                "updated_at": r[10].isoformat() if hasattr(r[10], "isoformat") else str(r[10]),
             })
         return out
     except Exception as exc:
