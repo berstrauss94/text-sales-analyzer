@@ -1452,8 +1452,18 @@ HTML = """
            el icono y el tooltip estan dentro de un mismo contenedor (no como
            hermanos adyacentes). Al pasar el cursor por el envoltorio, se muestra
            el tooltip que contiene. Cubre el caso que el selector '+' no alcanza. */
-        .info-wrap { position: relative; display: inline-flex; align-items: center; }
+        .info-wrap { position: relative; display: inline-block; line-height: normal; vertical-align: middle; }
         .info-wrap:hover .card-info-tooltip { display: block; }
+        /* El tooltip nunca debe heredar una altura del contenedor: se dimensiona
+           solo por su contenido. !important gana sobre cualquier estilo inline
+           de alto/recorte que se hubiera colado. */
+        .card-info-tooltip {
+            height: auto !important;
+            max-height: none !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+            white-space: normal !important;
+        }
         /* The card and its title must not clip the tooltip, and the hovered
            card must sit above its siblings so the tooltip is fully visible
            even while the section is collapsed. */
@@ -2886,7 +2896,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.5{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.6{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v31.1)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
