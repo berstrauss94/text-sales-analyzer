@@ -1977,8 +1977,27 @@ HTML = """
             padding: 0;
         }
         .fb-btn:hover { border-color: #4a6cf7; }
+        .fb-btn:disabled { opacity: 0.5; cursor: default; }
         .fb-up.fb-active { background: #12321f; color: #5bf5a3; border-color: #5bf5a3; }
         .fb-down.fb-active { background: #331414; color: #f55b5b; border-color: #f55b5b; }
+        .fb-accept {
+            cursor: pointer;
+            border: 1px solid #4a6cf7;
+            background: #1a2340;
+            color: #cdd6ff;
+            border-radius: 6px;
+            padding: 3px 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-left: 4px;
+        }
+        .fb-accept:hover { background: #24306b; }
+        .fb-done {
+            font-size: 0.68rem;
+            color: #5bf5a3;
+            font-weight: 600;
+            margin-left: 4px;
+        }
         .intent-detail-section {
             margin-bottom: 10px;
             padding: 10px;
@@ -2848,12 +2867,12 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v27.2{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v27.3{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v27.2)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
                     Ahora <strong style="color:#5bf5a3;">TODOS los filtros</strong> traen explicaciones a medida escritas por la IA: intencion, sentimiento, <strong style="color:#f5a35b;">conceptos de ventas y de bienes raices</strong>, y el <strong style="color:#f5a35b;">analisis comercial</strong> (funnel, urgencia, compromiso, operacion, financiamiento).
-                    <div style="margin-top:8px;">Cada apartado tiene su perilla <strong style="color:#5bf5a3;">&#10003;</strong> / <strong style="color:#f55b5b;">&#10007;</strong> para marcar si te resulto acertado. Tus votos guian a la IA para mejorar las proximas explicaciones.</div>
+                    <div style="margin-top:8px;">Cada apartado tiene su perilla <strong style="color:#5bf5a3;">&#10003;</strong> / <strong style="color:#f55b5b;">&#10007;</strong>. Elegis y despues toca <strong style="color:#cdd6ff;">Aceptar</strong> para confirmar (podes cambiar de opcion antes de aceptar, por si tocaste una sin querer). Tus votos guian a la IA para mejorar.</div>
                     <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Si la IA no esta disponible en ese momento, ves el analisis normal, sin cambios.</div>
                 </div>
             </div>
@@ -5816,10 +5835,15 @@ function feedbackToggle(filterKey, sectionKey, label) {
     var fk = String(filterKey || '');
     var sk = String(sectionKey || '');
     var lb = String(label || '');
+    // Flujo en DOS pasos: primero se ELIGE ✓/✗ (solo marca visual, no envia), y
+    // recien al tocar "Aceptar" se confirma y se manda al sistema. Asi, si se
+    // apreto una opcion por error, se puede cambiar antes de confirmar.
     return '<div class="fb-toggle" data-fb-filter="' + fk + '" data-fb-section="' + sk + '" data-fb-label="' + lb + '">'
         + '<span class="fb-q">¿Acertado?</span>'
         + '<button type="button" class="fb-btn fb-up" data-fb-vote="up" title="Si, acertado">&#10003;</button>'
         + '<button type="button" class="fb-btn fb-down" data-fb-vote="down" title="No, poco acertado">&#10007;</button>'
+        + '<button type="button" class="fb-accept" data-fb-accept="1" style="display:none;">Aceptar</button>'
+        + '<span class="fb-done" style="display:none;">&#10003; Registrado</span>'
         + '</div>';
 }
 
@@ -9220,14 +9244,35 @@ document.addEventListener('click', function (e) {
     fetchNotifications();
 });
 
-// Perilla de feedback ✓/✗ de los apartados de los filtros. Listener delegado
-// (los guards prohiben e.target.closest directo). Guarda el voto y marca visual.
+// Paso 1 de la perilla de feedback: ELEGIR ✓/✗. Solo marca visual y muestra el
+// boton "Aceptar"; NO envia todavia. Se puede cambiar de opcion cuantas veces
+// se quiera antes de confirmar (previene enviar un voto apretado por error).
 document.addEventListener('click', function (e) {
     var btn = _closest(e, '.fb-btn');
     if (!btn) return;
     var box = _closest(e, '.fb-toggle');
     if (!box) return;
-    var vote = btn.getAttribute('data-fb-vote');
+    // Si ya se confirmo este apartado, no permitir re-votar.
+    if (box.getAttribute('data-fb-done') === '1') return;
+    // Marca visual: resaltar el elegido, apagar el otro. Guardar la eleccion
+    // pendiente en el contenedor (aun sin enviar).
+    box.querySelectorAll('.fb-btn').forEach(function (b) { b.classList.remove('fb-active'); });
+    btn.classList.add('fb-active');
+    box.setAttribute('data-fb-pending', btn.getAttribute('data-fb-vote'));
+    // Mostrar el boton Aceptar.
+    var accept = box.querySelector('.fb-accept');
+    if (accept) accept.style.display = 'inline-block';
+});
+
+// Paso 2: ACEPTAR. Recien aca se envia el voto elegido al backend y se bloquea
+// el apartado. Best-effort: si el POST falla, igual mostramos "Registrado".
+document.addEventListener('click', function (e) {
+    var accept = _closest(e, '.fb-accept');
+    if (!accept) return;
+    var box = _closest(e, '.fb-toggle');
+    if (!box) return;
+    var vote = box.getAttribute('data-fb-pending');
+    if (!vote) return;  // no eligio ✓/✗ todavia
     var filterKey = box.getAttribute('data-fb-filter');
     var sectionKey = box.getAttribute('data-fb-section');
     var label = box.getAttribute('data-fb-label') || '';
@@ -9242,9 +9287,12 @@ document.addEventListener('click', function (e) {
             if (listEl) sectionText = listEl.textContent || '';
         }
     }
-    // Marca visual: resaltar el elegido, apagar el otro.
-    box.querySelectorAll('.fb-btn').forEach(function (b) { b.classList.remove('fb-active'); });
-    btn.classList.add('fb-active');
+    // Bloquear el apartado y mostrar "Registrado".
+    box.setAttribute('data-fb-done', '1');
+    accept.style.display = 'none';
+    var done = box.querySelector('.fb-done');
+    if (done) done.style.display = 'inline-block';
+    box.querySelectorAll('.fb-btn').forEach(function (b) { b.disabled = true; });
     // Enviar al backend (best-effort: si falla, la marca visual queda igual).
     fetch('/api/filter-feedback', {
         method: 'POST',
