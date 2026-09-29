@@ -1308,6 +1308,77 @@ def migrate_json_to_pg(users_dir: str = USERS_DIR) -> dict:
 # ---------------------------------------------------------------------------
 # Lectura AGREGADA multi-usuario para paneles admin (optimizacion de carga)
 # ---------------------------------------------------------------------------
+def search_entries(query: str, usernames: list[str] | None = None,
+                   limit: int = 30) -> list[dict]:
+    """
+    Busca entradas cuyo texto (text_short/text_full) o titulo (audio_filename)
+    contengan `query` (case-insensitive, ILIKE). Opcionalmente acotado a un set
+    de usernames (para aislar por tenant/vendedor). Devuelve entradas LIGERAS
+    (sin text_full completo, solo un fragmento) newest-first. Solo LECTURA.
+    [] si PG no esta disponible o query es muy corta.
+    """
+    q = (query or "").strip()
+    if len(q) < 2:
+        return []
+    if not _is_pg_available():
+        return []
+    conn = _get_pg_conn()
+    if conn is None:
+        return []
+    like = f"%{q}%"
+    try:
+        with conn.cursor() as cur:
+            if usernames:
+                cur.execute(
+                    """
+                    SELECT id, username, timestamp, audio_filename,
+                           text_short, intent, sentiment, day_label
+                    FROM analysis_history
+                    WHERE username = ANY(%s)
+                      AND (text_short ILIKE %s OR text_full ILIKE %s
+                           OR audio_filename ILIKE %s)
+                    ORDER BY timestamp DESC
+                    LIMIT %s
+                    """,
+                    (list(usernames), like, like, like, int(limit)),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT id, username, timestamp, audio_filename,
+                           text_short, intent, sentiment, day_label
+                    FROM analysis_history
+                    WHERE (text_short ILIKE %s OR text_full ILIKE %s
+                           OR audio_filename ILIKE %s)
+                    ORDER BY timestamp DESC
+                    LIMIT %s
+                    """,
+                    (like, like, like, int(limit)),
+                )
+            rows = cur.fetchall()
+        _return_pg_conn(conn)
+        out = []
+        for r in rows:
+            eid, username, ts, audio_fn, text_short, intent, sentiment, day_label = r
+            ts_str = ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
+            out.append({
+                "id": eid, "username": username, "timestamp": ts_str,
+                "titulo": (audio_fn or "").strip(),
+                "fragmento": (text_short or "")[:200],
+                "intent": intent or "", "sentiment": sentiment or "",
+                "day_label": day_label or "",
+            })
+        return out
+    except Exception as exc:
+        logger.error(f"Error en search_entries: {exc}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        _return_pg_conn(conn, close=True)
+        return []
+
+
 def get_report_entries_all(usernames: list[str]) -> dict:
     """
     Devuelve, para TODOS los usuarios dados, sus entradas en forma LIGERA, en

@@ -2867,12 +2867,15 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v28.2{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v29.0{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v28.2)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v29.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    El informe de seguimiento ahora se puede <strong style="color:#5bf5a3;">exportar a Excel/CSV</strong> con el boton <strong style="color:#5bf5a3;">&#128190; Exportar</strong> (al lado de Imprimir).
-                    <div style="margin-top:8px;">Respeta los mismos filtros que estas viendo (año, mes, semana, vendedor) y descarga la tabla de cargas por vendedor y mes, lista para trabajar en planillas.</div>
+                    Cuatro herramientas nuevas para admins:
+                    <div style="margin-top:6px;">&#128276; <strong style="color:#f5a35b;">Leads sin seguimiento</strong>: avisa que leads activos llevan dias sin tocarse.</div>
+                    <div style="margin-top:4px;">&#129504; <strong style="color:#8fa8ff;">Resumen IA del lead</strong>: la IA resume el estado del cliente y el proximo paso.</div>
+                    <div style="margin-top:4px;">&#128200; <strong style="color:#5bf5a3;">Comparativa</strong> mes vs mes anterior en el informe.</div>
+                    <div style="margin-top:4px;">&#128269; <strong style="color:#5bd4f5;">Buscador global</strong> de textos y leads.</div>
                 </div>
             </div>
         </div>
@@ -3111,6 +3114,16 @@ HTML = """
     <div class="results" id="results"></div>
 
     {% if username in ['admin', 'Vanesa.Admin', 'Berna.Strauss', 'FedericoCeballos', 'MartinianoSosa'] %}
+    <!-- ── BUSCADOR GLOBAL (ADMIN) ── -->
+    <div class="input-section" id="buscadorPanel" style="margin-top:20px;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div style="font-size:0.85rem;font-weight:600;color:#5bd4f5;white-space:nowrap;">&#128269; Buscador</div>
+            <input type="text" id="buscadorInput" placeholder="Buscar en textos y leads (nombre, zona, contenido...)" style="flex:1;min-width:200px;background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:8px 12px;font-size:0.8rem;box-sizing:border-box;">
+            <button type="button" id="buscadorBtn" onclick="doBuscarGlobal()" style="background:#101c2a;color:#5bd4f5;border:1px solid #2a3a4a;border-radius:6px;padding:8px 14px;font-size:0.78rem;cursor:pointer;">Buscar</button>
+        </div>
+        <div id="buscadorContent" style="margin-top:12px;font-size:0.8rem;color:#888;"></div>
+    </div>
+
     <!-- ── ADMIN STATS PANEL ── -->
     <div class="input-section" id="adminStatsPanel" style="margin-top:20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
@@ -3150,6 +3163,23 @@ HTML = """
         <div id="adminStatsContent" style="display:flex;flex-wrap:wrap;gap:16px;justify-content:center;">
             <div style="color:#555;font-size:0.8rem;">Selecciona un usuario y periodo para ver estadisticas.</div>
         </div>
+    </div>
+
+    <!-- ── ALERTAS DE LEADS SIN SEGUIMIENTO ── -->
+    <div class="input-section" id="leadAlertasPanel" style="margin-top:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:0.85rem;font-weight:600;color:#f5a35b;">&#128276; Leads sin seguimiento</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <label for="leadAlertaDias" style="font-size:0.72rem;color:#9aa0b0;">Alertar tras</label>
+                <select id="leadAlertaDias" onchange="loadLeadAlertas()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.8rem;">
+                    <option value="3">3 dias</option>
+                    <option value="5" selected>5 dias</option>
+                    <option value="7">7 dias</option>
+                    <option value="14">14 dias</option>
+                </select>
+            </div>
+        </div>
+        <div id="leadAlertasContent" style="font-size:0.8rem;color:#888;">Cargando alertas...</div>
     </div>
 
     <!-- ── INFORME DE SEGUIMIENTO ── -->
@@ -3330,6 +3360,9 @@ async function saveEntry() {
         }
         if (typeof loadAdminStats === 'function' && document.getElementById('adminStatsPanel')) {
             loadAdminStats();
+        }
+        if (typeof loadLeadAlertas === 'function' && document.getElementById('leadAlertasPanel')) {
+            loadLeadAlertas();
         }
     } catch (e) {
         document.getElementById('results').innerHTML =
@@ -4933,6 +4966,90 @@ async function loadAdminUsers() {
             });
         }
     } catch(e) { console.error('Error loading users:', e); }
+}
+
+// Buscador global (admin): busca en textos analizados y en fichas de lead.
+async function doBuscarGlobal() {
+    const input = document.getElementById('buscadorInput');
+    const container = document.getElementById('buscadorContent');
+    if (!input || !container) return;
+    const q = (input.value || '').trim();
+    if (q.length < 2) { container.innerHTML = '<span style="color:#888;">Escribi al menos 2 caracteres.</span>'; return; }
+    container.innerHTML = '<span style="color:#555;">Buscando...</span>';
+    try {
+        const resp = await fetch('/admin/buscar?q=' + encodeURIComponent(q), { cache: 'no-store' });
+        if (!resp.ok) { container.innerHTML = '<span style="color:#f55b5b;">Error ' + resp.status + '</span>'; return; }
+        const data = await resp.json();
+        if (!data.ok) { container.innerHTML = '<span style="color:#f55b5b;">No se pudo buscar.</span>'; return; }
+        const textos = data.textos || [];
+        const leads = data.leads || [];
+        if (textos.length === 0 && leads.length === 0) {
+            container.innerHTML = '<span style="color:#9aa0b0;">Sin resultados para "' + _esc(q) + '".</span>';
+            return;
+        }
+        var html = '';
+        if (leads.length > 0) {
+            html += '<div style="font-size:0.72rem;color:#f5a35b;font-weight:600;margin:4px 0 6px;">Leads (' + leads.length + ')</div>';
+            leads.forEach(function (l) {
+                var meta = [l.lead_contacto, l.lead_zona, l.lead_estado].filter(function (x) { return x; }).join(' &middot; ');
+                html += '<div style="padding:6px 10px;margin-bottom:4px;background:#0a0c14;border-left:3px solid #f5a35b;border-radius:6px;">'
+                    + '<span style="color:#e0e0e0;font-weight:600;">' + _esc(l.lead_nombre) + '</span> '
+                    + '<span style="color:#888;font-size:0.68rem;">' + _esc(l.username) + (meta ? ' &middot; ' + meta : '') + '</span></div>';
+            });
+        }
+        if (textos.length > 0) {
+            html += '<div style="font-size:0.72rem;color:#8fa8ff;font-weight:600;margin:10px 0 6px;">Textos (' + textos.length + ')</div>';
+            textos.forEach(function (t) {
+                html += '<div style="padding:6px 10px;margin-bottom:4px;background:#0a0c14;border-left:3px solid #4a6cf7;border-radius:6px;">'
+                    + '<div style="color:#e0e0e0;font-size:0.76rem;">' + _esc(t.titulo || '(sin titulo)') + ' '
+                    + '<span style="color:#888;font-size:0.66rem;">' + _esc(t.username) + ' &middot; ' + _esc(t.day_label) + '</span></div>'
+                    + '<div style="color:#9aa0b0;font-size:0.7rem;margin-top:2px;">' + _esc(t.fragmento) + '</div></div>';
+            });
+        }
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<span style="color:#f55b5b;">Error de conexion.</span>';
+    }
+}
+
+// Alertas de leads activos sin seguimiento reciente. Consulta el backend y
+// pinta una lista ordenada por dias sin tocar (mas urgente arriba).
+async function loadLeadAlertas() {
+    const container = document.getElementById('leadAlertasContent');
+    if (!container) return;
+    const diasSel = document.getElementById('leadAlertaDias');
+    const dias = diasSel ? diasSel.value : 5;
+    container.innerHTML = '<span style="color:#555;">Cargando alertas...</span>';
+    try {
+        const resp = await fetch('/admin/lead-alertas?dias=' + encodeURIComponent(dias), { cache: 'no-store' });
+        if (!resp.ok) { container.innerHTML = '<span style="color:#f55b5b;">Error ' + resp.status + '</span>'; return; }
+        const data = await resp.json();
+        if (!data.ok) { container.innerHTML = '<span style="color:#f55b5b;">No se pudieron cargar las alertas.</span>'; return; }
+        const alertas = data.alertas || [];
+        if (alertas.length === 0) {
+            container.innerHTML = '<span style="color:#5bf5a3;">&#10003; Ningun lead activo lleva mas de ' + data.dias_umbral + ' dias sin seguimiento.</span>';
+            return;
+        }
+        var html = '<div style="font-size:0.72rem;color:#9aa0b0;margin-bottom:8px;">'
+            + alertas.length + ' lead(s) activo(s) sin seguimiento hace ' + data.dias_umbral + '+ dias:</div>';
+        alertas.forEach(function (a) {
+            var urg = a.dias_sin_seguimiento >= 14 ? '#f55b5b' : (a.dias_sin_seguimiento >= 7 ? '#f5a35b' : '#f5d75b');
+            var meta = [a.lead_contacto, a.lead_operacion, a.lead_zona].filter(function (x) { return x; }).join(' &middot; ');
+            html += '<div style="padding:8px 10px;margin-bottom:6px;background:#0a0c14;border-left:3px solid ' + urg + ';border-radius:6px;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">'
+                + '<div><div style="color:#e0e0e0;font-weight:600;font-size:0.8rem;">' + _esc(a.lead_nombre) + '</div>'
+                + '<div style="color:#888;font-size:0.68rem;">' + _esc(a.username) + (meta ? ' &middot; ' + meta : '') + '</div></div>'
+                + '<div style="display:flex;align-items:center;gap:8px;white-space:nowrap;">'
+                + '<span style="color:' + urg + ';font-weight:700;font-size:0.75rem;">' + a.dias_sin_seguimiento + ' dias</span>'
+                + '<button type="button" class="lead-resumen-btn" data-lead-user="' + _esc(a.username) + '" style="font-size:0.68rem;padding:3px 8px;background:#1a2340;color:#8fa8ff;border:1px solid #2a3d6a;border-radius:6px;cursor:pointer;">&#129504; Resumen IA</button>'
+                + '</div></div>'
+                + '<div class="lead-resumen-box" style="display:none;margin-top:8px;padding:8px 10px;background:#0f1219;border:1px solid #232838;border-radius:6px;font-size:0.74rem;color:#cfd3dc;line-height:1.55;white-space:pre-wrap;"></div>'
+                + '</div>';
+        });
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<span style="color:#f55b5b;">Error de conexion.</span>';
+    }
 }
 
 async function loadAdminStats() {
@@ -7144,6 +7261,34 @@ async function loadInforme() {
         const users = Object.keys(data.matrix).filter(u => data.user_totals[u] > 0).sort((a, b) => data.user_totals[b] - data.user_totals[a]);
         const meta = data.meta_mensual;
 
+        // Comparativa mes vs mes anterior: solo cuando hay un mes seleccionado.
+        // Se calcula en el cliente desde totals_per_month (los 12 meses) que ya
+        // manda el backend. Sin costo extra ni cambios en el guardado.
+        let compareHtml = '';
+        const fm = data.filter_month || 0;
+        if (fm >= 1 && fm <= 12) {
+            const tpm = data.totals_per_month || {};
+            const actual = tpm[fm] || tpm[String(fm)] || 0;
+            const prevM = fm - 1;
+            if (prevM >= 1) {
+                const prev = tpm[prevM] || tpm[String(prevM)] || 0;
+                const diff = actual - prev;
+                let pct = '';
+                if (prev > 0) pct = ' (' + (diff >= 0 ? '+' : '') + Math.round((diff / prev) * 100) + '%)';
+                else if (actual > 0) pct = ' (nuevo)';
+                const col = diff > 0 ? '#5bf5a3' : (diff < 0 ? '#f55b5b' : '#9aa0b0');
+                const flecha = diff > 0 ? '&#9650;' : (diff < 0 ? '&#9660;' : '&#8594;');
+                compareHtml = '<div style="margin-bottom:12px;padding:10px 14px;background:#0a0c14;'
+                    + 'border:1px solid #1e2130;border-left:3px solid ' + col + ';border-radius:8px;font-size:0.78rem;">'
+                    + '<span style="color:#9aa0b0;">Comparativa: </span>'
+                    + '<strong style="color:#e0e0e0;">' + months[fm] + '</strong> '
+                    + '<strong style="color:#e0e0e0;">' + actual + '</strong> textos '
+                    + 'vs <strong style="color:#e0e0e0;">' + months[prevM] + '</strong> ' + prev + ' '
+                    + '<span style="color:' + col + ';font-weight:700;">' + flecha + ' ' + (diff >= 0 ? '+' : '') + diff + pct + '</span>'
+                    + '</div>';
+            }
+        }
+
         // Table header
         let tableHtml = '<div class="seller-table-frame" style="overflow-x:auto;max-height:400px;border-radius:8px;">';
         tableHtml += '<table style="width:100%;border-collapse:collapse;font-size:0.72rem;">';
@@ -7916,7 +8061,7 @@ async function loadInforme() {
             (pieVHtml ? '<div class="pie-block" style="flex:1 1 320px;min-width:300px;">' + pieVHtml + '</div>' : '') +
             '</div>';
 
-        container.innerHTML = tableHtml + totalsHtml + lineHtml + piesRowHtml + complianceHtml + actividadHtml + synthesisHtml + card2Html;
+        container.innerHTML = compareHtml + tableHtml + totalsHtml + lineHtml + piesRowHtml + complianceHtml + actividadHtml + synthesisHtml + card2Html;
         // Wire up chart interactivity now that the SVG/pie are in the DOM.
         setTimeout(function() { attachLineChartInteractivity(); attachLineChartHover(); attachPieInteractivity(); attachReportSectionInteractivity(); }, 0);
         // Fluid staggered entrance for the report blocks.
@@ -9263,9 +9408,46 @@ document.addEventListener('click', function (e) {
     fetchNotifications();
 });
 
-// Paso 1 de la perilla de feedback: ELEGIR ✓/✗. Solo marca visual y muestra el
-// boton "Aceptar"; NO envia todavia. Se puede cambiar de opcion cuantas veces
-// se quiera antes de confirmar (previene enviar un voto apretado por error).
+// Enter en el buscador global dispara la busqueda (sin onkeydown inline).
+document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    var t = e.target;
+    if (t && t.id === 'buscadorInput') { e.preventDefault(); doBuscarGlobal(); }
+});
+
+// Boton "Resumen IA" de un lead en la tarjeta de alertas. Pide el resumen al
+// backend y lo muestra en la caja del propio item (toggle). Listener delegado.
+document.addEventListener('click', function (e) {
+    var btn = _closest(e, '.lead-resumen-btn');
+    if (!btn) return;
+    var user = btn.getAttribute('data-lead-user');
+    var box = null;
+    var cur = btn;
+    // Subir hasta el item contenedor y buscar la caja del resumen.
+    for (var i = 0; i < 5 && cur; i++) {
+        cur = cur.parentElement;
+        if (cur) { var found = cur.querySelector('.lead-resumen-box'); if (found) { box = found; break; } }
+    }
+    if (!box) return;
+    if (box.style.display === 'block' && box.getAttribute('data-loaded') === '1') {
+        box.style.display = 'none';
+        box.setAttribute('data-loaded', '0');
+        return;
+    }
+    box.style.display = 'block';
+    box.textContent = 'Generando resumen...';
+    fetch('/admin/lead-resumen?user=' + encodeURIComponent(user), { cache: 'no-store' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (d && d.ok) { box.textContent = d.resumen || 'Sin datos.'; box.setAttribute('data-loaded', '1'); }
+            else { box.textContent = 'No se pudo generar el resumen.'; }
+        })
+        .catch(function () { box.textContent = 'Error de conexion.'; });
+});
+
+// Paso 1 de la perilla de feedback: ELEGIR checkmark/cross. Solo marca visual y
+// muestra el boton "Aceptar"; NO envia todavia. Se puede cambiar de opcion antes
+// de confirmar (previene enviar un voto apretado por error).
 document.addEventListener('click', function (e) {
     var btn = _closest(e, '.fb-btn');
     if (!btn) return;
@@ -11670,6 +11852,196 @@ def lead_list():
     from src.users import lead_store_pg
     fichas = lead_store_pg.list_fichas(tenant_id=_current_tenant())
     return jsonify({"ok": True, "fichas": fichas})
+
+
+@app.route("/admin/lead-alertas")
+def admin_lead_alertas():
+    """
+    Alertas de leads ACTIVOS (estado nuevo/seguimiento) sin seguimiento reciente.
+    Cruza las fichas de lead con los dias transcurridos desde su ultima
+    actualizacion (updated_at). Un lead activo que lleva muchos dias sin tocar es
+    una oportunidad que se puede estar enfriando. Solo lectura, admin only.
+
+    Umbral configurable por query ?dias=N (default 5). Los leads cerrados o
+    perdidos NO alertan (ya no requieren seguimiento).
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from datetime import datetime as _dt, timezone as _tz
+    from src.users import lead_store_pg
+    dias_umbral = request.args.get("dias", type=int) or 5
+    fichas = lead_store_pg.list_fichas(tenant_id=_current_tenant())
+    ahora = _dt.now(_tz.utc)
+    alertas = []
+    for f in fichas:
+        estado = (f.get("lead_estado") or "nuevo").lower()
+        # Solo leads que siguen requiriendo seguimiento.
+        if estado not in ("nuevo", "seguimiento"):
+            continue
+        # Un lead "vacio" (sin nombre ni notas ni CRM) no cuenta como oportunidad.
+        if not (f.get("lead_nombre") or f.get("lead_notas") or f.get("crm_text")):
+            continue
+        dias = None
+        upd = f.get("updated_at") or ""
+        try:
+            dt = _dt.fromisoformat(str(upd).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=_tz.utc)
+            dias = (ahora - dt).days
+        except Exception:
+            dias = None
+        if dias is not None and dias >= dias_umbral:
+            alertas.append({
+                "username": f.get("username", ""),
+                "lead_nombre": f.get("lead_nombre", "") or "(sin nombre)",
+                "lead_contacto": f.get("lead_contacto", ""),
+                "lead_operacion": f.get("lead_operacion", ""),
+                "lead_zona": f.get("lead_zona", ""),
+                "lead_estado": estado,
+                "dias_sin_seguimiento": dias,
+            })
+    # Mas dias sin seguimiento primero (mas urgente arriba).
+    alertas.sort(key=lambda a: -a["dias_sin_seguimiento"])
+    return jsonify({"ok": True, "alertas": alertas, "dias_umbral": dias_umbral,
+                    "total": len(alertas)})
+
+
+@app.route("/admin/lead-resumen")
+def admin_lead_resumen():
+    """
+    Resumen ejecutivo de un lead/vendedor generado por IA: junta la ficha CRM/Lead
+    con los textos recientes analizados y pide a la IA un resumen accionable del
+    estado del cliente. Solo lectura, admin only. ?user=<username>.
+
+    Si la IA no esta disponible, devuelve un resumen basico armado con reglas
+    (estado del lead + ultimos intents/sentimientos), para no dejar al admin sin
+    nada.
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    user = (request.args.get("user", "") or "").strip()
+    if not user:
+        return jsonify({"ok": False, "error": "falta user"}), 400
+    tenant = _current_tenant()
+    from src.users import lead_store_pg
+    from src.users.history_manager import get_flat_entries
+    ficha = lead_store_pg.get_ficha(user, tenant_id=tenant)
+    entradas = get_flat_entries(user, limit=15)
+
+    # Resumen de contexto para la IA (compacto: no mandamos textos enteros).
+    lineas_txt = []
+    for e in entradas:
+        nombre = (e.get("entry_name") or e.get("audio_filename") or "").strip()
+        intent = e.get("intent", "")
+        sent = e.get("sentiment", "")
+        com = e.get("commercial") or {}
+        prob = com.get("probabilidad_cierre", "")
+        frag = (e.get("text") or "")[:160]
+        lineas_txt.append(
+            f"- [{e.get('day_label', '')}] {nombre or 'sin titulo'}: intent={intent}, "
+            f"sentimiento={sent}, prob_cierre={prob}. \"{frag}\"")
+    textos_block = "\n".join(lineas_txt) if lineas_txt else "(sin textos analizados)"
+
+    ficha_block = (
+        f"Nombre: {ficha.get('lead_nombre', '')}\n"
+        f"Contacto: {ficha.get('lead_contacto', '')}\n"
+        f"Operacion: {ficha.get('lead_operacion', '')}\n"
+        f"Presupuesto: {ficha.get('lead_presupuesto', '')}\n"
+        f"Zona: {ficha.get('lead_zona', '')}\n"
+        f"Estado: {ficha.get('lead_estado', 'nuevo')}\n"
+        f"Notas: {ficha.get('lead_notas', '')}\n"
+        f"CRM: {ficha.get('crm_text', '')}"
+    )
+
+    # Fallback por reglas: siempre disponible aunque la IA falle.
+    def _fallback():
+        intents = [e.get("intent", "") for e in entradas if e.get("intent")]
+        sents = [e.get("sentiment", "") for e in entradas if e.get("sentiment")]
+        estado = ficha.get("lead_estado", "nuevo")
+        partes = [f"Lead en estado '{estado}'."]
+        if entradas:
+            partes.append(f"{len(entradas)} texto(s) reciente(s) analizado(s).")
+            if intents:
+                partes.append("Intenciones frecuentes: "
+                              + ", ".join(sorted(set(intents))[:4]) + ".")
+            if sents:
+                partes.append("Sentimiento: " + ", ".join(sorted(set(sents))[:3]) + ".")
+        else:
+            partes.append("Aun sin textos analizados para este lead.")
+        return " ".join(partes)
+
+    system = (
+        "Sos un asesor comercial senior de una inmobiliaria en Argentina. A partir "
+        "de la ficha de un lead y sus conversaciones analizadas, escribi un RESUMEN "
+        "EJECUTIVO breve y accionable para el vendedor/coordinador. Estructura: "
+        "1) Estado del cliente en 2-3 oraciones; 2) Senales clave (interes, "
+        "objeciones, urgencia); 3) Proximo paso recomendado, concreto. Se directo, "
+        "en espanol rioplatense (trato de 'vos'). No inventes datos que no esten."
+    )
+    usermsg = (
+        f"FICHA DEL LEAD:\n{ficha_block}\n\n"
+        f"TEXTOS RECIENTES:\n{textos_block}\n\n"
+        "Escribi el resumen ejecutivo."
+    )
+    try:
+        resumen = _ai_chat(
+            [{"role": "system", "content": system},
+             {"role": "user", "content": usermsg}],
+            max_tokens=700, temperature=0.4, retries=2, timeout=45,
+        )
+        if not resumen:
+            resumen = _fallback()
+            fuente = "reglas"
+        else:
+            fuente = "ia"
+    except Exception as exc:  # noqa: BLE001
+        app.logger.warning(f"admin_lead_resumen IA fallo: {exc}")
+        resumen = _fallback()
+        fuente = "reglas"
+    return jsonify({"ok": True, "user": user, "resumen": resumen,
+                    "fuente": fuente, "textos": len(entradas)})
+
+
+@app.route("/admin/buscar")
+def admin_buscar():
+    """
+    Buscador global (admin): busca una palabra/frase en los TEXTOS analizados
+    (contenido y titulo) y en las FICHAS de lead (nombre, contacto, zona, notas,
+    CRM) del tenant. Solo lectura. ?q=<texto>.
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    q = (request.args.get("q", "") or "").strip()
+    if len(q) < 2:
+        return jsonify({"ok": True, "textos": [], "leads": [], "q": q})
+    tenant = _current_tenant()
+    # Acotar la busqueda de textos a los usuarios del tenant.
+    _users = user_manager.list_users(tenant_id=(None if tenant == "__legacy__" else tenant))
+
+    from src.users.history_manager import search_entries
+    from src.users import lead_store_pg
+    textos = search_entries(q, usernames=_users, limit=25)
+
+    # Leads: filtrar en memoria las fichas del tenant por coincidencia.
+    ql = q.lower()
+    leads = []
+    for f in lead_store_pg.list_fichas(tenant_id=tenant):
+        campos = " ".join([
+            f.get("lead_nombre", ""), f.get("lead_contacto", ""),
+            f.get("lead_zona", ""), f.get("lead_operacion", ""),
+            f.get("lead_notas", ""), f.get("crm_text", ""),
+            f.get("username", ""),
+        ]).lower()
+        if ql in campos:
+            leads.append({
+                "username": f.get("username", ""),
+                "lead_nombre": f.get("lead_nombre", "") or "(sin nombre)",
+                "lead_contacto": f.get("lead_contacto", ""),
+                "lead_estado": f.get("lead_estado", "nuevo"),
+                "lead_zona": f.get("lead_zona", ""),
+            })
+    return jsonify({"ok": True, "q": q, "textos": textos, "leads": leads,
+                    "total": len(textos) + len(leads)})
 
 
 # ── Dictionary overrides (user-contributed phrases) ────────────────────────
