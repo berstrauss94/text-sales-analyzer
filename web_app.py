@@ -2867,12 +2867,12 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v28.1{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v28.2{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v28.1)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v28.2)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    El analisis con IA ahora es <strong style="color:#5bf5a3;">mas rapido y economico</strong>: si un texto ya fue analizado con las mismas condiciones, se reutiliza la explicacion en vez de volver a pedirsela a la IA.
-                    <div style="margin-top:8px;">Ademas de ahorrar, da <strong style="color:#f5a35b;">mas estabilidad</strong>: si la IA esta lenta en ese momento, un texto ya analizado igual muestra sus explicaciones completas al instante.</div>
+                    El informe de seguimiento ahora se puede <strong style="color:#5bf5a3;">exportar a Excel/CSV</strong> con el boton <strong style="color:#5bf5a3;">&#128190; Exportar</strong> (al lado de Imprimir).
+                    <div style="margin-top:8px;">Respeta los mismos filtros que estas viendo (año, mes, semana, vendedor) y descarga la tabla de cargas por vendedor y mes, lista para trabajar en planillas.</div>
                 </div>
             </div>
         </div>
@@ -3195,6 +3195,7 @@ HTML = """
                     {% endfor %}
                 </select>
                 <button id="btnPrintInforme" onclick="printInforme()" style="background:#1a2a3a;color:#5bd4f5;border:1px solid #2a3a4a;border-radius:6px;padding:6px 12px;font-size:0.75rem;cursor:pointer;" title="Imprimir informe">&#128424; Imprimir</button>
+                <button id="btnExportInforme" onclick="exportInformeCsv()" style="background:#1a3a24;color:#5bf5a3;border:1px solid #2a4a34;border-radius:6px;padding:6px 12px;font-size:0.75rem;cursor:pointer;" title="Exportar a Excel/CSV">&#128190; Exportar</button>
             </div>
         </div>
         <div id="informeContent" style="font-size:0.78rem;color:#aaa;">Cargando informe...</div>
@@ -8336,6 +8337,25 @@ function attachReportSectionInteractivity() {
     });
 }
 
+// Exporta el informe actual a CSV (se abre en Excel). Arma la URL de
+// /admin/informe.csv con los MISMOS filtros que muestra el panel.
+function exportInformeCsv() {
+    var g = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
+    var year = g('informeYear') || new Date().getFullYear();
+    var month = g('informeMonth') || 0;
+    var week = g('informeWeek') || 0;
+    var seller = g('informeSeller') || '_all';
+    var weekUpto = window._informeWeekUpto || 0;
+    var quincena = window._informeQuincena || 0;
+    var url = '/admin/informe.csv?year=' + encodeURIComponent(year)
+        + '&month=' + encodeURIComponent(month)
+        + '&week=' + encodeURIComponent(week)
+        + '&week_upto=' + encodeURIComponent(weekUpto)
+        + '&quincena=' + encodeURIComponent(quincena)
+        + '&seller=' + encodeURIComponent(seller);
+    window.open(url, '_blank');
+}
+
 function printInforme() {
     const content = document.getElementById('informeContent');
     if (!content) return;
@@ -12789,17 +12809,13 @@ def debug_sync_one():
         })
 
 
-@app.route("/admin/informe")
-def admin_informe():
+def _build_informe_data():
     """
-    Return aggregated report data for the informe panel.
-    Groups entries by username and month for annual tracking.
-    Supports filters: year, month, week, seller.
-    Admin only.
+    Construye los datos agregados del informe a partir de los filtros del request
+    (year, meta, month, week, week_upto, quincena, seller). Es la fuente UNICA que
+    usan tanto el JSON del panel como la exportacion CSV, para que coincidan
+    exactamente. Devuelve el mismo dict que la respuesta JSON.
     """
-    if not _is_admin():
-        return jsonify({"error": "unauthorized"}), 403
-
     year = request.args.get("year", type=int) or 2026
     meta_mensual = request.args.get("meta", type=int) or 30
     filter_month = request.args.get("month", type=int) or 0  # 0 = all months
@@ -12808,7 +12824,6 @@ def admin_informe():
     quincena = request.args.get("quincena", type=int) or 0    # 1 = dias 1-15, 2 = 16-fin
     filter_seller = request.args.get("seller", "") or "_all"
 
-    from src.users.history_manager import get_flat_entries
     from datetime import datetime as _dt
 
     # Multi-tenant Fase 4: la lista de vendedores del informe se acota al tenant
@@ -12886,7 +12901,7 @@ def admin_informe():
     cumplen = [u for u in target_users if matrix[u].get(eval_month, 0) >= meta_mensual]
     no_cumplen = [u for u in target_users if matrix[u].get(eval_month, 0) < meta_mensual and user_totals[u] > 0]
 
-    return jsonify({
+    return {
         "year": year,
         "meta_mensual": meta_mensual,
         "matrix": matrix,
@@ -12903,7 +12918,61 @@ def admin_informe():
         "week_upto": week_upto,
         "quincena": quincena,
         "filter_seller": filter_seller,
-    })
+        "target_users": target_users,
+    }
+
+
+@app.route("/admin/informe")
+def admin_informe():
+    """
+    Return aggregated report data for the informe panel (JSON).
+    Admin only. La logica vive en _build_informe_data (compartida con el CSV).
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    data = _build_informe_data()
+    data.pop("target_users", None)  # detalle interno, no va en el JSON del panel
+    return jsonify(data)
+
+
+@app.route("/admin/informe.csv")
+def admin_informe_csv():
+    """
+    Exporta el informe (matriz vendedor x mes + totales) como CSV, respetando los
+    MISMOS filtros que el panel (year, month, week, quincena, seller). Se abre
+    directo en Excel. Solo lectura, admin only.
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    import csv as _csv
+    import io as _io
+    data = _build_informe_data()
+    meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
+             "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    buf = _io.StringIO()
+    w = _csv.writer(buf)
+    # Encabezado con contexto de los filtros aplicados.
+    w.writerow([f"Informe {data['year']}",
+                f"Meta mensual: {data['meta_mensual']}",
+                f"Vendedor: {data['filter_seller']}"])
+    w.writerow([])
+    # Cabecera de columnas.
+    w.writerow(["Vendedor"] + meses + ["Total"])
+    matrix = data["matrix"]
+    for u in data["target_users"]:
+        fila = [u] + [matrix[u].get(m, 0) for m in range(1, 13)]
+        fila.append(data["user_totals"].get(u, 0))
+        w.writerow(fila)
+    # Fila de totales por mes.
+    tot = data["totals_per_month"]
+    w.writerow(["TOTAL"] + [tot.get(m, 0) for m in range(1, 13)]
+               + [data["total_general"]])
+    csv_text = buf.getvalue()
+    resp = app.make_response(csv_text)
+    resp.headers["Content-Type"] = "text/csv; charset=utf-8"
+    resp.headers["Content-Disposition"] = (
+        f"attachment; filename=informe_{data['year']}.csv")
+    return resp
 
 
 @app.route("/admin/actividad")
