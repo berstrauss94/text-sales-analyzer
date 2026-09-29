@@ -2867,12 +2867,12 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v28.0{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v28.1{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v28.0)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v28.1)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    Nuevo <strong style="color:#f5a35b;">Panel de Feedback de filtros</strong> (solo admin): muestra como califican los vendedores las explicaciones de la IA, con tasa de acierto por filtro y apartado, y ejemplos de lo que marcaron como poco acertado.
-                    <div style="margin-top:8px;">Se abre desde el enlace <strong style="color:#4da3ff;">&#9733; Feedback de filtros</strong> arriba del Panel de Seguimiento. Cierra el circulo: los votos guian a la IA para mejorar y ahora ademas se pueden <strong style="color:#5bf5a3;">ver y medir</strong>.</div>
+                    El analisis con IA ahora es <strong style="color:#5bf5a3;">mas rapido y economico</strong>: si un texto ya fue analizado con las mismas condiciones, se reutiliza la explicacion en vez de volver a pedirsela a la IA.
+                    <div style="margin-top:8px;">Ademas de ahorrar, da <strong style="color:#f5a35b;">mas estabilidad</strong>: si la IA esta lenta en ese momento, un texto ya analizado igual muestra sus explicaciones completas al instante.</div>
                 </div>
             </div>
         </div>
@@ -10855,6 +10855,25 @@ def _ai_refine_analysis(text, analysis_dict, tenant_id="__legacy__"):
         "tipo_operacion": com.get("tipo_operacion", ""),
         "financiamiento": com.get("financiamiento", ""),
     }
+    # --- CACHE: si este MISMO texto (con las mismas etiquetas/valores y modelo)
+    # ya fue refinado, reutilizamos el resultado en vez de volver a llamar a la
+    # IA. Ahorra costo y latencia, y da resiliencia si Gemini esta lento/caido.
+    _cache_key = None
+    try:
+        from src.users import ai_cache
+        _model_name = (os.environ.get("GEMINI_MODEL") or "gemini-3.5-flash").strip()
+        _cache_key = ai_cache.make_key(clean, cur_intent, cur_sent, sales_keys,
+                                       re_keys, com_vals, _model_name, tenant_id)
+        cached = ai_cache.get(_cache_key, tenant_id)
+        if cached:
+            _apply_ai_payload(refined, meta, cached, cur_intent, cur_sent)
+            meta["ran"] = True
+            meta["reason"] = "cache" if meta.get("has_sections") else "cache (sin apartados)"
+            meta["cached"] = True
+            return refined
+    except Exception as exc:  # noqa: BLE001
+        app.logger.warning(f"_ai_refine_analysis cache lookup fallo: {exc}")
+        _cache_key = None
     system = (
         "Sos un analista experto de conversaciones de ventas inmobiliarias en "
         "espanol de Argentina (tono rioplatense, trato de 'vos'). Recibis un "
@@ -10924,40 +10943,68 @@ def _ai_refine_analysis(text, analysis_dict, tenant_id="__legacy__"):
     if not parsed:
         meta["reason"] = "IA respondio pero sin JSON parseable"
         return refined
-    new_intent = str(parsed.get("intent") or "").upper().strip()
+    _apply_ai_payload(refined, meta, parsed, cur_intent, cur_sent)
+    if not meta["reason"]:
+        meta["reason"] = "ok" if meta["has_sections"] else "sin apartados (JSON incompleto)"
+    # Guardar en cache el resultado (solo si hubo apartados utiles). Best-effort.
+    if _cache_key and meta.get("has_sections"):
+        try:
+            from src.users import ai_cache
+            payload = {
+                "intent": refined.get("intent"),
+                "intent_confidence": refined.get("intent_confidence"),
+                "sentiment": refined.get("sentiment"),
+                "sentiment_confidence": refined.get("sentiment_confidence"),
+                "intent_sections": meta.get("intent_sections", {}),
+                "sentiment_sections": meta.get("sentiment_sections", {}),
+                "sales_concepts": meta.get("sales_concepts", {}),
+                "re_concepts": meta.get("re_concepts", {}),
+                "commercial": meta.get("commercial", {}),
+            }
+            ai_cache.put(_cache_key, payload,
+                         (os.environ.get("GEMINI_MODEL") or "gemini-3.5-flash").strip(),
+                         tenant_id)
+        except Exception as exc:  # noqa: BLE001
+            app.logger.warning(f"_ai_refine_analysis cache put fallo: {exc}")
+    return refined
+
+
+def _apply_ai_payload(refined, meta, payload, cur_intent, cur_sent):
+    """
+    Aplica un payload de refinamiento (venga de la IA o de la cache) al dict
+    `refined` y llena la traza `meta`. Valida etiquetas y sanitiza secciones.
+    Es el punto UNICO donde se traduce la respuesta de IA al resultado, para que
+    cache y respuesta fresca se comporten identico.
+    """
+    new_intent = str(payload.get("intent") or "").upper().strip()
     if new_intent in _AI_REFINE_INTENTS:
         if new_intent != cur_intent:
             meta["changed"] = True
         refined["intent"] = new_intent
-        conf = _coerce_confidence(parsed.get("intent_confidence"))
+        conf = _coerce_confidence(payload.get("intent_confidence"))
         if conf is not None:
             refined["intent_confidence"] = conf
-    new_sent = str(parsed.get("sentiment") or "").upper().strip()
+    new_sent = str(payload.get("sentiment") or "").upper().strip()
     if new_sent in _AI_REFINE_SENTIMENTS:
         if new_sent != cur_sent:
             meta["changed"] = True
         refined["sentiment"] = new_sent
-        conf = _coerce_confidence(parsed.get("sentiment_confidence"))
+        conf = _coerce_confidence(payload.get("sentiment_confidence"))
         if conf is not None:
             refined["sentiment_confidence"] = conf
-    # Apartados largos generados por la IA. Van SOLO en la traza (no se guardan).
-    meta["intent_sections"] = _sanitize_sections(parsed.get("intent_sections"))
-    meta["sentiment_sections"] = _sanitize_sections(parsed.get("sentiment_sections"))
-    # Conceptos (ventas + bienes raices): {clave: {desc, tip}}.
-    meta["sales_concepts"] = _sanitize_concept_map(parsed.get("sales_concepts"))
-    meta["re_concepts"] = _sanitize_concept_map(parsed.get("re_concepts"))
-    # Bloque comercial: {funnel|urgencia|compromiso|operacion|financiamiento: {desc, action}}.
-    meta["commercial"] = _sanitize_commercial_map(parsed.get("commercial"))
+    # Apartados largos. Van SOLO en la traza (no se persisten).
+    meta["intent_sections"] = _sanitize_sections(payload.get("intent_sections"))
+    meta["sentiment_sections"] = _sanitize_sections(payload.get("sentiment_sections"))
+    meta["sales_concepts"] = _sanitize_concept_map(payload.get("sales_concepts"))
+    meta["re_concepts"] = _sanitize_concept_map(payload.get("re_concepts"))
+    meta["commercial"] = _sanitize_commercial_map(payload.get("commercial"))
     meta["has_sections"] = bool(meta["intent_sections"]) or bool(meta["sentiment_sections"])
-    if not meta["reason"]:
-        meta["reason"] = "ok" if meta["has_sections"] else "sin apartados (JSON incompleto)"
     # Re-alinear el riesgo comercial con el sentimiento afinado (misma regla
     # que ya usa el pipeline). NO cambia densidad ni keywords del diccionario.
     if isinstance(refined.get("commercial"), dict):
         base = refined["commercial"].get("nivel_riesgo", "LOW")
         refined["commercial"]["nivel_riesgo"] = _adjust_risk_with_sentiment(
             base, refined.get("sentiment", "NEUTRAL"))
-    return refined
 
 
 def _extract_json_object(raw):
@@ -11758,6 +11805,12 @@ def admin_full_diag():
         # dos campos en entradas nuevas. Sirve para confirmar el estado sin adivinar.
         "ai_refine_persist": _ai_refine_persist_enabled(),
     }
+    # Estado de la cache de refinamiento IA (best-effort).
+    try:
+        from src.users import ai_cache
+        out["ai_cache"] = ai_cache.stats(_current_tenant())
+    except Exception as _exc:  # noqa: BLE001
+        out["ai_cache"] = {"error": str(_exc)}
     # Raw DB counts
     conn = _get_pg_conn()
     if conn:
