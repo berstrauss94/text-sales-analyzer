@@ -1,7 +1,7 @@
 # PROJECT_CONTEXT.md
 ## Analizador de Textos de Ventas Inmobiliarias — Contexto integral del proyecto
 
-> Documento de conocimiento único del sistema, pensado para dar contexto completo a personas nuevas y a herramientas de IA (Kiro AI, NotebookLM). Reúne el marco conceptual de negocio, el funcionamiento de cada herramienta y la arquitectura técnica. Versión del sistema: **v30.0**.
+> Documento de conocimiento único del sistema, pensado para dar contexto completo a personas nuevas y a herramientas de IA (Kiro AI, NotebookLM). Reúne el marco conceptual de negocio, el funcionamiento de cada herramienta y la arquitectura técnica. Versión del sistema: **v31.0**.
 
 ---
 
@@ -262,6 +262,25 @@ Configuración por empresa que adapta el **contexto de la IA** al tipo de negoci
 ### Limpieza de infraestructura (v30.0)
 Se eliminó un servicio en desuso del entorno de despliegue (Railway). Hoy el sistema corre con dos servicios: la base de datos (PostgreSQL) y la aplicación web.
 
+### App instalable — PWA (v31.0)
+El sistema es una PWA (Progressive Web App): desde el navegador del celular se puede "agregar a la pantalla de inicio" y usarlo como una app, con su ícono, pantalla propia y arranque más rápido. No requiere tiendas de aplicaciones. Técnicamente incluye un manifest y un service worker (estrategia network-first, que nunca cachea datos sensibles ni el análisis).
+
+### API pública de integración (v31.0)
+El sistema expone una API para que aplicaciones externas (un CRM, un bot de WhatsApp, otra herramienta de la empresa) envíen textos a analizar sin iniciar sesión, autenticándose con una **clave de API** (`X-API-Key`). Cada clave pertenece a una empresa, así el análisis queda aislado por tenant. La clave se guarda hasheada (SHA-256), se muestra una sola vez al crearla, se puede desactivar, y el endpoint tiene su propio límite de uso. Endpoint de análisis: `POST /api/v1/analyze` con `{"text": "..."}`. Gestión de claves: `/admin/api-keys` (crear requiere superadmin). Esta es la base técnica para las integraciones; la conexión concreta con cada proveedor (WhatsApp Business, HubSpot, etc.) se configura del lado de ese proveedor con sus credenciales.
+
+Tablas nuevas de esta versión: `api_keys` (claves de integración por empresa, hasheadas).
+
+---
+
+## 7-sexies. Pendientes que requieren decisión o acción del titular (no son código)
+
+Estos puntos amplían el producto pero dependen de cuentas, credenciales o costos externos, así que se documentan como decisiones a tomar, no como algo ya implementado:
+
+- **Región del servidor**: hoy la infraestructura corre en una región de EE.UU. Acercarla a Argentina reduciría la latencia para usuarios locales. Es una configuración del panel de Railway (no del código).
+- **Integración real con WhatsApp Business / CRMs**: el sistema ya tiene la API lista para recibir. Conectar un proveedor concreto requiere sus cuentas, tokens y (en el caso de WhatsApp) el proceso de verificación de Meta.
+- **Redundancia / alta disponibilidad**: correr más de una instancia para tolerar caídas. Decisión de costo/infraestructura.
+- **Multi-idioma**: la IA ya trabaja en español; abrir a otros idiomas amplía mercado y es un cambio acotado cuando se decida.
+
 ---
 
 ## 8. Regla de oro sobre los datos
@@ -286,4 +305,4 @@ El sistema está preparado para servir a **varias inmobiliarias** manteniendo lo
 
 ---
 
-*Documento generado como contexto integral del proyecto, con catálogo exacto de filtros, visión de producto para ventas en general, ciclo de retroalimentación y las novedades v28.0–v30.0 (panel de feedback, caché de IA, exportar informe, alertas y resumen de leads, comparativas, buscador, rate limiting, etiquetas y modo rubro). Versión del sistema: v30.0.*
+*Documento generado como contexto integral del proyecto, con catálogo exacto de filtros, visión de producto para ventas en general, ciclo de retroalimentación y las novedades v28.0–v30.0 (panel de feedback, caché de IA, exportar informe, alertas y resumen de leads, comparativas, buscador, rate limiting, etiquetas y modo rubro). Ademas suma la app instalable (PWA) y la API publica de integracion (v31.0), y documenta los pendientes que requieren decision del titular. Versión del sistema: v31.0.*
