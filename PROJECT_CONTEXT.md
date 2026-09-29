@@ -1,7 +1,7 @@
 # PROJECT_CONTEXT.md
 ## Analizador de Textos de Ventas Inmobiliarias — Contexto integral del proyecto
 
-> Documento de conocimiento único del sistema, pensado para dar contexto completo a personas nuevas y a herramientas de IA (Kiro AI, NotebookLM). Reúne el marco conceptual de negocio, el funcionamiento de cada herramienta y la arquitectura técnica. Versión del sistema: **v27.3**.
+> Documento de conocimiento único del sistema, pensado para dar contexto completo a personas nuevas y a herramientas de IA (Kiro AI, NotebookLM). Reúne el marco conceptual de negocio, el funcionamiento de cada herramienta y la arquitectura técnica. Versión del sistema: **v30.0**.
 
 ---
 
@@ -127,6 +127,8 @@ Los votos negativos se reutilizan como ejemplos "a evitar" en el prompt de la IA
 - `user_messages`: chat de sugerencias (con foto en base64).
 - `lead_fichas`: fichas CRM/Lead por vendedor (una por vendedor, upsert).
 - `filter_feedback`: votos ✓/✗ por apartado de cada filtro (tabla separada, no toca el historial).
+- `ai_refine_cache`: caché de las explicaciones de IA por texto (ahorra costo/latencia; tabla separada).
+- `tenant_config`: configuración por empresa, incluye el "rubro" del negocio (modo rubro).
 
 ### Variables de entorno relevantes
 - `DATABASE_URL`: conexión a PostgreSQL.
@@ -223,6 +225,45 @@ Importante sobre los límites reales: el sistema **no reentrena el modelo de IA 
 
 ---
 
+## 7-quinquies. Novedades recientes (v28.0 – v30.0)
+
+Esta sección resume las capacidades agregadas después de la v27.3, para que el contexto quede al día.
+
+### Panel de feedback de filtros (v28.0)
+Panel admin de solo lectura (`/admin/feedback`) que muestra cómo califican los vendedores las explicaciones de la IA: totales de votos, **tasa de acierto** global, tabla por filtro y apartado (ordenada por los que más votos negativos tienen) y ejemplos de las explicaciones marcadas como poco acertadas. Cierra el círculo del feedback: ahora los votos no solo alimentan a la IA, también se pueden ver y medir.
+
+### Caché de explicaciones de IA (v28.1)
+Las explicaciones que genera la IA se guardan en una tabla separada (`ai_refine_cache`) con una clave basada en el texto + etiquetas detectadas + modelo. Si un texto se reanaliza en las mismas condiciones, se reutiliza la explicación en vez de volver a llamar a Gemini. Beneficios: **ahorra costo** de IA, **responde al instante** en textos ya vistos y da **resiliencia** (si la IA está lenta/caída, un texto cacheado igual muestra sus explicaciones). Tiene vencimiento (30 días) y una versión de prompt para refrescar todo cuando se mejora el prompt.
+
+### Exportar informe a Excel/CSV (v28.2)
+El informe de seguimiento se exporta a CSV (se abre directo en Excel) con el botón **Exportar**, respetando los mismos filtros que se están viendo (año, mes, semana, vendedor). Descarga la matriz de cargas por vendedor y mes con sus totales.
+
+### Alertas de leads sin seguimiento (v29.0)
+Tarjeta admin que avisa qué leads **activos** (estado nuevo/seguimiento) llevan varios días sin tocarse, ordenados por urgencia, con umbral configurable (3/5/7/14 días). Convierte los datos del CRM en una acción concreta para no perder oportunidades.
+
+### Resumen ejecutivo por lead con IA (v29.0)
+Botón "Resumen IA" en cada lead: la IA junta la ficha del cliente + sus textos recientes y redacta un resumen accionable (estado del cliente, señales clave, próximo paso). Si la IA no responde, arma un resumen básico por reglas.
+
+### Comparativa entre períodos (v29.0)
+En el informe, al seleccionar un mes se muestra una comparación con el mes anterior: cantidad, diferencia y % de variación, con indicador visual de subida/bajada.
+
+### Buscador global (v29.0)
+Buscador admin que encuentra por palabra clave tanto en los **textos analizados** (contenido y título) como en las **fichas de lead** (nombre, contacto, zona, notas, CRM, etiquetas).
+
+### Seguridad: rate limiting (v30.0)
+Protección contra abuso y fuerza bruta: el acceso (login) y las funciones que usan IA (análisis, audio, simulador, chat) tienen límites de uso por período. Si se superan, el sistema pide esperar unos segundos. Es una defensa de robustez que también controla el costo de IA ante usos anómalos.
+
+### Etiquetas (tags) en los leads (v30.0)
+Cada lead puede tener etiquetas libres (ej. "urgente", "referido", "crédito") que se muestran como chips y sirven para segmentar y encontrar clientes desde el buscador.
+
+### Modo rubro (v30.0)
+Configuración por empresa que adapta el **contexto de la IA** al tipo de negocio (inmobiliaria, autos, seguros, tecnología, retail, servicios, genérico). No reentrena el modelo: cambia el lenguaje con el que la IA redacta las explicaciones. Por defecto es "inmobiliaria" (comportamiento actual). Es la base para ofrecer el producto a empresas de ventas de otros rubros.
+
+### Limpieza de infraestructura (v30.0)
+Se eliminó un servicio en desuso del entorno de despliegue (Railway). Hoy el sistema corre con dos servicios: la base de datos (PostgreSQL) y la aplicación web.
+
+---
+
 ## 8. Regla de oro sobre los datos
 
 Cualquier cambio que mejore cómo se muestran o explican los análisis **nunca** debe alterar los textos históricos ni su fecha. Se distingue siempre entre:
@@ -245,4 +286,4 @@ El sistema está preparado para servir a **varias inmobiliarias** manteniendo lo
 
 ---
 
-*Documento generado como contexto integral del proyecto, con catálogo exacto de filtros, visión de producto para ventas en general y ciclo de retroalimentación. Versión del sistema: v27.3.*
+*Documento generado como contexto integral del proyecto, con catálogo exacto de filtros, visión de producto para ventas en general, ciclo de retroalimentación y las novedades v28.0–v30.0 (panel de feedback, caché de IA, exportar informe, alertas y resumen de leads, comparativas, buscador, rate limiting, etiquetas y modo rubro). Versión del sistema: v30.0.*
