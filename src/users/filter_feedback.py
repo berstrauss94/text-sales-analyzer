@@ -229,6 +229,42 @@ def stats(tenant_id: str = "__legacy__") -> dict:
         return {}
 
 
+def totals(tenant_id: str = "__legacy__") -> dict:
+    """
+    Totales globales de votos del tenant: {"up": N, "down": M, "total": N+M}.
+    {"up":0,"down":0,"total":0} si PG no esta o no hay votos.
+    """
+    base = {"up": 0, "down": 0, "total": 0}
+    if not is_available():
+        return base
+    conn = _conn()
+    if conn is None:
+        return base
+    try:
+        _ensure_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT vote, COUNT(*) FROM filter_feedback "
+                "WHERE tenant_id = %s GROUP BY vote",
+                (tenant_id or "__legacy__",),
+            )
+            rows = cur.fetchall()
+        _release(conn)
+        for v, cnt in rows:
+            if v in ("up", "down"):
+                base[v] = int(cnt)
+        base["total"] = base["up"] + base["down"]
+        return base
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"filter_feedback totals error: {exc}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        _release(conn, close=True)
+        return base
+
+
 def recent_negative(filter_key: str, section_key: str, tenant_id: str = "__legacy__",
                     limit: int = 3) -> list[dict]:
     """

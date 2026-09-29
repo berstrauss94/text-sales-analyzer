@@ -2867,13 +2867,12 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v27.3{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v28.0{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v27.2)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v28.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    Ahora <strong style="color:#5bf5a3;">TODOS los filtros</strong> traen explicaciones a medida escritas por la IA: intencion, sentimiento, <strong style="color:#f5a35b;">conceptos de ventas y de bienes raices</strong>, y el <strong style="color:#f5a35b;">analisis comercial</strong> (funnel, urgencia, compromiso, operacion, financiamiento).
-                    <div style="margin-top:8px;">Cada apartado tiene su perilla <strong style="color:#5bf5a3;">&#10003;</strong> / <strong style="color:#f55b5b;">&#10007;</strong>. Elegis y despues toca <strong style="color:#cdd6ff;">Aceptar</strong> para confirmar (podes cambiar de opcion antes de aceptar, por si tocaste una sin querer). Tus votos guian a la IA para mejorar.</div>
-                    <div style="margin-top:8px;color:#9aa0b0;font-size:0.68rem;">Si la IA no esta disponible en ese momento, ves el analisis normal, sin cambios.</div>
+                    Nuevo <strong style="color:#f5a35b;">Panel de Feedback de filtros</strong> (solo admin): muestra como califican los vendedores las explicaciones de la IA, con tasa de acierto por filtro y apartado, y ejemplos de lo que marcaron como poco acertado.
+                    <div style="margin-top:8px;">Se abre desde el enlace <strong style="color:#4da3ff;">&#9733; Feedback de filtros</strong> arriba del Panel de Seguimiento. Cierra el circulo: los votos guian a la IA para mejorar y ahora ademas se pueden <strong style="color:#5bf5a3;">ver y medir</strong>.</div>
                 </div>
             </div>
         </div>
@@ -3115,7 +3114,7 @@ HTML = """
     <!-- ── ADMIN STATS PANEL ── -->
     <div class="input-section" id="adminStatsPanel" style="margin-top:20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-            <div id="adminStatsTitulo" style="font-size:0.85rem;font-weight:600;color:#b38bff;">📊 Panel de Seguimiento (Admin)</div>
+            <div id="adminStatsTitulo" style="font-size:0.85rem;font-weight:600;color:#b38bff;">📊 Panel de Seguimiento (Admin) &nbsp;<a href="/admin/feedback" target="_blank" style="font-size:0.7rem;font-weight:600;color:#4da3ff;text-decoration:none;border:1px solid #2a3d6a;border-radius:6px;padding:2px 8px;">&#9733; Feedback de filtros</a></div>
             <div id="statsFilters" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                 <select id="statsVendor" onchange="loadAdminStats()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.8rem;">
                     <option value="_all">General (todos)</option>
@@ -11172,7 +11171,7 @@ def api_filter_feedback():
 
 @app.route("/admin/filter-feedback-stats")
 def admin_filter_feedback_stats():
-    """Resumen de votos por filtro/apartado (admin). Solo lectura."""
+    """Resumen de votos por filtro/apartado (admin). Solo lectura. JSON crudo."""
     if not _is_admin():
         return jsonify({"error": "unauthorized"}), 403
     try:
@@ -11180,6 +11179,143 @@ def admin_filter_feedback_stats():
         return jsonify({"ok": True, "stats": filter_feedback.stats(_current_tenant())})
     except Exception as exc:  # noqa: BLE001
         return jsonify({"ok": False, "error": str(exc)})
+
+
+# Etiquetas legibles para el panel de feedback.
+_FB_FILTER_LABELS = {
+    "intent": "Intencion del texto",
+    "sentiment": "Sentimiento",
+    "sales": "Conceptos de ventas",
+    "re": "Conceptos de bienes raices",
+    "commercial": "Analisis comercial",
+}
+_FB_SECTION_LABELS = {
+    "meaning": "Que significa para la venta",
+    "seller": "Para el vendedor",
+    "tips": "Tips practicos",
+    "next": "Siguiente paso",
+    "risk": "Nivel de riesgo",
+    "funnel": "Funnel", "urgencia": "Urgencia", "compromiso": "Compromiso",
+    "operacion": "Operacion", "financiamiento": "Financiamiento",
+}
+
+
+def _fb_esc(s):
+    """Escapa HTML minimo para mostrar textos de forma segura."""
+    return (str(s or "")
+            .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+
+
+@app.route("/admin/feedback")
+def admin_feedback_panel():
+    """
+    Panel visual (HTML) del feedback de los vendedores sobre los filtros. Solo
+    lectura, admin only. Muestra: totales, tabla por filtro/apartado con % de
+    acierto, y ejemplos de explicaciones marcadas como poco acertadas. Aprovecha
+    la tabla filter_feedback (separada del historial): cero impacto en datos.
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users import filter_feedback
+    tenant = _current_tenant()
+    stats = filter_feedback.stats(tenant)
+    totals = filter_feedback.totals(tenant)
+
+    # Filas de la tabla: (filtro, apartado, up, down, %acierto), ordenadas por
+    # mas votos negativos primero (lo que mas conviene revisar).
+    filas = []
+    for fk, secciones in stats.items():
+        for sk, vt in secciones.items():
+            up = vt.get("up", 0)
+            down = vt.get("down", 0)
+            tot = up + down
+            pct = round(100 * up / tot) if tot else 0
+            filas.append((fk, sk, up, down, tot, pct))
+    filas.sort(key=lambda r: (-r[3], -r[4]))  # mas down primero, luego mas votos
+
+    filas_html = ""
+    if filas:
+        for fk, sk, up, down, tot, pct in filas:
+            flabel = _FB_FILTER_LABELS.get(fk, fk)
+            slabel = _FB_SECTION_LABELS.get(sk, sk)
+            color = "#5bf5a3" if pct >= 70 else ("#f5a35b" if pct >= 40 else "#f55b5b")
+            filas_html += (
+                "<tr>"
+                f"<td>{_fb_esc(flabel)}</td>"
+                f"<td>{_fb_esc(slabel)}</td>"
+                f"<td style='text-align:center;color:#5bf5a3;'>{up}</td>"
+                f"<td style='text-align:center;color:#f55b5b;'>{down}</td>"
+                f"<td style='text-align:center;'>{tot}</td>"
+                f"<td style='text-align:center;color:{color};font-weight:700;'>{pct}%</td>"
+                "</tr>"
+            )
+    else:
+        filas_html = "<tr><td colspan='6' style='text-align:center;color:#888;padding:20px;'>Aun no hay votos registrados.</td></tr>"
+
+    # Ejemplos de explicaciones marcadas como poco acertadas (down), por filtro.
+    ejemplos_html = ""
+    for fk in ("intent", "sentiment", "sales", "re", "commercial"):
+        negs = filter_feedback.recent_negative_any(fk, tenant, limit=5)
+        if not negs:
+            continue
+        items = ""
+        for n in negs:
+            slabel = _FB_SECTION_LABELS.get(n.get("section_key", ""), n.get("section_key", ""))
+            txt = _fb_esc(n.get("section_text", ""))[:400]
+            items += (
+                f"<div style='margin:6px 0;padding:8px 10px;background:#0a0c14;"
+                f"border-left:3px solid #f55b5b;border-radius:6px;'>"
+                f"<div style='font-size:0.68rem;color:#f5a35b;font-weight:600;'>{_fb_esc(slabel)}</div>"
+                f"<div style='font-size:0.75rem;color:#cfd3dc;margin-top:3px;'>{txt}</div>"
+                f"</div>"
+            )
+        ejemplos_html += (
+            f"<div style='margin-bottom:14px;'>"
+            f"<div style='font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:4px;'>"
+            f"{_fb_esc(_FB_FILTER_LABELS.get(fk, fk))}</div>{items}</div>"
+        )
+    if not ejemplos_html:
+        ejemplos_html = "<div style='color:#888;'>Sin explicaciones marcadas como poco acertadas.</div>"
+
+    pct_global = round(100 * totals["up"] / totals["total"]) if totals["total"] else 0
+    page = f"""<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feedback de filtros</title>
+<style>
+  body {{ background:#0b0d14; color:#e0e0e0; font-family:system-ui,Segoe UI,Roboto,sans-serif; margin:0; padding:24px; }}
+  h1 {{ font-size:1.2rem; margin:0 0 4px; }}
+  .sub {{ color:#9aa0b0; font-size:0.8rem; margin-bottom:20px; }}
+  .cards {{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px; }}
+  .card {{ background:#12141c; border:1px solid #22252f; border-radius:10px; padding:14px 18px; min-width:120px; }}
+  .card .n {{ font-size:1.6rem; font-weight:700; }}
+  .card .l {{ font-size:0.7rem; color:#9aa0b0; text-transform:uppercase; letter-spacing:0.04em; }}
+  table {{ width:100%; border-collapse:collapse; background:#12141c; border-radius:10px; overflow:hidden; }}
+  th, td {{ padding:9px 12px; font-size:0.8rem; border-bottom:1px solid #1e212b; }}
+  th {{ text-align:left; color:#9aa0b0; text-transform:uppercase; font-size:0.68rem; letter-spacing:0.04em; }}
+  h2 {{ font-size:0.95rem; margin:28px 0 10px; }}
+  a.back {{ color:#4da3ff; font-size:0.8rem; text-decoration:none; }}
+</style></head><body>
+  <a class="back" href="/">&#8592; Volver al sistema</a>
+  <h1>Feedback de los filtros</h1>
+  <div class="sub">Cómo califican los vendedores las explicaciones de la IA. Solo lectura.</div>
+  <div class="cards">
+    <div class="card"><div class="n">{totals['total']}</div><div class="l">Votos totales</div></div>
+    <div class="card"><div class="n" style="color:#5bf5a3;">{totals['up']}</div><div class="l">Acertados</div></div>
+    <div class="card"><div class="n" style="color:#f55b5b;">{totals['down']}</div><div class="l">Poco acertados</div></div>
+    <div class="card"><div class="n" style="color:#4da3ff;">{pct_global}%</div><div class="l">Tasa de acierto</div></div>
+  </div>
+  <h2>Detalle por filtro y apartado</h2>
+  <table>
+    <thead><tr><th>Filtro</th><th>Apartado</th><th style="text-align:center;">&#10003;</th>
+    <th style="text-align:center;">&#10007;</th><th style="text-align:center;">Total</th>
+    <th style="text-align:center;">Acierto</th></tr></thead>
+    <tbody>{filas_html}</tbody>
+  </table>
+  <h2>Explicaciones marcadas como poco acertadas</h2>
+  {ejemplos_html}
+</body></html>"""
+    return app.make_response(page)
 
 
 def _log_activity(event_type, tool="", entry_id="", detail="", username=None):
