@@ -414,6 +414,14 @@ HTML = """
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    <!-- PWA: instalable en el celular. El manifest y el service worker se
+         sirven como rutas Flask (/manifest.webmanifest y /sw.js). -->
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#0b0d14">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Analizador">
     <title>Analizador de Textos - Ventas y Bienes Raices v7</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -2868,14 +2876,13 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v30.0{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.0{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v30.0)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v31.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    Mejoras de robustez y organizacion:
-                    <div style="margin-top:6px;">&#128274; <strong style="color:#5bf5a3;">Mas seguridad</strong>: proteccion contra abuso en el acceso y en las funciones con IA.</div>
-                    <div style="margin-top:4px;">&#127991; <strong style="color:#f5c06a;">Etiquetas en los leads</strong>: clasifica cada cliente (urgente, referido, credito...) y encontralos por etiqueta.</div>
-                    <div style="margin-top:4px;">&#127970; <strong style="color:#8fa8ff;">Modo rubro</strong>: el sistema puede adaptar la IA a distintos tipos de negocio, no solo inmobiliaria.</div>
+                    El sistema da un paso hacia plataforma:
+                    <div style="margin-top:6px;">&#128241; <strong style="color:#5bf5a3;">App instalable</strong>: podes agregar el sistema a la pantalla de tu celular como una app (desde el menu del navegador, "Agregar a inicio").</div>
+                    <div style="margin-top:4px;">&#128279; <strong style="color:#8fa8ff;">API de integracion</strong>: otros sistemas (CRM, bots) pueden enviar textos a analizar mediante una clave de API, con el analisis aislado por empresa.</div>
                 </div>
             </div>
         </div>
@@ -3277,6 +3284,13 @@ HTML = """
 <script>
 const INDICADOR_CATEGORIAS = {{ indicador_categorias_json | safe }};
 window.CURRENT_USERNAME = (document.body && document.body.getAttribute('data-username')) || '';
+// PWA: registrar el service worker para que la app sea instalable y arranque
+// mas rapido. Best-effort: si el navegador no soporta SW, no pasa nada.
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').catch(function () {});
+    });
+}
 let _lastCommercialData = null;
 window._currentEntryName = '';
 window._currentEntryId = '';
@@ -10969,6 +10983,91 @@ def _current_tenant():
     return session.get("tenant_id") or _DEFAULT_TENANT
 
 
+@app.route("/manifest.webmanifest")
+def pwa_manifest():
+    """Manifest PWA: hace la app instalable en el celular (icono, nombre, tema)."""
+    import json as _json
+    manifest = {
+        "name": "Analizador de Textos de Ventas",
+        "short_name": "Analizador",
+        "description": "Analisis de conversaciones de venta con IA.",
+        "start_url": "/",
+        "scope": "/",
+        "display": "standalone",
+        "background_color": "#0b0d14",
+        "theme_color": "#0b0d14",
+        "lang": "es-AR",
+        "icons": [
+            {"src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}
+        ],
+    }
+    resp = app.make_response(_json.dumps(manifest, ensure_ascii=False))
+    resp.headers["Content-Type"] = "application/manifest+json; charset=utf-8"
+    return resp
+
+
+@app.route("/icon.svg")
+def pwa_icon():
+    """Icono de la app (SVG vectorial: nitido en cualquier tamano, sin binarios)."""
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">'
+        '<rect width="512" height="512" rx="96" fill="#0b0d14"/>'
+        '<rect x="112" y="120" width="288" height="44" rx="12" fill="#4a6cf7"/>'
+        '<rect x="112" y="200" width="220" height="44" rx="12" fill="#5bd4f5"/>'
+        '<rect x="112" y="280" width="288" height="44" rx="12" fill="#5bf5a3"/>'
+        '<rect x="112" y="360" width="160" height="44" rx="12" fill="#f5a35b"/>'
+        '</svg>'
+    )
+    resp = app.make_response(svg)
+    resp.headers["Content-Type"] = "image/svg+xml"
+    resp.headers["Cache-Control"] = "public, max-age=86400"
+    return resp
+
+
+@app.route("/sw.js")
+def pwa_service_worker():
+    """
+    Service worker minimo: cachea el shell de la app para arranque rapido y para
+    que sea instalable. Estrategia network-first para navegaciones (siempre trae
+    la version fresca si hay red; usa cache si no hay), evitando servir HTML
+    viejo tras un deploy. No cachea /analyze ni endpoints de datos.
+    """
+    js = """
+const CACHE = 'analizador-v1';
+self.addEventListener('install', function (e) { self.skipWaiting(); });
+self.addEventListener('activate', function (e) {
+    e.waitUntil(caches.keys().then(function (keys) {
+        return Promise.all(keys.filter(function (k) { return k !== CACHE; })
+            .map(function (k) { return caches.delete(k); }));
+    }));
+    self.clients.claim();
+});
+self.addEventListener('fetch', function (e) {
+    var req = e.request;
+    if (req.method !== 'GET') return;  // no tocar POST (analyze, login, etc.)
+    var url = new URL(req.url);
+    // No cachear APIs ni datos: siempre a la red.
+    if (url.pathname.indexOf('/api/') === 0 || url.pathname.indexOf('/admin/') === 0
+        || url.pathname === '/analyze' || url.pathname === '/history'
+        || url.pathname === '/saved-texts') {
+        return;
+    }
+    // Network-first para el resto (HTML, icono): fresco si hay red, cache si no.
+    e.respondWith(
+        fetch(req).then(function (resp) {
+            var copy = resp.clone();
+            caches.open(CACHE).then(function (c) { c.put(req, copy); });
+            return resp;
+        }).catch(function () { return caches.match(req); })
+    );
+});
+"""
+    resp = app.make_response(js)
+    resp.headers["Content-Type"] = "application/javascript; charset=utf-8"
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
 def _client_ip():
     """
     IP del cliente para el rate limiting. Respeta X-Forwarded-For (Railway pone
@@ -12168,6 +12267,99 @@ def admin_rubro():
     ok = tenant_config.set_config(
         tenant, str(data.get("rubro", "")), str(data.get("descripcion", "")))
     return jsonify({"ok": bool(ok)})
+
+
+# ── API PUBLICA (integraciones externas: CRM, WhatsApp, otras apps) ─────────
+# Autenticacion por clave de API (header X-API-Key), no por sesion. Cada clave
+# pertenece a una empresa (tenant) y el analisis queda aislado por empresa.
+
+@app.route("/admin/api-keys", methods=["GET", "POST"])
+def admin_api_keys():
+    """
+    Gestion de claves de API del tenant. GET lista (admin); POST crea una nueva
+    (superadmin) y la devuelve UNA sola vez. Tambien POST con action=deactivate
+    + hint desactiva una clave.
+    """
+    from src.users import api_keys
+    tenant = _current_tenant()
+    if request.method == "GET":
+        if not _is_admin():
+            return jsonify({"error": "unauthorized"}), 403
+        return jsonify({"ok": True, "keys": api_keys.list_keys(tenant)})
+    if not _is_superadmin():
+        return jsonify({"ok": False, "error": "solo superadmin"}), 403
+    data = request.get_json(silent=True) or {}
+    if str(data.get("action", "")) == "deactivate":
+        ok = api_keys.deactivate(tenant, str(data.get("hint", "")))
+        return jsonify({"ok": bool(ok)})
+    raw = api_keys.create_key(tenant, str(data.get("label", "")))
+    if not raw:
+        return jsonify({"ok": False, "error": "no se pudo crear la clave"}), 500
+    # La clave se muestra UNA sola vez. Guardala ahora: no se puede recuperar.
+    return jsonify({"ok": True, "api_key": raw,
+                    "aviso": "Guarda esta clave ahora. No se vuelve a mostrar."})
+
+
+@app.route("/api/v1/analyze", methods=["POST"])
+def api_v1_analyze():
+    """
+    API publica de analisis. Autenticacion por header X-API-Key. Recibe JSON
+    {"text": "..."} y devuelve el analisis (intencion, sentimiento, conceptos,
+    comercial), aislado por el tenant de la clave. NO guarda en el historial
+    (es de solo analisis); la integracion decide que hacer con el resultado.
+    """
+    from src.users import api_keys
+    raw_key = request.headers.get("X-API-Key", "")
+    tenant = api_keys.resolve_tenant(raw_key)
+    if not tenant:
+        return jsonify({"error": True, "error_code": "UNAUTHORIZED",
+                        "error_message": "Clave de API invalida o inactiva"}), 401
+    # Rate limit por clave (no por sesion): protege costo y abuso.
+    ok_rl, retry = rate_limiter.check(f"apiv1:{raw_key[:16]}", limit=60, window_seconds=60)
+    if not ok_rl:
+        r = jsonify({"error": True, "error_code": "RATE_LIMITED",
+                     "error_message": f"Limite superado. Reintenta en {retry}s."})
+        r.status_code = 429
+        r.headers["Retry-After"] = str(retry)
+        return r
+
+    data = request.get_json(silent=True) or {}
+    text = str(data.get("text", "") or "").strip()
+    if not text:
+        return jsonify({"error": True, "error_code": "BAD_REQUEST",
+                        "error_message": "Falta el campo 'text'"}), 400
+
+    result = analyzer.analyze(text)
+    if isinstance(result, AnalysisError):
+        return jsonify({"error": True, "error_code": result.error_code,
+                        "error_message": result.error_message}), 400
+    ca = commercial_analyzer.analyze(text)
+    analysis_dict = {
+        "intent": result.intent,
+        "intent_confidence": result.intent_confidence,
+        "sentiment": result.sentiment,
+        "sentiment_confidence": result.sentiment_confidence,
+        "sales_concepts": [
+            {"concept": c.concept, "confidence": c.confidence, "source_text": c.source_text}
+            for c in result.sales_concepts
+        ],
+        "real_estate_concepts": [
+            {"concept": c.concept, "confidence": c.confidence, "source_text": c.source_text}
+            for c in result.real_estate_concepts
+        ],
+        "entities": [
+            {"concept": e.concept, "raw_value": e.raw_value,
+             "numeric_value": e.numeric_value, "unit": e.unit}
+            for e in result.entities
+        ],
+        "commercial": _build_commercial_dict(ca),
+    }
+    analysis_dict["commercial"]["nivel_riesgo"] = _adjust_risk_with_sentiment(
+        analysis_dict["commercial"].get("nivel_riesgo", "LOW"), result.sentiment)
+    # Afinado con IA (mismo mecanismo que la app; usa el rubro del tenant).
+    refined = _ai_refine_analysis(text, analysis_dict, tenant)
+    refined.pop("_ai_refine", None)  # traza interna: no va en la respuesta publica
+    return jsonify({"error": False, "input_text": text, **refined})
 
 
 # ── Dictionary overrides (user-contributed phrases) ────────────────────────
