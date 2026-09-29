@@ -2876,7 +2876,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.1{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.2{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v31.1)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -3069,8 +3069,10 @@ HTML = """
                 <span id="crmLeadArrow" style="font-size:1.4rem;line-height:1;transition:transform 0.2s;">&#9658;</span>
                 CRM y Lead del cliente
             </button>
-            <span class="card-info-icon" id="infoIconCrmLead" onclick="event.stopPropagation()" style="position:static;font-size:0.62rem;width:16px;height:16px;line-height:16px;text-align:center;">!</span>
-            <div class="card-info-tooltip" style="top:38px;left:0;right:auto;min-width:250px;max-width:330px;font-size:0.72rem;">Dos casillas persistentes del cliente que quedan guardadas y disponibles al volver a entrar: CRM (texto libre de seguimiento) y Lead (ficha con nombre, contacto, operacion, presupuesto, zona, estado, notas y etiquetas).</div>
+            <span style="position:relative;display:inline-flex;align-items:center;">
+                <span class="card-info-icon" id="infoIconCrmLead" onclick="event.stopPropagation()" style="position:static;font-size:0.62rem;width:16px;height:16px;line-height:16px;text-align:center;">!</span>
+                <div class="card-info-tooltip" style="top:26px;left:0;right:auto;min-width:250px;max-width:330px;font-size:0.72rem;white-space:normal;">Dos casillas persistentes del cliente que quedan guardadas y disponibles al volver a entrar: CRM (texto libre de seguimiento) y Lead (ficha con nombre, contacto, operacion, presupuesto, zona, estado, notas y etiquetas).</div>
+            </span>
         </div>
 
         <div id="crmLeadPanel" style="display:none;margin-top:10px;border:1px solid #6a4a2a;border-radius:10px;padding:14px;background:#140f08;">
@@ -3127,9 +3129,11 @@ HTML = """
     <!-- ── BUSCADOR GLOBAL (ADMIN) ── -->
     <div class="input-section" id="buscadorPanel" style="margin-top:20px;">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <div style="font-size:0.85rem;font-weight:600;color:#5bd4f5;white-space:nowrap;position:relative;">&#128269; Buscador
-                <span class="card-info-icon" onclick="event.stopPropagation()" style="position:static;font-size:0.62rem;width:16px;height:16px;line-height:16px;text-align:center;">!</span>
-                <div class="card-info-tooltip" style="top:22px;left:0;right:auto;min-width:240px;max-width:300px;font-size:0.72rem;">Busca una palabra o frase en los textos analizados (contenido y titulo) y en las fichas de lead (nombre, contacto, zona, notas, etiquetas). Escribi y toca Buscar o Enter.</div>
+            <div style="font-size:0.85rem;font-weight:600;color:#5bd4f5;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;">&#128269; Buscador
+                <span style="position:relative;display:inline-flex;align-items:center;">
+                    <span class="card-info-icon" onclick="event.stopPropagation()" style="position:static;font-size:0.62rem;width:16px;height:16px;line-height:16px;text-align:center;">!</span>
+                    <div class="card-info-tooltip" style="top:22px;left:0;right:auto;min-width:240px;max-width:300px;font-size:0.72rem;white-space:normal;">Busca una palabra o frase en los textos analizados (contenido y titulo) y en las fichas de lead (nombre, contacto, zona, notas, etiquetas). Escribi y toca Buscar o Enter.</div>
+                </span>
             </div>
             <input type="text" id="buscadorInput" placeholder="Buscar en textos y leads (nombre, zona, contenido...)" style="flex:1;min-width:200px;background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:8px 12px;font-size:0.8rem;box-sizing:border-box;">
             <button type="button" id="buscadorBtn" onclick="doBuscarGlobal()" style="background:#101c2a;color:#5bd4f5;border:1px solid #2a3a4a;border-radius:6px;padding:8px 14px;font-size:0.78rem;cursor:pointer;">Buscar</button>
@@ -3140,9 +3144,11 @@ HTML = """
     <!-- ── ADMIN STATS PANEL ── -->
     <div class="input-section" id="adminStatsPanel" style="margin-top:20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-            <div id="adminStatsTitulo" style="font-size:0.85rem;font-weight:600;color:#b38bff;position:relative;">📊 Panel de Seguimiento (Admin) &nbsp;<a href="/admin/feedback" target="_blank" style="font-size:0.7rem;font-weight:600;color:#4da3ff;text-decoration:none;border:1px solid #2a3d6a;border-radius:6px;padding:2px 8px;">&#9733; Feedback de filtros</a>
-                <span class="card-info-icon" onclick="event.stopPropagation()" style="position:static;font-size:0.62rem;width:16px;height:16px;line-height:16px;text-align:center;">!</span>
-                <div class="card-info-tooltip" style="top:22px;left:0;right:auto;min-width:250px;max-width:320px;font-size:0.72rem;">Tendencias por vendedor, cumplimiento de metas y uso del sistema. El enlace "Feedback de filtros" abre un panel que muestra como califican los vendedores las explicaciones de la IA (tasa de acierto por filtro).</div>
+            <div id="adminStatsTitulo" style="font-size:0.85rem;font-weight:600;color:#b38bff;display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;">📊 Panel de Seguimiento (Admin) <a href="/admin/feedback" target="_blank" style="font-size:0.7rem;font-weight:600;color:#4da3ff;text-decoration:none;border:1px solid #2a3d6a;border-radius:6px;padding:2px 8px;">&#9733; Feedback de filtros</a>
+                <span style="position:relative;display:inline-flex;align-items:center;">
+                    <span class="card-info-icon" onclick="event.stopPropagation()" style="position:static;font-size:0.62rem;width:16px;height:16px;line-height:16px;text-align:center;">!</span>
+                    <div class="card-info-tooltip" style="top:22px;left:0;right:auto;min-width:250px;max-width:320px;font-size:0.72rem;white-space:normal;">Tendencias por vendedor, cumplimiento de metas y uso del sistema. El enlace "Feedback de filtros" abre un panel que muestra como califican los vendedores las explicaciones de la IA (tasa de acierto por filtro).</div>
+                </span>
             </div>
             <div id="statsFilters" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                 <select id="statsVendor" onchange="loadAdminStats()" style="background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px 10px;font-size:0.8rem;">
@@ -3184,9 +3190,11 @@ HTML = """
     <!-- ── ALERTAS DE LEADS SIN SEGUIMIENTO ── -->
     <div class="input-section" id="leadAlertasPanel" style="margin-top:20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-            <div style="font-size:0.85rem;font-weight:600;color:#f5a35b;position:relative;">&#128276; Leads sin seguimiento
-                <span class="card-info-icon" onclick="event.stopPropagation()" style="position:static;font-size:0.62rem;width:16px;height:16px;line-height:16px;text-align:center;">!</span>
-                <div class="card-info-tooltip" style="top:22px;left:0;right:auto;min-width:250px;max-width:320px;font-size:0.72rem;">Avisa que leads activos (nuevo o en seguimiento) llevan varios dias sin actualizarse, para que no se enfrien. Ordenados por urgencia. Ajusta el umbral de dias con el selector. Cada lead tiene un boton de Resumen IA.</div>
+            <div style="font-size:0.85rem;font-weight:600;color:#f5a35b;display:inline-flex;align-items:center;gap:6px;">&#128276; Leads sin seguimiento
+                <span style="position:relative;display:inline-flex;align-items:center;">
+                    <span class="card-info-icon" onclick="event.stopPropagation()" style="position:static;font-size:0.62rem;width:16px;height:16px;line-height:16px;text-align:center;">!</span>
+                    <div class="card-info-tooltip" style="top:22px;left:0;right:auto;min-width:250px;max-width:320px;font-size:0.72rem;white-space:normal;">Avisa que leads activos (nuevo o en seguimiento) llevan varios dias sin actualizarse, para que no se enfrien. Ordenados por urgencia. Ajusta el umbral de dias con el selector. Cada lead tiene un boton de Resumen IA.</div>
+                </span>
             </div>
             <div style="display:flex;gap:8px;align-items:center;">
                 <label for="leadAlertaDias" style="font-size:0.72rem;color:#9aa0b0;">Alertar tras</label>
