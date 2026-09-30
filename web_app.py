@@ -414,9 +414,8 @@ HTML = """
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <!-- PWA: instalable en el celular. El manifest y el service worker se
-         sirven como rutas Flask (/manifest.webmanifest y /sw.js). -->
-    <link rel="manifest" href="/manifest.webmanifest">
+    <!-- PWA desactivada temporalmente: el service worker rompia la carga. Se
+         deja solo el theme-color (inofensivo); sin manifest ni SW. -->
     <meta name="theme-color" content="#0b0d14">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -2896,7 +2895,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.6{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.7{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v31.1)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -3326,12 +3325,19 @@ HTML = """
 <script>
 const INDICADOR_CATEGORIAS = {{ indicador_categorias_json | safe }};
 window.CURRENT_USERNAME = (document.body && document.body.getAttribute('data-username')) || '';
-// PWA: registrar el service worker para que la app sea instalable y arranque
-// mas rapido. Best-effort: si el navegador no soporta SW, no pasa nada.
+// El service worker se DESHABILITO: la version anterior rompia la carga de la
+// pagina (intentaba cachear requests chrome-extension y rechazaba la navegacion).
+// Aca desregistramos cualquier SW ya instalado y borramos sus caches, para que
+// los navegadores que lo tenian vuelvan a cargar la app normal, sin cache.
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function () {
-        navigator.serviceWorker.register('/sw.js').catch(function () {});
-    });
+    navigator.serviceWorker.getRegistrations().then(function (regs) {
+        regs.forEach(function (r) { r.unregister(); });
+    }).catch(function () {});
+    if (window.caches && caches.keys) {
+        caches.keys().then(function (keys) {
+            keys.forEach(function (k) { caches.delete(k); });
+        }).catch(function () {});
+    }
 }
 let _lastCommercialData = null;
 window._currentEntryName = '';
@@ -11073,47 +11079,31 @@ def pwa_icon():
 @app.route("/sw.js")
 def pwa_service_worker():
     """
-    Service worker minimo: cachea el shell de la app para arranque rapido y para
-    que sea instalable. Estrategia network-first para navegaciones (siempre trae
-    la version fresca si hay red; usa cache si no hay), evitando servir HTML
-    viejo tras un deploy. No cachea /analyze ni endpoints de datos.
+    Service worker AUTO-DESTRUCTIVO. La version anterior rompia la carga de la
+    pagina: intentaba cachear requests con esquema 'chrome-extension' (fallaba el
+    put) y hacia que el FetchEvent de la navegacion se rechazara, sirviendo una
+    version rota/vieja. En vez de intentar arreglar el caching, se ELIMINA el SW:
+    este script se desregistra a si mismo y borra todas sus caches. Los
+    navegadores que ya tenian el SW instalado (como el del usuario) lo purgan en
+    la proxima carga y la app vuelve a funcionar sin service worker, sirviendo
+    siempre HTML fresco desde el servidor.
     """
     js = """
-const CACHE = 'analizador-v2';
-self.addEventListener('install', function (e) { self.skipWaiting(); });
+self.addEventListener('install', function () { self.skipWaiting(); });
 self.addEventListener('activate', function (e) {
-    e.waitUntil(caches.keys().then(function (keys) {
-        return Promise.all(keys.filter(function (k) { return k !== CACHE; })
-            .map(function (k) { return caches.delete(k); }));
-    }));
-    self.clients.claim();
+    e.waitUntil((async function () {
+        try {
+            var keys = await caches.keys();
+            await Promise.all(keys.map(function (k) { return caches.delete(k); }));
+        } catch (err) {}
+        try { await self.registration.unregister(); } catch (err) {}
+        try {
+            var clients = await self.clients.matchAll();
+            clients.forEach(function (c) { c.navigate(c.url); });
+        } catch (err) {}
+    })());
 });
-self.addEventListener('fetch', function (e) {
-    var req = e.request;
-    if (req.method !== 'GET') return;  // no tocar POST (analyze, login, etc.)
-    var url = new URL(req.url);
-    // El HTML (navegaciones) SIEMPRE a la red, sin cache: asi cada deploy se ve
-    // al instante y nunca queda una version vieja pegada. Si no hay red, cae al
-    // ultimo HTML que hubiera en cache como fallback.
-    if (req.mode === 'navigate' || (req.headers.get('accept') || '').indexOf('text/html') !== -1) {
-        e.respondWith(fetch(req).catch(function () { return caches.match(req); }));
-        return;
-    }
-    // No cachear APIs ni datos: siempre a la red.
-    if (url.pathname.indexOf('/api/') === 0 || url.pathname.indexOf('/admin/') === 0
-        || url.pathname === '/analyze' || url.pathname === '/history'
-        || url.pathname === '/saved-texts') {
-        return;
-    }
-    // Recursos estaticos (icono, etc.): cache con refresco en segundo plano.
-    e.respondWith(
-        fetch(req).then(function (resp) {
-            var copy = resp.clone();
-            caches.open(CACHE).then(function (c) { c.put(req, copy); });
-            return resp;
-        }).catch(function () { return caches.match(req); })
-    );
-});
+// Sin handler de 'fetch': el SW no intercepta nada mientras se desinstala.
 """
     resp = app.make_response(js)
     resp.headers["Content-Type"] = "application/javascript; charset=utf-8"
