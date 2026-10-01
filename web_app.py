@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.9{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.10{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v31.1)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -2911,10 +2911,10 @@ HTML = """
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
             <button id="tutorialBtn" type="button" onclick="startTour()" disabled title="El tutorial se habilita cuando el sistema termina de cargar" aria-label="Iniciar tutorial guiado" style="font-size:0.75rem;padding:4px 10px;margin-right:6px;background:#22242e;color:#666;border:1px solid #3a3d4a;border-radius:6px;cursor:not-allowed;opacity:0.7;">&#127891; Cargando...</button>
             <button id="soundToggleBtn" type="button" onclick="toggleUISound()" title="Activar/silenciar sonidos de interfaz" aria-label="Activar o silenciar sonidos de interfaz" style="font-size:0.75rem;padding:4px 10px;margin-right:6px;background:#2a2d3a;color:#888;border:1px solid #3a3d4a;border-radius:6px;cursor:pointer;">&#128266; Sonido</button>
-            {% if username not in ['admin', 'Vanesa.Admin', 'Berna.Strauss', 'FedericoCeballos', 'MartinianoSosa'] %}
+            {% if username != 'Berna.Strauss' %}
             <button id="chatBtn" type="button" onclick="toggleChatWidget()" title="Consultas y sugerencias" aria-label="Abrir chat de consultas y sugerencias" style="font-size:0.75rem;padding:4px 10px;margin-right:6px;background:#1a2a4a;color:#7b9cff;border:1px solid #4a6cf7;border-radius:6px;cursor:pointer;">&#128172; Chat</button>
             {% endif %}
-            {% if username in ['admin', 'Vanesa.Admin', 'Berna.Strauss', 'FedericoCeballos', 'MartinianoSosa'] %}
+            {% if username == 'Berna.Strauss' %}
             <span id="adminNotifWrapper" style="display:inline-block;margin-right:6px;vertical-align:middle;">
                 <button id="notifBellBtn" type="button" onclick="toggleNotificationsMenu()" title="Consultas de los vendedores" aria-label="Ver consultas de los vendedores" style="font-size:0.9rem;padding:2px 8px;background:#22242e;color:#e0b46a;border:1px solid #3a3d4a;border-radius:6px;cursor:pointer;position:relative;">&#128276;<span id="notifBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:#f55b5b;color:#fff;font-size:0.55rem;font-weight:700;min-width:15px;height:15px;line-height:15px;border-radius:8px;padding:0 3px;text-align:center;">0</span></button>
             </span>
@@ -11859,8 +11859,8 @@ def messages_send():
 
 @app.route("/api/messages/admin-notifications")
 def messages_admin_notifications():
-    """Mensajes sin resolver de la empresa del admin (para la campana)."""
-    if not _is_admin():
+    """Mensajes sin resolver del tenant (para la campana). Solo Berna.Strauss."""
+    if session.get("username") != "Berna.Strauss":
         return jsonify({"error": "unauthorized"}), 403
     from src.users import message_store_pg
     msgs = message_store_pg.list_messages(
@@ -11870,8 +11870,8 @@ def messages_admin_notifications():
 
 @app.route("/api/messages/<int:message_id>/resolve", methods=["POST"])
 def messages_resolve(message_id):
-    """El admin marca un mensaje como resuelto (solo de su empresa)."""
-    if not _is_admin():
+    """El admin marca un mensaje como resuelto (solo Berna.Strauss)."""
+    if session.get("username") != "Berna.Strauss":
         return jsonify({"error": "unauthorized"}), 403
     from src.users import message_store_pg
     ok = message_store_pg.mark_resolved(message_id, tenant_id=_current_tenant())
@@ -11880,8 +11880,8 @@ def messages_resolve(message_id):
 
 @app.route("/api/messages/history")
 def messages_history():
-    """Historial COMPLETO (resueltos y no) de la empresa del admin."""
-    if not _is_admin():
+    """Historial COMPLETO de mensajes (solo Berna.Strauss)."""
+    if session.get("username") != "Berna.Strauss":
         return jsonify({"error": "unauthorized"}), 403
     from src.users import message_store_pg
     msgs = message_store_pg.list_messages(
