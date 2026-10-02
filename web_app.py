@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.10{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.11{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v31.1)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -6035,22 +6035,23 @@ function feedbackToggle(filterKey, sectionKey, label) {
 var TOUR_STEPS = [
     { sel: '.date-selectors', title: 'Elegir el texto', text: 'Acá seleccionás el año, el mes y el texto guardado que querés ver o volver a analizar.' },
     { sel: '#textareaWrapper', title: 'Cargar la conversación', text: 'Escribí o pegá acá la conversación de venta que querés analizar. Luego podés filtrar y seleccionar el texto guardado desde los selectores de arriba.' },
-    { sel: '#btnHighlightDefine', title: 'Resaltar y definir', text: 'Seleccioná una palabra o frase y agregala al diccionario de filtros, eligiendo a qué categoría pertenece.' },
-    { sel: '#btnEditDictionary', title: 'Editar diccionario', text: 'Revisá todas las palabras del diccionario: podés eliminar las que ya no sirven o moverlas al filtro correcto.' },
+    { sel: '#btnHighlightDefine', title: 'Resaltar y definir', text: 'Seleccioná una palabra o frase del texto y agregala al diccionario de filtros. Así el sistema aprende el vocabulario de tu empresa y mejora la detección.' },
+    { sel: '#btnEditDictionary', title: 'Editar diccionario', text: 'Revisá todas las palabras y frases del diccionario: podés eliminar las que ya no sirven o moverlas al filtro correcto si fueron mal clasificadas.' },
     { sel: '#infoIconHelp', title: 'Ayuda rápida (!)', text: 'En distintas partes del sistema vas a ver este ícono. Al pasar el cursor te muestra una explicación breve de qué hace cada función.' },
-    { sel: '.btn-primary', title: 'Analizar', text: 'Con un clic, el sistema analiza el texto: intención, sentimiento, conceptos y el nivel de riesgo de perder la venta.' },
+    { sel: '.btn-primary', title: 'Analizar', text: 'Analiza el texto en todos sus filtros: intención, sentimiento, conceptos de venta y bienes raíces, datos extraídos y nivel de riesgo. La IA redacta las explicaciones a medida de cada conversación.' },
     { sel: '#btnClear', title: 'Limpiar', text: 'Borra el texto y los resultados para empezar de cero con una nueva conversación.' },
-    { sel: '.btn-save', title: 'Guardar', text: 'Guarda el texto analizado para poder consultarlo y compararlo más adelante.' },
-    { sel: '#crmLeadToggle', title: 'CRM y Lead del cliente', text: 'Dos casillas que quedan guardadas: CRM (seguimiento libre del cliente) y la ficha de Lead (nombre, contacto, operación, presupuesto, zona, estado, notas y etiquetas). Se abre con el triángulo naranja.' },
-    { sel: '#buscadorPanel', title: 'Buscador', text: 'Buscá una palabra en los textos analizados y en las fichas de lead (nombre, zona, notas, etiquetas) para encontrar rápido lo que necesitás.' },
-    { sel: '#leadAlertasPanel', title: 'Leads sin seguimiento', text: 'Avisa qué leads activos llevan varios días sin tocarse, para que no se enfríen. Podés pedir un Resumen IA del estado de cada cliente.' },
-    { sel: '#adminStatsTitulo', title: 'Panel de seguimiento', text: 'El panel de administración: tendencias por vendedor, cumplimiento de metas y el seguimiento de uso del sistema. El enlace “Feedback de filtros” muestra cómo califican los vendedores las explicaciones de la IA.' },
+    { sel: '.btn-save', title: 'Guardar', text: 'Guarda el texto analizado con un nombre para consultarlo, compararlo y verlo en los informes. Solo los administradores pueden guardar.' },
+    { sel: '#crmLeadToggle', title: 'CRM y Lead del cliente', text: 'Dos casillas persistentes que quedan guardadas y disponibles cada vez que entrás: CRM (seguimiento libre del cliente) y la ficha de Lead con nombre, contacto, operación, presupuesto, zona, estado, notas y etiquetas. Se abre con el triángulo naranja.' },
+    { sel: '#chatBtn', title: 'Chat de ayuda y sugerencias', text: '"Necesito ayuda" para que la IA te responda al instante. "Tengo una sugerencia" para que le llegue una notificación al coordinador. Podés adjuntar una foto también.' },
+    { sel: '#buscadorPanel', title: 'Buscador', text: 'Buscá una palabra o frase en todos los textos analizados y en las fichas de lead (nombre, zona, notas, etiquetas) para encontrar rápido lo que necesitás. Enter o el botón Buscar.' },
+    { sel: '#leadAlertasPanel', title: 'Leads sin seguimiento', text: 'Avisa qué leads activos llevan varios días sin tocarse, ordenados por urgencia. Cada lead tiene un botón Resumen IA que genera un diagnóstico del estado del cliente con el próximo paso recomendado.' },
+    { sel: '#adminStatsTitulo', title: 'Panel de seguimiento', text: 'Tendencias por vendedor, cumplimiento de metas y uso del sistema. Feedback de filtros muestra la tasa de acierto de las explicaciones de la IA por filtro.' },
     { sel: '#statsFilters', title: 'Filtros del panel', text: 'Filtrá el panel por vendedor, mes y período (mensual, trimestral, anual...) para ver justo lo que necesitás.' },
-    { sel: '#statsPieChart', title: 'Distribución de indicadores', text: 'La torta muestra el peso de cada indicador comercial (positivas, cierre, objeciones, etc.) en el período elegido.' },
-    { sel: '#informeTitulo', title: 'Informe de seguimiento', text: 'El informe completo del equipo. Podés filtrarlo por período, año, mes, semana y vendedor, e imprimirlo.' },
+    { sel: '#statsPieChart', title: 'Distribución de indicadores', text: 'La torta muestra el peso de cada indicador comercial (positivas, cierre, objeciones, etc.) en el período elegido. Tocá un segmento para ver el detalle de palabras detectadas.' },
+    { sel: '#informeTitulo', title: 'Informe de seguimiento', text: 'El informe completo del equipo. Filtralo por período, año, mes, semana y vendedor. Al elegir un mes específico aparece la comparativa automática con el mes anterior.' },
     { sel: '#informePreset', title: 'Filtro de período', text: 'Elegí rápido el período a mostrar: Enero a la fecha, el mes en curso, primeras semanas, etc.' },
     { sel: '#informeYear', title: 'Filtro de año', text: 'Seleccioná el año del informe.' },
-    { sel: '#informeMonth', title: 'Filtro de mes', text: 'Muestra todos los meses o acota el informe a un mes puntual.' },
+    { sel: '#informeMonth', title: 'Filtro de mes', text: 'Muestra todos los meses o acota el informe a un mes puntual. Al elegir un mes aparece la comparativa con el mes anterior: cantidad, diferencia y porcentaje de variación.' },
     { sel: '#informeWeek', title: 'Filtro de semana', text: 'Acota el informe a una semana específica del mes seleccionado.' },
     { sel: '#informeSeller', title: 'Filtro por vendedor', text: 'Muestra el informe de todo el equipo o de un vendedor puntual.' },
     { sel: '#btnPrintInforme', title: 'Imprimir informe', text: 'Genera el informe formal en hoja blanca, listo para presentar o entregar en físico.' },
@@ -6060,9 +6061,9 @@ var TOUR_STEPS = [
     { sel: '#piesRow', title: 'Distribución', text: 'Dos gráficos de torta: el reparto de la actividad por mes y por vendedor.' },
     { sel: '.activity-block', title: 'Seguimiento de uso', text: 'Cuánto usa cada vendedor el sistema: ingresos, tiempo, última vez y herramientas usadas. Tocá Ingresos o Tiempo para ver el detalle por día.' },
     { sel: '#informeReporte', title: 'Informe redactado', text: 'Un informe de auditoría escrito automáticamente (objeto, metodología, resultados y desempeño), listo para imprimir.' },
-    { sel: '#simulatorHeader', title: 'Simulador de ventas', text: 'Practicá una conversación de venta contra un cliente simulado por IA, con distintos niveles de dificultad.' },
+    { sel: '#simulatorHeader', title: 'Simulador de ventas', text: 'Practicá una conversación real contra un cliente simulado por IA con 5 niveles de dificultad (fácil a veterano). El simulador sugiere 3 posibles respuestas para guiarte. Ideal para entrenar antes de una reunión importante.' },
     { sel: '#versionBadge', title: 'Novedades', text: 'Tocá la versión para ver, en palabras simples, qué trae cada actualización del sistema.' },
-    { sel: '#tutorialBtn', title: 'Repetir el tutorial', text: 'Podés volver a ver este recorrido cuando quieras desde acá. Listo, ya conocés lo principal!' }
+    { sel: '#tutorialBtn', title: 'Repetir el tutorial', text: 'Podés volver a ver este recorrido cuando quieras desde acá. Listo, ya conocés todo el sistema!' }
 ];
 var _tourIdx = 0;
 var _tourActive = [];  // pasos filtrados a los elementos realmente visibles
