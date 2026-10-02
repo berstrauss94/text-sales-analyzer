@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.11{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.12{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v31.1)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -8864,6 +8864,10 @@ async function sendToSimulator(message) {
         }
         renderSimSuggestions(data.suggestions || []);
         if (data.ended) {
+            if (data.sale_closed) {
+                // Cierre exitoso: mensaje especial y sugerencia de revisar frases.
+                addSimMessage('system', '&#127881; Vendiste! La IA acepto la compra. Revisa la conversacion: si hay frases clave que usaste bien, podes agregarlas al diccionario con "Resaltar y definir".');
+            }
             endSimulation();
         }
     } catch(e) {
@@ -10830,15 +10834,37 @@ def simulator_chat():
 
     system_prompt = difficulty_prompts.get(difficulty, difficulty_prompts["mediano"])
     system_prompt += "\n\nREGLAS:\n- Responde SIEMPRE en espanol.\n- Maximo 60 palabras por respuesta.\n- Nunca rompas el personaje.\n- Si el vendedor logra convencerte genuinamente, acepta la compra.\n- Si detectas que el vendedor no maneja objeciones, muestra mas resistencia."
-    # Ademas de responder como cliente, sugerir 3 respuestas cortas que el
-    # VENDEDOR podria darte en el proximo turno (para guiarlo). Se pide en JSON.
+
+    # APERTURA VARIADA: si es el inicio, pedimos un primer mensaje del cliente
+    # con un angulo aleatorio (precio, ubicacion, plazo, inversion, comparativa
+    # con la competencia, etc.) para evitar que SIEMPRE empiece igual.
+    if message == "[INICIO]":
+        aperturas = [
+            "Empeza la simulacion. Abris con una PREGUNTA sobre el precio o las condiciones de pago, como lo haria un cliente real interesado.",
+            "Empeza la simulacion. Abris con una DUDA sobre la ubicacion y el entorno del inmueble (servicios, transporte, zona).",
+            "Empeza la simulacion. Abris mostrando que ya estuviste mirando otros proyectos y comparas, cuestionando el valor diferencial.",
+            "Empeza la simulacion. Abris como alguien que consulta para invertir: pregunta sobre rentabilidad, ROI o plusvalia.",
+            "Empeza la simulacion. Abris con dudas sobre los plazos de entrega y el estado de avance de la obra.",
+            "Empeza la simulacion. Abris como un cliente que fue referido por alguien, pregunta de forma amigable pero quiere confirmar que vale la pena.",
+            "Empeza la simulacion. Abris con una consulta practica: metraje disponible, orientacion, si hay cochera o espacios comunes.",
+            "Empeza la simulacion. Abris como alguien que recibio informacion por redes y quiere confirmar si los datos que vio son reales.",
+        ]
+        import random as _random
+        apertura = _random.choice(aperturas)
+        inicio_msg = apertura
+    else:
+        inicio_msg = None
+
+    # Formato de salida: JSON con response + 4 sugerencias para el vendedor.
     system_prompt += (
         "\n\nFORMATO DE SALIDA: responde EXCLUSIVAMENTE con un JSON valido, sin "
         "texto extra ni markdown, con esta forma exacta:\n"
-        '{\"response\": \"tu respuesta como cliente\", \"suggestions\": '
-        '[\"posible respuesta 1 del vendedor\", \"posible respuesta 2\", \"posible respuesta 3\"]}\n'
-        "Las 3 sugerencias son opciones BREVES que el VENDEDOR podria usar para "
-        "responderte, utiles segun lo que acabas de decir."
+        '{"response": "tu respuesta como cliente", "suggestions": '
+        '["opcion 1 del vendedor", "opcion 2", "opcion 3", "opcion 4"], '
+        '"sale_closed": false}\n'
+        "Las 4 sugerencias son frases BREVES Y DISTINTAS que el VENDEDOR podria "
+        "usar para responderte. sale_closed debe ser true SOLO si el vendedor "
+        "logro convencerte y aceptaste comprar."
     )
 
     # Build messages for OpenAI
@@ -10849,10 +10875,11 @@ def simulator_chat():
         elif msg.get("role") == "client":
             openai_messages.append({"role": "assistant", "content": msg["text"]})
 
-    if message and message != "[INICIO]":
+    if inicio_msg:
+        # Apertura variada: le decimos al cliente con que angulo empezar.
+        openai_messages.append({"role": "user", "content": inicio_msg})
+    elif message and message != "[INICIO]":
         openai_messages.append({"role": "user", "content": message})
-    elif message == "[INICIO]":
-        openai_messages.append({"role": "user", "content": "Hola, buenas tardes."})
 
     try:
         # _ai_chat reintenta ante fallos transitorios (timeout/red), comunes en
@@ -10871,13 +10898,20 @@ def simulator_chat():
             reply = (parsed.get("response") or "").strip() or raw
             sug = parsed.get("suggestions") or []
             if isinstance(sug, list):
-                suggestions = [str(s).strip() for s in sug if str(s).strip()][:3]
+                suggestions = [str(s).strip() for s in sug if str(s).strip()][:4]
+            sale_closed = bool(parsed.get("sale_closed", False))
         except Exception:
             # Si no vino JSON, usamos el texto crudo como respuesta (sin sugerencias).
             reply = raw
             suggestions = []
+            sale_closed = False
         if not reply:
             reply = "Disculpa, no te escuche bien. Me lo repetis?"
+        # Si el cliente cerro la venta exitosamente, notificar al frontend para
+        # que pueda guardar la simulacion como caso de exito.
+        if sale_closed:
+            return jsonify({"response": reply, "suggestions": suggestions,
+                            "ended": True, "sale_closed": True})
         return jsonify({"response": reply, "suggestions": suggestions, "ended": False})
     except Exception as exc:
         app.logger.error(f"Simulator error: {exc}")
