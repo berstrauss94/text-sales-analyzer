@@ -5134,13 +5134,16 @@ function _fmtMoney(n, moneda) {
 }
 
 async function loadInteligencia() {
+    console.log('[INTEL] loadInteligencia() disparada');
     const container = document.getElementById('inteligenciaContent');
-    if (!container) return;
+    if (!container) { console.warn('[INTEL] NO existe #inteligenciaContent'); return; }
     container.innerHTML = '<span style="color:#555;">Cargando inteligencia comercial...</span>';
     try {
         const resp = await fetch('/admin/inteligencia', { cache: 'no-store' });
-        if (!resp.ok) { container.innerHTML = '<span style="color:#f55b5b;">Error ' + resp.status + '</span>'; return; }
+        console.log('[INTEL] fetch status =', resp.status, resp.ok);
+        if (!resp.ok) { container.innerHTML = '<span style="color:#f55b5b;">Error ' + resp.status + ' al cargar inteligencia (¿sesión de admin activa?)</span>'; return; }
         const d = await resp.json();
+        console.log('[INTEL] respuesta JSON =', d);
         if (!d.ok) { container.innerHTML = '<span style="color:#f55b5b;">No se pudo cargar.</span>'; return; }
         window._inteligenciaData = d;   // guardar para el reporte imprimible
 
@@ -5216,7 +5219,9 @@ async function loadInteligencia() {
             + '<div style="font-size:0.64rem;color:#777;margin-top:6px;">El ROI compara el ingreso extra anual (por la mejora de cierre) contra el costo anual del sistema. Son proyecciones sobre los parámetros cargados.</div>';
 
         container.innerHTML = embudoHtml + objHtml + roiHtml;
+        console.log('[INTEL] panel renderizado OK');
     } catch (e) {
+        console.error('[INTEL] excepción:', e);
         container.innerHTML = '<span style="color:#f55b5b;">Error de conexión.</span>';
     }
 }
