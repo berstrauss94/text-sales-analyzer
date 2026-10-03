@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.0{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.1{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -5177,14 +5177,19 @@ async function loadInteligencia() {
         // Proyeccion financiera ROI.
         var roiColor = (p.roi_pct === null || p.roi_pct === undefined) ? '#9aa0b0' : (p.roi_pct >= 0 ? '#5bf5a3' : '#f55b5b');
         var roiTxt = (p.roi_pct === null || p.roi_pct === undefined) ? 'Cargá los parámetros' : (p.roi_pct + '%');
+        // Textos de ayuda de cada metrica (que es + para que sirve). Parentesis
+        // balanceados a proposito para no romper el gate de JS.
+        var tipLTV = '<b>LTV — Valor de Vida del Cliente.</b> Qué es: el total de ingresos que se espera que genere un cliente promedio durante toda su relación con la empresa. Para qué sirve: saber cuánto es razonable invertir en captar un cliente nuevo. Un LTV alto indica buena retención.';
+        var tipARR = '<b>ARR — Ingresos Recurrentes Anuales.</b> Qué es: el valor de los ingresos recurrentes normalizados a un año. Para qué sirve: medir la tracción del negocio, predecir el flujo de caja y evaluar el valor de la empresa. Ejemplo: 100 clientes a 100/mes equivalen a 120.000 al año.';
+        var tipROI = '<b>ROI — Retorno de la Inversión.</b> Qué es: la ganancia obtenida en relación al dinero invertido. Para qué sirve: determinar si una iniciativa genera dinero o es pérdida. Fórmula: beneficio neto dividido el costo, por 100. Ejemplo: invertir 1.000 y ganar 4.000 neto da un ROI de 400%.';
         var roiHtml = '<div style="font-size:0.75rem;font-weight:600;color:#5bf5a3;margin:14px 0 6px;">Proyección financiera (estimada)</div>'
             + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;">'
-            + _roiCard('ROI anual', roiTxt, roiColor)
-            + _roiCard('LTV por venta', _fmtMoney(p.ltv_proyectado, moneda), '#8fa8ff')
+            + _roiCard('ROI anual', roiTxt, roiColor, tipROI)
+            + _roiCard('LTV por venta', _fmtMoney(p.ltv_proyectado, moneda), '#8fa8ff', tipLTV)
             + _roiCard('Ventas extra/mes', (p.ventas_extra_mes || 0), '#5bf5a3')
             + _roiCard('Ingreso extra/mes', _fmtMoney(p.ingreso_extra_mes, moneda), '#5bf5a3')
             + _roiCard('Ingreso extra/año', _fmtMoney(p.ingreso_extra_anual, moneda), '#5bf5a3')
-            + _roiCard('ARR proyectado', _fmtMoney(p.arr_proyectado, moneda), '#8fa8ff')
+            + _roiCard('ARR proyectado', _fmtMoney(p.arr_proyectado, moneda), '#8fa8ff', tipARR)
             + _roiCard('Costo anual (TCO)', _fmtMoney(p.costo_anual, moneda), '#f5a35b')
             + '</div>'
             + '<div style="font-size:0.64rem;color:#777;margin-top:6px;">El ROI compara el ingreso extra anual (por la mejora de cierre) contra el costo anual del sistema. Son proyecciones sobre los parámetros cargados.</div>';
@@ -5195,9 +5200,18 @@ async function loadInteligencia() {
     }
 }
 
-function _roiCard(label, value, color) {
-    return '<div style="background:#0a0c14;border:1px solid #1e2130;border-radius:8px;padding:8px 10px;">'
-        + '<div style="font-size:0.62rem;color:#9aa0b0;text-transform:uppercase;letter-spacing:0.03em;">' + _esc(label) + '</div>'
+// tip opcional: si viene, agrega el icono (!) con tooltip violeta (mismo estilo
+// que el resto del sistema) explicando que es la metrica y para que sirve.
+function _roiCard(label, value, color, tip) {
+    var ayuda = '';
+    if (tip) {
+        ayuda = ' <span class="info-wrap">'
+            + '<span class="card-info-icon" onclick="event.stopPropagation()" style="position:static;font-size:0.55rem;width:14px;height:14px;line-height:14px;text-align:center;">!</span>'
+            + '<div class="card-info-tooltip info-up" style="left:0;right:auto;min-width:230px;max-width:300px;font-size:0.7rem;">' + tip + '</div>'
+            + '</span>';
+    }
+    return '<div style="background:#0a0c14;border:1px solid #1e2130;border-radius:8px;padding:8px 10px;position:relative;">'
+        + '<div style="font-size:0.62rem;color:#9aa0b0;text-transform:uppercase;letter-spacing:0.03em;display:inline-flex;align-items:center;">' + _esc(label) + ayuda + '</div>'
         + '<div style="font-size:1rem;font-weight:700;color:' + color + ';margin-top:2px;">' + _esc(String(value)) + '</div></div>';
 }
 
