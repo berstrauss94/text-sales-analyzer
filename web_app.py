@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.5{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.6{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -3240,7 +3240,21 @@ HTML = """
                     <div class="card-info-tooltip info-up" style="left:0;right:auto;min-width:260px;max-width:340px;font-size:0.72rem;">Cruza los datos ya analizados para mostrar: en qué etapa del embudo se traban los leads, qué objeciones frenan la venta, y una proyección financiera (LTV, ARR, ROI) sobre los parámetros que cargás abajo. Las cifras financieras son estimaciones sobre esos parámetros, no ventas reales.</div>
                 </span>
             </div>
-            <button type="button" id="btnPrintInteligencia" onclick="printInteligencia()" style="background:#1a2a3a;color:#5bd4f5;border:1px solid #2a3a4a;border-radius:6px;padding:6px 12px;font-size:0.75rem;cursor:pointer;" title="Imprimir reporte de auditoría">&#128424; Imprimir reporte</button>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                <span class="info-wrap">
+                    <button type="button" style="background:#141a2e;color:#8fa8ff;border:1px solid #2a3a5a;border-radius:6px;padding:5px 11px;font-size:0.72rem;font-weight:600;cursor:help;">LTV</button>
+                    <div class="card-info-tooltip info-up" style="left:0;right:auto;min-width:240px;max-width:320px;font-size:0.72rem;"><b>LTV — Valor de Vida del Cliente.</b> Es el total de ingresos que se espera que genere un cliente promedio durante toda su relación con la empresa. Sirve para saber cuánto es razonable invertir en captar un cliente nuevo. Un LTV alto indica buena retención.</div>
+                </span>
+                <span class="info-wrap">
+                    <button type="button" style="background:#141a2e;color:#8fa8ff;border:1px solid #2a3a5a;border-radius:6px;padding:5px 11px;font-size:0.72rem;font-weight:600;cursor:help;">ARR</button>
+                    <div class="card-info-tooltip info-up" style="left:0;right:auto;min-width:240px;max-width:320px;font-size:0.72rem;"><b>ARR — Ingresos Recurrentes Anuales.</b> Es el valor de los ingresos recurrentes normalizados a un año. Sirve para medir la tracción del negocio, predecir el flujo de caja y evaluar el valor de la empresa. Ejemplo: 100 clientes a 100 por mes equivalen a 120.000 al año.</div>
+                </span>
+                <span class="info-wrap">
+                    <button type="button" style="background:#141a2e;color:#5bf5a3;border:1px solid #2a4a34;border-radius:6px;padding:5px 11px;font-size:0.72rem;font-weight:600;cursor:help;">ROI</button>
+                    <div class="card-info-tooltip info-up" style="left:0;right:auto;min-width:240px;max-width:320px;font-size:0.72rem;"><b>ROI — Retorno de la Inversión.</b> Es la ganancia obtenida en relación al dinero invertido. Sirve para determinar si una iniciativa genera dinero o es pérdida. Fórmula: beneficio neto dividido el costo, por 100. Ejemplo: invertir 1.000 y ganar 4.000 neto da un ROI de 400%.</div>
+                </span>
+                <button type="button" id="btnPrintInteligencia" onclick="printInteligencia()" style="background:#1a2a3a;color:#5bd4f5;border:1px solid #2a3a4a;border-radius:6px;padding:6px 12px;font-size:0.75rem;cursor:pointer;" title="Imprimir reporte de auditoría">&#128424; Imprimir reporte</button>
+            </div>
         </div>
         <div id="inteligenciaContent" style="font-size:0.8rem;color:#888;">Cargando inteligencia comercial...</div>
 
@@ -5134,16 +5148,13 @@ function _fmtMoney(n, moneda) {
 }
 
 async function loadInteligencia() {
-    console.log('[INTEL] loadInteligencia() disparada');
     const container = document.getElementById('inteligenciaContent');
-    if (!container) { console.warn('[INTEL] NO existe #inteligenciaContent'); return; }
+    if (!container) return;
     container.innerHTML = '<span style="color:#555;">Cargando inteligencia comercial...</span>';
     try {
         const resp = await fetch('/admin/inteligencia', { cache: 'no-store' });
-        console.log('[INTEL] fetch status =', resp.status, resp.ok);
-        if (!resp.ok) { container.innerHTML = '<span style="color:#f55b5b;">Error ' + resp.status + ' al cargar inteligencia (¿sesión de admin activa?)</span>'; return; }
+        if (!resp.ok) { container.innerHTML = '<span style="color:#f55b5b;">Error ' + resp.status + '</span>'; return; }
         const d = await resp.json();
-        console.log('[INTEL] respuesta JSON =', d);
         if (!d.ok) { container.innerHTML = '<span style="color:#f55b5b;">No se pudo cargar.</span>'; return; }
         window._inteligenciaData = d;   // guardar para el reporte imprimible
 
@@ -5219,9 +5230,7 @@ async function loadInteligencia() {
             + '<div style="font-size:0.64rem;color:#777;margin-top:6px;">El ROI compara el ingreso extra anual (por la mejora de cierre) contra el costo anual del sistema. Son proyecciones sobre los parámetros cargados.</div>';
 
         container.innerHTML = embudoHtml + objHtml + roiHtml;
-        console.log('[INTEL] panel renderizado OK');
     } catch (e) {
-        console.error('[INTEL] excepción:', e);
         container.innerHTML = '<span style="color:#f55b5b;">Error de conexión.</span>';
     }
 }
