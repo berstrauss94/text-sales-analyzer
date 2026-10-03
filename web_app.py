@@ -2898,12 +2898,12 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.13{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.0{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
-                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v31.1)</div>
+                <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
-                    Todas las herramientas nuevas ahora tienen su <strong style="color:#5bf5a3;">icono de ayuda (!)</strong>: CRM/Lead, buscador, leads sin seguimiento, feedback de filtros y exportar informe. Pasa el cursor por el (!) para ver que hace cada una.
-                    <div style="margin-top:8px;">Ademas, el <strong style="color:#f5a35b;">tutorial guiado</strong> ahora las incluye en el recorrido.</div>
+                    Nuevo panel de <strong style="color:#5bf5a3;">Inteligencia Comercial y ROI</strong> (admin): muestra en que etapa del embudo se traban los leads, que <strong style="color:#f5a35b;">objeciones</strong> frenan la conversion, y una <strong style="color:#8fa8ff;">proyeccion financiera</strong> (LTV, ARR, ROI) sobre parametros editables (ticket, margen, cierre, costo).
+                    <div style="margin-top:8px;">Incluye un <strong style="color:#5bd4f5;">reporte de auditoria imprimible</strong> "Mi Primer Casa S.A." en hoja blanca.</div>
                 </div>
             </div>
         </div>
@@ -3231,6 +3231,40 @@ HTML = """
         <div id="leadAlertasContent" style="font-size:0.8rem;color:#888;">Cargando alertas...</div>
     </div>
 
+    <!-- ── INTELIGENCIA COMERCIAL / ROI ── -->
+    <div class="input-section" id="inteligenciaPanel" style="margin-top:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+            <div style="font-size:0.85rem;font-weight:600;color:#5bf5a3;display:inline-flex;align-items:center;gap:6px;">&#128200; Inteligencia Comercial y ROI
+                <span class="info-wrap">
+                    <span class="card-info-icon" onclick="event.stopPropagation()" style="position:static;font-size:0.62rem;width:16px;height:16px;line-height:16px;text-align:center;">!</span>
+                    <div class="card-info-tooltip info-up" style="left:0;right:auto;min-width:260px;max-width:340px;font-size:0.72rem;">Cruza los datos ya analizados para mostrar: en qué etapa del embudo se traban los leads, qué objeciones frenan la venta, y una proyección financiera (LTV, ARR, ROI) sobre los parámetros que cargás abajo. Las cifras financieras son estimaciones sobre esos parámetros, no ventas reales.</div>
+                </span>
+            </div>
+            <button type="button" id="btnPrintInteligencia" onclick="printInteligencia()" style="background:#1a2a3a;color:#5bd4f5;border:1px solid #2a3a4a;border-radius:6px;padding:6px 12px;font-size:0.75rem;cursor:pointer;" title="Imprimir reporte de auditoría">&#128424; Imprimir reporte</button>
+        </div>
+        <div id="inteligenciaContent" style="font-size:0.8rem;color:#888;">Cargando inteligencia comercial...</div>
+
+        <!-- Parametros financieros (editables solo por el superadmin) -->
+        <div style="margin-top:16px;border-top:1px solid #1e2130;padding-top:12px;">
+            <div style="font-size:0.75rem;font-weight:600;color:#9aa0b0;margin-bottom:8px;">Parámetros de proyección (estimados, editables)</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;">
+                <label style="font-size:0.68rem;color:#888;">Ticket promedio por lote<input type="number" id="bcTicket" min="0" step="any" style="width:100%;margin-top:3px;background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px;font-size:0.78rem;box-sizing:border-box;"></label>
+                <label style="font-size:0.68rem;color:#888;">Margen estimado (%)<input type="number" id="bcMargen" min="0" max="100" step="any" style="width:100%;margin-top:3px;background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px;font-size:0.78rem;box-sizing:border-box;"></label>
+                <label style="font-size:0.68rem;color:#888;">Tasa de cierre actual (%)<input type="number" id="bcCierreBase" min="0" max="100" step="any" style="width:100%;margin-top:3px;background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px;font-size:0.78rem;box-sizing:border-box;"></label>
+                <label style="font-size:0.68rem;color:#888;">Mejora de cierre (puntos %)<input type="number" id="bcCierreMejora" min="0" max="100" step="any" style="width:100%;margin-top:3px;background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px;font-size:0.78rem;box-sizing:border-box;"></label>
+                <label style="font-size:0.68rem;color:#888;">Leads por mes<input type="number" id="bcLeads" min="0" step="any" style="width:100%;margin-top:3px;background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px;font-size:0.78rem;box-sizing:border-box;"></label>
+                <label style="font-size:0.68rem;color:#888;">Costo mensual del sistema (TCO)<input type="number" id="bcCosto" min="0" step="any" style="width:100%;margin-top:3px;background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px;font-size:0.78rem;box-sizing:border-box;"></label>
+                <label style="font-size:0.68rem;color:#888;">Moneda<input type="text" id="bcMoneda" maxlength="8" style="width:100%;margin-top:3px;background:#0d0f18;color:#e0e0e0;border:1px solid #2a2d3e;border-radius:6px;padding:6px;font-size:0.78rem;box-sizing:border-box;"></label>
+            </div>
+            {% if username == 'Berna.Strauss' %}
+            <button type="button" id="btnSaveBusinessConfig" onclick="saveBusinessConfig()" style="margin-top:10px;background:#1a3a24;color:#5bf5a3;border:1px solid #2a4a34;border-radius:6px;padding:7px 16px;font-size:0.78rem;cursor:pointer;">Guardar parámetros y recalcular</button>
+            <span id="bcSaveStatus" style="margin-left:10px;font-size:0.72rem;color:#9aa0b0;"></span>
+            {% else %}
+            <div style="margin-top:8px;font-size:0.68rem;color:#777;">Solo el administrador general puede modificar estos parámetros.</div>
+            {% endif %}
+        </div>
+    </div>
+
     <!-- ── INFORME DE SEGUIMIENTO ── -->
     <div class="input-section" id="informePanel" style="margin-top:20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
@@ -3430,6 +3464,9 @@ async function saveEntry() {
         }
         if (typeof loadLeadAlertas === 'function' && document.getElementById('leadAlertasPanel')) {
             loadLeadAlertas();
+        }
+        if (typeof loadInteligencia === 'function' && document.getElementById('inteligenciaPanel')) {
+            loadInteligencia();
         }
     } catch (e) {
         document.getElementById('results').innerHTML =
@@ -5077,6 +5114,190 @@ async function doBuscarGlobal() {
     } catch (e) {
         container.innerHTML = '<span style="color:#f55b5b;">Error de conexion.</span>';
     }
+}
+
+// Inteligencia Comercial: embudo, objeciones por etapa y proyeccion ROI.
+function _fmtMoney(n, moneda) {
+    var v = Number(n || 0);
+    return (moneda || '') + ' ' + v.toLocaleString('es-AR', { maximumFractionDigits: 0 });
+}
+
+async function loadInteligencia() {
+    const container = document.getElementById('inteligenciaContent');
+    if (!container) return;
+    container.innerHTML = '<span style="color:#555;">Cargando inteligencia comercial...</span>';
+    try {
+        const resp = await fetch('/admin/inteligencia', { cache: 'no-store' });
+        if (!resp.ok) { container.innerHTML = '<span style="color:#f55b5b;">Error ' + resp.status + '</span>'; return; }
+        const d = await resp.json();
+        if (!d.ok) { container.innerHTML = '<span style="color:#f55b5b;">No se pudo cargar.</span>'; return; }
+        window._inteligenciaData = d;   // guardar para el reporte imprimible
+
+        // Llenar los inputs de parametros con lo guardado.
+        var c = d.config || {};
+        var set = function (id, v) { var el = document.getElementById(id); if (el) el.value = (v === 0 ? '' : v); };
+        set('bcTicket', c.ticket_promedio); set('bcMargen', c.margen_pct);
+        set('bcCierreBase', c.cierre_base_pct); set('bcCierreMejora', c.cierre_mejora_pct);
+        set('bcLeads', c.leads_por_mes); set('bcCosto', c.costo_mensual);
+        var mon = document.getElementById('bcMoneda'); if (mon) mon.value = c.moneda || 'USD';
+
+        var moneda = c.moneda || 'USD';
+        var p = d.proyeccion || {};
+
+        // Embudo: cuellos de botella.
+        var embudoHtml = '<div style="font-size:0.75rem;font-weight:600;color:#8fa8ff;margin:4px 0 8px;">Embudo de conversación (' + (d.total_textos || 0) + ' textos)</div>';
+        (d.embudo || []).forEach(function (e) {
+            var esCuello = d.cuello_de_botella && d.cuello_de_botella.etapa === e.etapa;
+            embudoHtml += '<div style="margin-bottom:5px;">'
+                + '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#cfd3dc;">'
+                + '<span>' + _esc(e.label) + (esCuello ? ' <span style="color:#f5a35b;">(cuello de botella)</span>' : '') + '</span>'
+                + '<span>' + e.count + ' (' + e.pct + '%)</span></div>'
+                + '<div style="height:7px;background:#0a0c14;border-radius:4px;overflow:hidden;margin-top:2px;">'
+                + '<div style="height:100%;width:' + e.pct + '%;background:' + (esCuello ? '#f5a35b' : '#4a6cf7') + ';"></div></div>'
+                + '</div>';
+        });
+
+        // Objeciones por etapa.
+        var objHtml = '<div style="font-size:0.75rem;font-weight:600;color:#f5a35b;margin:14px 0 6px;">Objeciones que frenan la conversión</div>';
+        var huboObj = false;
+        var orden = ['AWARENESS', 'CONSIDERATION', 'DECISION', 'CLOSED'];
+        orden.forEach(function (etapa) {
+            var lista = (d.objeciones_por_etapa || {})[etapa] || [];
+            if (lista.length === 0) return;
+            huboObj = true;
+            objHtml += '<div style="margin-bottom:6px;"><div style="font-size:0.68rem;color:#9aa0b0;">' + _esc((d.funnel_labels || {})[etapa] || etapa) + '</div>';
+            objHtml += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;">';
+            lista.forEach(function (o) {
+                objHtml += '<span style="background:#2a1a0d;color:#f5c06a;border:1px solid #4a3d1e;border-radius:10px;padding:2px 8px;font-size:0.66rem;">' + _esc(o.objecion) + ' (' + o.count + ')</span>';
+            });
+            objHtml += '</div></div>';
+        });
+        if (!huboObj) objHtml += '<div style="color:#777;font-size:0.7rem;">Sin objeciones específicas detectadas aún.</div>';
+
+        // Proyeccion financiera ROI.
+        var roiColor = (p.roi_pct === null || p.roi_pct === undefined) ? '#9aa0b0' : (p.roi_pct >= 0 ? '#5bf5a3' : '#f55b5b');
+        var roiTxt = (p.roi_pct === null || p.roi_pct === undefined) ? 'Cargá los parámetros' : (p.roi_pct + '%');
+        var roiHtml = '<div style="font-size:0.75rem;font-weight:600;color:#5bf5a3;margin:14px 0 6px;">Proyección financiera (estimada)</div>'
+            + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;">'
+            + _roiCard('ROI anual', roiTxt, roiColor)
+            + _roiCard('LTV por venta', _fmtMoney(p.ltv_proyectado, moneda), '#8fa8ff')
+            + _roiCard('Ventas extra/mes', (p.ventas_extra_mes || 0), '#5bf5a3')
+            + _roiCard('Ingreso extra/mes', _fmtMoney(p.ingreso_extra_mes, moneda), '#5bf5a3')
+            + _roiCard('Ingreso extra/año', _fmtMoney(p.ingreso_extra_anual, moneda), '#5bf5a3')
+            + _roiCard('ARR proyectado', _fmtMoney(p.arr_proyectado, moneda), '#8fa8ff')
+            + _roiCard('Costo anual (TCO)', _fmtMoney(p.costo_anual, moneda), '#f5a35b')
+            + '</div>'
+            + '<div style="font-size:0.64rem;color:#777;margin-top:6px;">El ROI compara el ingreso extra anual (por la mejora de cierre) contra el costo anual del sistema. Son proyecciones sobre los parámetros cargados.</div>';
+
+        container.innerHTML = embudoHtml + objHtml + roiHtml;
+    } catch (e) {
+        container.innerHTML = '<span style="color:#f55b5b;">Error de conexión.</span>';
+    }
+}
+
+function _roiCard(label, value, color) {
+    return '<div style="background:#0a0c14;border:1px solid #1e2130;border-radius:8px;padding:8px 10px;">'
+        + '<div style="font-size:0.62rem;color:#9aa0b0;text-transform:uppercase;letter-spacing:0.03em;">' + _esc(label) + '</div>'
+        + '<div style="font-size:1rem;font-weight:700;color:' + color + ';margin-top:2px;">' + _esc(String(value)) + '</div></div>';
+}
+
+async function saveBusinessConfig() {
+    var status = document.getElementById('bcSaveStatus');
+    var val = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
+    if (status) { status.textContent = 'Guardando...'; status.style.color = '#9aa0b0'; }
+    try {
+        var res = await fetch('/admin/business-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ticket_promedio: val('bcTicket'), margen_pct: val('bcMargen'),
+                cierre_base_pct: val('bcCierreBase'), cierre_mejora_pct: val('bcCierreMejora'),
+                leads_por_mes: val('bcLeads'), costo_mensual: val('bcCosto'),
+                moneda: val('bcMoneda')
+            })
+        });
+        var d = await res.json();
+        if (d && d.ok) {
+            if (status) { status.textContent = 'Guardado.'; status.style.color = '#5bf5a3'; }
+            loadInteligencia();   // recalcular con los nuevos parametros
+        } else {
+            if (status) { status.textContent = (d && d.error) || 'No se pudo guardar.'; status.style.color = '#f5a35b'; }
+        }
+    } catch (e) {
+        if (status) { status.textContent = 'Error de conexión.'; status.style.color = '#f55b5b'; }
+    }
+}
+
+// Reporte formal imprimible de Inteligencia Comercial (hoja blanca, Mi Primer
+// Casa S.A.). Usa los datos ya cargados (window._inteligenciaData), sin re-fetch.
+function printInteligencia() {
+    var d = window._inteligenciaData;
+    if (!d) { alert('Esperá a que cargue la inteligencia comercial.'); return; }
+    var p = d.proyeccion || {};
+    var c = d.config || {};
+    var moneda = c.moneda || 'USD';
+    var fecha = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    var money = function (n) { return moneda + ' ' + Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 }); };
+
+    // Embudo
+    var embudoRows = (d.embudo || []).map(function (e) {
+        var esCuello = d.cuello_de_botella && d.cuello_de_botella.etapa === e.etapa;
+        return '<tr><td>' + _esc(e.label) + (esCuello ? ' <b>(cuello de botella)</b>' : '') + '</td>'
+            + '<td style="text-align:center;">' + e.count + '</td>'
+            + '<td style="text-align:center;">' + e.pct + '%</td></tr>';
+    }).join('');
+
+    // Objeciones
+    var objRows = '';
+    var orden = ['AWARENESS', 'CONSIDERATION', 'DECISION', 'CLOSED'];
+    orden.forEach(function (etapa) {
+        var lista = (d.objeciones_por_etapa || {})[etapa] || [];
+        if (lista.length === 0) return;
+        var txt = lista.map(function (o) { return o.objecion + ' (' + o.count + ')'; }).join(', ');
+        objRows += '<tr><td>' + _esc((d.funnel_labels || {})[etapa] || etapa) + '</td><td>' + _esc(txt) + '</td></tr>';
+    });
+    if (!objRows) objRows = '<tr><td colspan="2">Sin objeciones específicas detectadas.</td></tr>';
+
+    // Proyeccion
+    var roiTxt = (p.roi_pct === null || p.roi_pct === undefined) ? 'Sin parámetros cargados' : (p.roi_pct + '%');
+    var proyRows = ''
+        + '<tr><td>Ganancia estimada por venta (LTV)</td><td style="text-align:right;">' + money(p.ltv_proyectado) + '</td></tr>'
+        + '<tr><td>Ventas extra por mes (por mejora de cierre)</td><td style="text-align:right;">' + (p.ventas_extra_mes || 0) + '</td></tr>'
+        + '<tr><td>Ingreso extra mensual</td><td style="text-align:right;">' + money(p.ingreso_extra_mes) + '</td></tr>'
+        + '<tr><td>Ingreso extra anual</td><td style="text-align:right;">' + money(p.ingreso_extra_anual) + '</td></tr>'
+        + '<tr><td>ARR proyectado</td><td style="text-align:right;">' + money(p.arr_proyectado) + '</td></tr>'
+        + '<tr><td>Costo anual del sistema (TCO)</td><td style="text-align:right;">' + money(p.costo_anual) + '</td></tr>'
+        + '<tr style="font-weight:700;"><td>ROI anual de la herramienta</td><td style="text-align:right;">' + roiTxt + '</td></tr>';
+
+    var w = window.open('', '_blank');
+    if (!w) { alert('Permití las ventanas emergentes para imprimir.'); return; }
+    var html = '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
+        + '<title>Reporte de Inteligencia Comercial - Mi Primer Casa S.A.</title><style>'
+        + 'body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:32px;background:#fff;}'
+        + '.header{display:flex;justify-content:space-between;border-bottom:3px solid #111;padding-bottom:10px;margin-bottom:18px;}'
+        + '.header h1{font-size:19px;margin:0;}'
+        + '.header .date{font-size:12px;color:#444;}'
+        + 'h2{font-size:14px;border-left:4px solid #111;padding-left:8px;margin:22px 0 8px;}'
+        + 'table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px;page-break-inside:avoid;}'
+        + 'th,td{border:1px solid #999;padding:6px 8px;text-align:left;}'
+        + 'th{background:#f0f0f0;}'
+        + '.nota{font-size:10px;color:#666;margin-top:4px;}'
+        + '.foot{margin-top:30px;font-size:10px;color:#666;border-top:1px solid #ccc;padding-top:8px;}'
+        + '</style></head><body>'
+        + '<div class="header"><h1>Mi Primer Casa S.A.</h1><div class="date">Reporte de Inteligencia Comercial<br>' + fecha + '</div></div>'
+        + '<h2>Embudo de conversación</h2>'
+        + '<table><thead><tr><th>Etapa</th><th style="text-align:center;">Textos</th><th style="text-align:center;">% del total</th></tr></thead><tbody>' + embudoRows + '</tbody></table>'
+        + '<div class="nota">Total de textos analizados: ' + (d.total_textos || 0) + '. El cuello de botella es la etapa con mayor caída hacia la siguiente.</div>'
+        + '<h2>Objeciones que frenan la conversión</h2>'
+        + '<table><thead><tr><th>Etapa</th><th>Objeciones detectadas (frecuencia)</th></tr></thead><tbody>' + objRows + '</tbody></table>'
+        + '<h2>Proyección financiera y ROI</h2>'
+        + '<table><tbody>' + proyRows + '</tbody></table>'
+        + '<div class="nota">Cifras financieras ESTIMADAS sobre los parámetros cargados (ticket promedio ' + money(c.ticket_promedio) + ', margen ' + (c.margen_pct || 0) + '%, cierre actual ' + (c.cierre_base_pct || 0) + '%, mejora ' + (c.cierre_mejora_pct || 0) + ' pts, ' + (c.leads_por_mes || 0) + ' leads/mes). No representan ventas reales registradas.</div>'
+        + '<div class="foot">Reporte generado automáticamente por el sistema de análisis de ventas. Documento interno de Mi Primer Casa S.A.</div>'
+        + '</body></html>';
+    w.document.write(html);
+    w.document.close();
+    setTimeout(function () { try { w.print(); } catch (e) {} }, 400);
 }
 
 // Alertas de leads activos sin seguimiento reciente. Consulta el backend y
@@ -12362,6 +12583,114 @@ def admin_rubro():
     ok = tenant_config.set_config(
         tenant, str(data.get("rubro", "")), str(data.get("descripcion", "")))
     return jsonify({"ok": bool(ok)})
+
+
+# ── INTELIGENCIA COMERCIAL / ROI ────────────────────────────────────────────
+# Etiquetas legibles para las etapas del funnel.
+_FUNNEL_LABELS = {
+    "AWARENESS": "Conocimiento",
+    "CONSIDERATION": "Evaluacion",
+    "DECISION": "Decision",
+    "CLOSED": "Cerrado",
+}
+_FUNNEL_ORDER = ["AWARENESS", "CONSIDERATION", "DECISION", "CLOSED"]
+
+
+@app.route("/admin/business-config", methods=["GET", "POST"])
+def admin_business_config():
+    """Parametros financieros del tenant (GET admin / POST superadmin)."""
+    from src.users import business_config
+    tenant = _current_tenant()
+    if request.method == "GET":
+        if not _is_admin():
+            return jsonify({"error": "unauthorized"}), 403
+        return jsonify({"ok": True, "config": business_config.get_config(tenant)})
+    if not _is_superadmin():
+        return jsonify({"ok": False, "error": "solo superadmin"}), 403
+    data = request.get_json(silent=True) or {}
+    ok = business_config.set_config(tenant, data)
+    return jsonify({"ok": bool(ok)})
+
+
+@app.route("/admin/inteligencia")
+def admin_inteligencia():
+    """
+    Modulo de Inteligencia Comercial (admin only). Cruza los datos YA guardados:
+      - Objeciones especificas por etapa del funnel (que frena la conversion).
+      - Distribucion del embudo (cuellos de botella por etapa).
+      - Proyecciones financieras (LTV/ARR/ROI) sobre los parametros cargados.
+    Solo LECTURA del historial; las proyecciones salen de business_config.
+    """
+    if not _is_admin():
+        return jsonify({"error": "unauthorized"}), 403
+    from src.users.history_manager import get_report_entries_all, resolve_entry_date
+    from src.users import business_config
+    tenant = _current_tenant()
+    year = request.args.get("year", type=int) or 0  # 0 = todos los anios
+
+    _users = user_manager.list_users(tenant_id=(None if tenant == "__legacy__" else tenant))
+    entries_by_user = get_report_entries_all(_users)
+
+    # Agregacion: objeciones por etapa + distribucion del embudo.
+    funnel_counts = {k: 0 for k in _FUNNEL_ORDER}
+    # objeciones_por_etapa[etapa][objecion] = cantidad
+    objeciones_por_etapa = {k: {} for k in _FUNNEL_ORDER}
+    total_textos = 0
+    for u in _users:
+        for e in entries_by_user.get(u, []):
+            if year:
+                ey, _, _ = resolve_entry_date(e)
+                if ey != year:
+                    continue
+            com = e.get("commercial") or {}
+            etapa = str(com.get("etapa_funnel") or "AWARENESS").upper()
+            if etapa not in funnel_counts:
+                etapa = "AWARENESS"
+            funnel_counts[etapa] += 1
+            total_textos += 1
+            objs = com.get("objeciones_especificas") or []
+            if isinstance(objs, list):
+                for o in objs:
+                    key = str(o).strip().lower()
+                    if key:
+                        objeciones_por_etapa[etapa][key] = objeciones_por_etapa[etapa].get(key, 0) + 1
+
+    # Embudo ordenado con etiquetas y porcentajes.
+    embudo = []
+    for k in _FUNNEL_ORDER:
+        n = funnel_counts[k]
+        pct = round(100 * n / total_textos) if total_textos else 0
+        embudo.append({"etapa": k, "label": _FUNNEL_LABELS[k], "count": n, "pct": pct})
+
+    # Cuello de botella: la etapa (excepto CLOSED) con mas acumulado sin avanzar.
+    # Heuristica simple: la etapa previa al mayor salto de caida.
+    cuello = None
+    for i in range(len(_FUNNEL_ORDER) - 1):
+        actual = funnel_counts[_FUNNEL_ORDER[i]]
+        siguiente = funnel_counts[_FUNNEL_ORDER[i + 1]]
+        caida = actual - siguiente
+        if actual > 0 and (cuello is None or caida > cuello["caida"]):
+            cuello = {"etapa": _FUNNEL_ORDER[i], "label": _FUNNEL_LABELS[_FUNNEL_ORDER[i]], "caida": caida}
+
+    # Top objeciones por etapa (ordenadas).
+    objeciones_top = {}
+    for etapa, mapa in objeciones_por_etapa.items():
+        items = sorted(mapa.items(), key=lambda kv: -kv[1])[:5]
+        objeciones_top[etapa] = [{"objecion": o, "count": c} for o, c in items]
+
+    cfg = business_config.get_config(tenant)
+    proyeccion = business_config.project_metrics(cfg)
+
+    return jsonify({
+        "ok": True,
+        "total_textos": total_textos,
+        "embudo": embudo,
+        "cuello_de_botella": cuello,
+        "objeciones_por_etapa": objeciones_top,
+        "funnel_labels": _FUNNEL_LABELS,
+        "config": cfg,
+        "proyeccion": proyeccion,
+    })
 
 
 # ── API PUBLICA (integraciones externas: CRM, WhatsApp, otras apps) ─────────
