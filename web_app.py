@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.3{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.4{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -5156,7 +5156,10 @@ async function loadInteligencia() {
         var p = d.proyeccion || {};
 
         // Embudo: cuellos de botella.
-        var embudoHtml = '<div style="font-size:0.75rem;font-weight:600;color:#8fa8ff;margin:4px 0 8px;">Embudo de conversación (' + (d.total_textos || 0) + ' textos)</div>';
+        var tipEmbudo = '<b>Embudo de conversación.</b> Qué es: cómo se reparten los textos analizados por etapa de la venta (Conocimiento, Evaluación, Decisión, Cerrado). Para qué sirve: ver dónde se concentran y dónde se traban los leads. La etapa con mayor caída hacia la siguiente es el cuello de botella a trabajar.';
+        var embudoHtml = '<div style="font-size:0.75rem;font-weight:600;color:#8fa8ff;margin:4px 0 8px;display:inline-flex;align-items:center;">Embudo de conversación (' + (d.total_textos || 0) + ' textos)'
+            + '<span class="info-wrap"><span class="card-info-icon" onclick="event.stopPropagation()" style="position:static;font-size:0.55rem;width:14px;height:14px;line-height:14px;text-align:center;">!</span>'
+            + '<div class="card-info-tooltip info-up" style="left:0;right:auto;min-width:240px;max-width:320px;font-size:0.7rem;">' + tipEmbudo + '</div></span></div>';
         (d.embudo || []).forEach(function (e) {
             var esCuello = d.cuello_de_botella && d.cuello_de_botella.etapa === e.etapa;
             embudoHtml += '<div style="margin-bottom:5px;">'
@@ -5169,7 +5172,10 @@ async function loadInteligencia() {
         });
 
         // Objeciones por etapa.
-        var objHtml = '<div style="font-size:0.75rem;font-weight:600;color:#f5a35b;margin:14px 0 6px;">Objeciones que frenan la conversión</div>';
+        var tipObj = '<b>Objeciones por etapa.</b> Qué es: las objeciones que los clientes plantearon con más frecuencia en cada etapa del embudo (precio, financiación, ubicación, etc.). Para qué sirve: saber qué argumento preparar para destrabar la venta en cada punto. El número entre paréntesis es cuántas veces apareció.';
+        var objHtml = '<div style="font-size:0.75rem;font-weight:600;color:#f5a35b;margin:14px 0 6px;display:inline-flex;align-items:center;">Objeciones que frenan la conversión'
+            + '<span class="info-wrap"><span class="card-info-icon" onclick="event.stopPropagation()" style="position:static;font-size:0.55rem;width:14px;height:14px;line-height:14px;text-align:center;">!</span>'
+            + '<div class="card-info-tooltip info-up" style="left:0;right:auto;min-width:240px;max-width:320px;font-size:0.7rem;">' + tipObj + '</div></span></div>';
         var huboObj = false;
         var orden = ['AWARENESS', 'CONSIDERATION', 'DECISION', 'CLOSED'];
         orden.forEach(function (etapa) {
@@ -5193,15 +5199,19 @@ async function loadInteligencia() {
         var tipLTV = '<b>LTV — Valor de Vida del Cliente.</b> Qué es: el total de ingresos que se espera que genere un cliente promedio durante toda su relación con la empresa. Para qué sirve: saber cuánto es razonable invertir en captar un cliente nuevo. Un LTV alto indica buena retención.';
         var tipARR = '<b>ARR — Ingresos Recurrentes Anuales.</b> Qué es: el valor de los ingresos recurrentes normalizados a un año. Para qué sirve: medir la tracción del negocio, predecir el flujo de caja y evaluar el valor de la empresa. Ejemplo: 100 clientes a 100/mes equivalen a 120.000 al año.';
         var tipROI = '<b>ROI — Retorno de la Inversión.</b> Qué es: la ganancia obtenida en relación al dinero invertido. Para qué sirve: determinar si una iniciativa genera dinero o es pérdida. Fórmula: beneficio neto dividido el costo, por 100. Ejemplo: invertir 1.000 y ganar 4.000 neto da un ROI de 400%.';
+        var tipVentasExtra = '<b>Ventas extra por mes.</b> Qué es: cuántas ventas adicionales por mes se estiman gracias a la mejora en la tasa de cierre que aporta la herramienta. Se calcula sobre los leads/mes y la mejora de cierre que cargaste. Es la base del ingreso extra.';
+        var tipIngMes = '<b>Ingreso extra mensual.</b> Qué es: el dinero adicional por mes que generan esas ventas extra (ventas extra por la ganancia estimada por venta). Para qué sirve: ver el impacto económico mensual atribuible a la herramienta.';
+        var tipIngAnio = '<b>Ingreso extra anual.</b> Qué es: el ingreso extra mensual proyectado a 12 meses. Para qué sirve: comparar el beneficio anual de la herramienta contra su costo anual (es el numerador del ROI).';
+        var tipTCO = '<b>Costo anual (TCO) — Costo Total de Propiedad.</b> Qué es: el costo total de operar el sistema durante un año (cómputo, procesamiento de IA, base de datos y mantenimiento). Para qué sirve: es el denominador del ROI; lo que la herramienta debe superar para ser rentable.';
         var roiHtml = '<div style="font-size:0.75rem;font-weight:600;color:#5bf5a3;margin:14px 0 6px;">Proyección financiera (estimada)</div>'
             + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;">'
             + _roiCard('ROI anual', roiTxt, roiColor, tipROI)
             + _roiCard('LTV por venta', _fmtMoney(p.ltv_proyectado, moneda), '#8fa8ff', tipLTV)
-            + _roiCard('Ventas extra/mes', (p.ventas_extra_mes || 0), '#5bf5a3')
-            + _roiCard('Ingreso extra/mes', _fmtMoney(p.ingreso_extra_mes, moneda), '#5bf5a3')
-            + _roiCard('Ingreso extra/año', _fmtMoney(p.ingreso_extra_anual, moneda), '#5bf5a3')
+            + _roiCard('Ventas extra/mes', (p.ventas_extra_mes || 0), '#5bf5a3', tipVentasExtra)
+            + _roiCard('Ingreso extra/mes', _fmtMoney(p.ingreso_extra_mes, moneda), '#5bf5a3', tipIngMes)
+            + _roiCard('Ingreso extra/año', _fmtMoney(p.ingreso_extra_anual, moneda), '#5bf5a3', tipIngAnio)
             + _roiCard('ARR proyectado', _fmtMoney(p.arr_proyectado, moneda), '#8fa8ff', tipARR)
-            + _roiCard('Costo anual (TCO)', _fmtMoney(p.costo_anual, moneda), '#f5a35b')
+            + _roiCard('Costo anual (TCO)', _fmtMoney(p.costo_anual, moneda), '#f5a35b', tipTCO)
             + '</div>'
             + '<div style="font-size:0.64rem;color:#777;margin-top:6px;">El ROI compara el ingreso extra anual (por la mejora de cierre) contra el costo anual del sistema. Son proyecciones sobre los parámetros cargados.</div>';
 
