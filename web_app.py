@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.12{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v31.13{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v31.1)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -10840,14 +10840,18 @@ def simulator_chat():
     # con la competencia, etc.) para evitar que SIEMPRE empiece igual.
     if message == "[INICIO]":
         aperturas = [
-            "Empeza la simulacion. Abris con una PREGUNTA sobre el precio o las condiciones de pago, como lo haria un cliente real interesado.",
-            "Empeza la simulacion. Abris con una DUDA sobre la ubicacion y el entorno del inmueble (servicios, transporte, zona).",
-            "Empeza la simulacion. Abris mostrando que ya estuviste mirando otros proyectos y comparas, cuestionando el valor diferencial.",
-            "Empeza la simulacion. Abris como alguien que consulta para invertir: pregunta sobre rentabilidad, ROI o plusvalia.",
-            "Empeza la simulacion. Abris con dudas sobre los plazos de entrega y el estado de avance de la obra.",
-            "Empeza la simulacion. Abris como un cliente que fue referido por alguien, pregunta de forma amigable pero quiere confirmar que vale la pena.",
-            "Empeza la simulacion. Abris con una consulta practica: metraje disponible, orientacion, si hay cochera o espacios comunes.",
-            "Empeza la simulacion. Abris como alguien que recibio informacion por redes y quiere confirmar si los datos que vio son reales.",
+            "Empeza la simulacion. Abris con una PREGUNTA sobre el precio o las condiciones de financiamiento, como lo haria un cliente real interesado pero con dudas de si puede pagarlo.",
+            "Empeza la simulacion. Abris como alguien que VIO UN AVISO EN REDES SOCIALES (Instagram o Facebook) de un proyecto inmobiliario y quiere saber si la informacion es real y cuales son los detalles.",
+            "Empeza la simulacion. Abris con una DUDA CONCRETA sobre la ubicacion: que tan lejos esta del centro, si hay transporte publico, colegios o supermercados cerca.",
+            "Empeza la simulacion. Abris mostrando que ya estuviste mirando otros proyectos similares y COMPARAS con otro que viste, cuestionando si este tiene algo diferente.",
+            "Empeza la simulacion. Abris como alguien que quiere INVERTIR y pregunta sobre la rentabilidad, si el valor va a subir y cuanto tiempo tardan en escriturar.",
+            "Empeza la simulacion. Abris con DUDAS SOBRE EL PROYECTO en si: si la empresa es seria, si el proyecto ya esta terminado o en construccion, si pueden visitar.",
+            "Empeza la simulacion. Abris como alguien que consulta por PRIMERA VEZ, que no sabe bien como funciona comprar un lote y tiene muchas preguntas basicas.",
+            "Empeza la simulacion. Abris como un cliente que fue REFERIDO POR UN CONOCIDO, que ya compro y lo recomendo, pero que igualmente quiere confirmar que vale la pena.",
+            "Empeza la simulacion. Abris como alguien que busca algo PARA SU FAMILIA (mudarse con pareja e hijos) y pregunta si la zona es tranquila y segura.",
+            "Empeza la simulacion. Abris con URGENCIA REAL: necesita resolver algo en los proximos meses y quiere saber si los tiempos del proyecto se ajustan a lo que necesita.",
+            "Empeza la simulacion. Abris como alguien que vio una PUBLICIDAD y llama directamente, algo escéptico sobre si el precio anunciado es el precio real o si tiene letras chicas.",
+            "Empeza la simulacion. Abris con una duda sobre LAS FORMAS DE PAGO: si se puede pagar en cuotas, si aceptan credito hipotecario o si hay planes propios.",
         ]
         import random as _random
         apertura = _random.choice(aperturas)
@@ -10887,24 +10891,34 @@ def simulator_chat():
         # max_tokens 800: Gemini 3.5 gasta tokens en razonamiento interno antes de
         # la respuesta visible; el largo real lo acota el prompt (max 60 palabras).
         raw = _ai_chat(openai_messages, max_tokens=800, temperature=0.8)
-        # La IA deberia devolver JSON {response, suggestions}. Puede venir con
-        # cercos de markdown (```json ... ```): los limpiamos antes de parsear.
+        # Usar _extract_json_object (que ya existe en el sistema): extrae el
+        # primer objeto JSON aunque haya texto razonamiento alrededor, y repara
+        # JSON truncado. Evita que el raw completo aparezca como texto en el chat.
         reply = raw
         suggestions = []
-        try:
-            import json as _json, re as _re
-            cleaned = _re.sub(r'^```(?:json)?|```$', '', raw.strip(), flags=_re.MULTILINE).strip()
-            parsed = _json.loads(cleaned)
+        sale_closed = False
+        parsed = _extract_json_object(raw)
+        if parsed and isinstance(parsed, dict):
             reply = (parsed.get("response") or "").strip() or raw
             sug = parsed.get("suggestions") or []
             if isinstance(sug, list):
                 suggestions = [str(s).strip() for s in sug if str(s).strip()][:4]
             sale_closed = bool(parsed.get("sale_closed", False))
-        except Exception:
-            # Si no vino JSON, usamos el texto crudo como respuesta (sin sugerencias).
-            reply = raw
-            suggestions = []
-            sale_closed = False
+        else:
+            # Fallback: devolver solo el texto crudo sin sugerencias
+            # (el raw puede ser solo el mensaje del cliente sin JSON).
+            reply = raw.strip()
+            # Intentar limpiar si empieza con {"response": para casos de parse parcial
+            import json as _json, re as _re
+            try:
+                cleaned = _re.sub(r'^```(?:json)?|```$', '', raw.strip(), flags=_re.MULTILINE).strip()
+                p2 = _json.loads(cleaned)
+                reply = (p2.get("response") or "").strip() or raw
+                sug = p2.get("suggestions") or []
+                suggestions = [str(s).strip() for s in sug if str(s).strip()][:4] if isinstance(sug, list) else []
+                sale_closed = bool(p2.get("sale_closed", False))
+            except Exception:
+                pass
         if not reply:
             reply = "Disculpa, no te escuche bien. Me lo repetis?"
         # Si el cliente cerro la venta exitosamente, notificar al frontend para
