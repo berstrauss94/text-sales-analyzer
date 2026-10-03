@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.1{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.2{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -11068,7 +11068,12 @@ def simulator_chat():
     }
 
     system_prompt = difficulty_prompts.get(difficulty, difficulty_prompts["mediano"])
-    system_prompt += "\n\nREGLAS:\n- Responde SIEMPRE en espanol.\n- Maximo 60 palabras por respuesta.\n- Nunca rompas el personaje.\n- Si el vendedor logra convencerte genuinamente, acepta la compra.\n- Si detectas que el vendedor no maneja objeciones, muestra mas resistencia."
+    system_prompt += ("\n\nREGLAS:\n- Responde SIEMPRE en espanol.\n"
+                      "- Tu respuesta como cliente: MAXIMO 40 palabras, una idea clara, SIEMPRE terminada (nunca cortes a mitad de frase).\n"
+                      "- Las 4 sugerencias: frases MUY cortas (max 12 palabras cada una).\n"
+                      "- Nunca rompas el personaje.\n"
+                      "- Si el vendedor logra convencerte genuinamente, acepta la compra.\n"
+                      "- Si detectas que el vendedor no maneja objeciones, muestra mas resistencia.")
 
     # APERTURA VARIADA: si es el inicio, pedimos un primer mensaje del cliente
     # con un angulo aleatorio (precio, ubicacion, plazo, inversion, comparativa
@@ -11096,14 +11101,15 @@ def simulator_chat():
 
     # Formato de salida: JSON con response + 4 sugerencias para el vendedor.
     system_prompt += (
-        "\n\nFORMATO DE SALIDA: responde EXCLUSIVAMENTE con un JSON valido, sin "
-        "texto extra ni markdown, con esta forma exacta:\n"
+        "\n\nFORMATO DE SALIDA (CRITICO): responde EXCLUSIVAMENTE con un JSON "
+        "valido y COMPLETO, sin texto extra ni markdown, con esta forma exacta:\n"
         '{"response": "tu respuesta como cliente", "suggestions": '
         '["opcion 1 del vendedor", "opcion 2", "opcion 3", "opcion 4"], '
         '"sale_closed": false}\n'
-        "Las 4 sugerencias son frases BREVES Y DISTINTAS que el VENDEDOR podria "
-        "usar para responderte. sale_closed debe ser true SOLO si el vendedor "
-        "logro convencerte y aceptaste comprar."
+        "REGLA DE ORO: el JSON SIEMPRE debe cerrar completo (las 4 sugerencias y "
+        "la llave final). Si tenes poco espacio, acorta los textos pero NUNCA "
+        "dejes el JSON a medias. Las 4 sugerencias son frases BREVES Y DISTINTAS "
+        "que el VENDEDOR podria usar. sale_closed es true SOLO si aceptaste comprar."
     )
 
     # Build messages for OpenAI
@@ -11121,52 +11127,65 @@ def simulator_chat():
         openai_messages.append({"role": "user", "content": message})
 
     try:
-        # _ai_chat reintenta ante fallos transitorios (timeout/red), comunes en
-        # conexiones moviles donde el simulador fallaba esporadicamente.
-        # max_tokens 800: Gemini 3.5 gasta tokens en razonamiento interno antes de
-        # la respuesta visible; el largo real lo acota el prompt (max 60 palabras).
-        raw = _ai_chat(openai_messages, max_tokens=800, temperature=0.8)
-        # Usar _extract_json_object (que ya existe en el sistema): extrae el
-        # primer objeto JSON aunque haya texto razonamiento alrededor, y repara
-        # JSON truncado. Evita que el raw completo aparezca como texto en el chat.
-        reply = raw
-        suggestions = []
-        sale_closed = False
-        parsed = _extract_json_object(raw)
-        if parsed and isinstance(parsed, dict):
-            reply = (parsed.get("response") or "").strip() or raw
-            sug = parsed.get("suggestions") or []
-            if isinstance(sug, list):
-                suggestions = [str(s).strip() for s in sug if str(s).strip()][:4]
-            sale_closed = bool(parsed.get("sale_closed", False))
-        else:
-            # Fallback: devolver solo el texto crudo sin sugerencias
-            # (el raw puede ser solo el mensaje del cliente sin JSON).
-            reply = raw.strip()
-            # Intentar limpiar si empieza con {"response": para casos de parse parcial
-            import json as _json, re as _re
-            try:
-                cleaned = _re.sub(r'^```(?:json)?|```$', '', raw.strip(), flags=_re.MULTILINE).strip()
-                p2 = _json.loads(cleaned)
-                reply = (p2.get("response") or "").strip() or raw
-                sug = p2.get("suggestions") or []
-                suggestions = [str(s).strip() for s in sug if str(s).strip()][:4] if isinstance(sug, list) else []
-                sale_closed = bool(p2.get("sale_closed", False))
-            except Exception:
-                pass
+        reply, suggestions, sale_closed = _simulator_turn(openai_messages)
         if not reply:
             reply = "Disculpa, no te escuche bien. Me lo repetis?"
-        # Si el cliente cerro la venta exitosamente, notificar al frontend para
-        # que pueda guardar la simulacion como caso de exito.
         if sale_closed:
             return jsonify({"response": reply, "suggestions": suggestions,
                             "ended": True, "sale_closed": True})
         return jsonify({"response": reply, "suggestions": suggestions, "ended": False})
     except Exception as exc:
         app.logger.error(f"Simulator error: {exc}")
-        # Mensaje HONESTO: no culpar a la clave (ya sabemos que suele estar OK).
-        # El fallo aca es de la llamada puntual (servicio lento/timeout).
         return jsonify({"response": "El servicio de IA tardo o no respondio esta vez. Proba enviar tu mensaje de nuevo.", "ended": False})
+
+
+def _simulator_turn(openai_messages):
+    """
+    "Agente" del simulador que MANTIENE EL COMANDO: garantiza que cada turno
+    devuelva una respuesta COMPLETA del cliente + 4 sugerencias.
+
+    Problema que resuelve: Gemini 3.5 a veces trunca el JSON (respuesta cortada
+    y sin sugerencias) por limite de tokens. Este helper:
+      1. Llama con tokens holgados (1500).
+      2. Parsea con _extract_json_object (tolera texto alrededor y repara truncados).
+      3. Si la respuesta vino vacia O sin sugerencias, REINTENTA una vez pidiendo
+         explicitamente el JSON completo. Asi casi siempre completa.
+    Devuelve (reply, suggestions, sale_closed).
+    """
+    def _parse(raw):
+        reply, suggestions, sale_closed = "", [], False
+        parsed = _extract_json_object(raw)
+        if parsed and isinstance(parsed, dict):
+            reply = (parsed.get("response") or "").strip()
+            sug = parsed.get("suggestions") or []
+            if isinstance(sug, list):
+                suggestions = [str(s).strip() for s in sug if str(s).strip()][:4]
+            sale_closed = bool(parsed.get("sale_closed", False))
+        return reply, suggestions, sale_closed
+
+    # Intento 1: tokens holgados para que no trunque.
+    raw = _ai_chat(openai_messages, max_tokens=1500, temperature=0.8, timeout=45)
+    reply, suggestions, sale_closed = _parse(raw)
+
+    # Si falto respuesta o faltaron sugerencias, reintentar una vez reforzando.
+    if not reply or len(suggestions) < 3:
+        refuerzo = list(openai_messages) + [{
+            "role": "user",
+            "content": ("Tu ultima respuesta vino incompleta. Devolve DE NUEVO el "
+                        "turno como JSON COMPLETO y valido: response (frase corta y "
+                        "terminada) y suggestions (4 frases breves). Cerra bien el JSON."),
+        }]
+        try:
+            raw2 = _ai_chat(refuerzo, max_tokens=1500, temperature=0.6, timeout=45)
+            r2, s2, sc2 = _parse(raw2)
+            if r2:
+                reply = r2
+            if len(s2) >= len(suggestions):
+                suggestions = s2
+            sale_closed = sale_closed or sc2
+        except Exception:
+            pass  # nos quedamos con lo del intento 1
+    return reply, suggestions, sale_closed
 
 
 @app.route("/api/simulator/feedback", methods=["POST"])
