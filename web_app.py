@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.12{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.13{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -7784,7 +7784,7 @@ async function loadInforme() {
             pieVHtml += '<div style="display:flex;flex-direction:row;align-items:center;justify-content:center;gap:20px;margin-top:8px;flex-wrap:wrap;">';
             pieVHtml += '<div id="' + pieVId + '" class="pie-chart-expand" style="width:140px;height:140px;border-radius:50%;background:conic-gradient(' + pieVGradient.join(',') + ');box-shadow:0 4px 12px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;transition:transform 0.2s;flex:none;">';
             pieVHtml += '<div style="width:60px;height:60px;border-radius:50%;background:#0f1117;display:flex;align-items:center;justify-content:center;pointer-events:none;"><span id="' + pieVId + '-center" style="font-size:0.6rem;color:#aaa;text-align:center;line-height:1.1;">' + data.total_general + '</span></div></div>';
-            pieVHtml += '<div style="display:flex;flex-direction:column;gap:2px;max-height:160px;overflow-y:auto;">' + pieVLegend + '</div></div>';
+            pieVHtml += '<div class="pie-v-legend" style="display:flex;flex-direction:column;gap:2px;max-height:160px;overflow-y:auto;">' + pieVLegend + '</div></div>';
         }
         window._pieInteractive[pieVId] = {
             base: 'conic-gradient(' + pieVGradient.join(',') + ')',
@@ -8170,7 +8170,7 @@ async function loadInforme() {
                 // (see .activity-block rules in printInforme). Class kept so those
                 // print rules still target this box.
                 actividadHtml = '<div class="chart-block activity-block" style="margin-top:14px;padding:14px 16px;background:#0a0c14;border:1px solid #1e2130;border-radius:10px;border-left:3px solid #5bd4f5;">';
-                actividadHtml += '<div style="font-size:0.8rem;color:#fff;font-weight:700;letter-spacing:0.02em;margin-bottom:2px;">Seguimiento de Uso del Sistema</div>';
+                actividadHtml += '<div class="activity-title" style="font-size:0.8rem;color:#fff;font-weight:700;letter-spacing:0.02em;margin-bottom:2px;">Seguimiento de Uso del Sistema</div>';
                 actividadHtml += '<div style="font-size:0.64rem;color:#777;margin-bottom:10px;">Periodo: ' + actPeriodLabel + '</div>';
 
                 if (actUsers.length === 0) {
@@ -8922,6 +8922,17 @@ function printInforme() {
     printWindow.document.write('svg, table, .report-section, .chart-block, .pie-block { break-inside: avoid; page-break-inside: avoid; }');
     // A section title should not be the last thing on a page (orphan heading).
     printWindow.document.write('.rep-sec-title { break-after: avoid; page-break-after: avoid; }');
+    // Torta "Distribucion por vendedor": en pantalla la leyenda tiene scroll
+    // (max-height + overflow) para ahorrar espacio. Al IMPRIMIR eso recortaba la
+    // lista: forzamos que se expanda completa con TODOS los vendedores visibles.
+    printWindow.document.write('.pie-v-legend { max-height: none !important; overflow: visible !important; }');
+    // El titulo "Seguimiento de Uso del Sistema" no debe quedar solo al pie de
+    // una pagina con su tabla saltando a la siguiente (dejaba una hoja casi en
+    // blanco). Permitimos que el bloque se parta y pegamos el titulo a la tabla.
+    printWindow.document.write('.activity-block { break-inside: auto !important; page-break-inside: auto !important; }');
+    printWindow.document.write('.activity-title { break-after: avoid !important; page-break-after: avoid !important; }');
+    printWindow.document.write('.activity-block table { break-inside: auto !important; page-break-inside: auto !important; }');
+    printWindow.document.write('.activity-block thead { display: table-header-group; }');
     // Activity ("Seguimiento de Uso") box: on screen it uses the dark theme.
     // For PAPER we re-skin it to a clean white table with thin, UNIFORM black
     // borders (outer edge same thickness as inner cells) and dark text.
