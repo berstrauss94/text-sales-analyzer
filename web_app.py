@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.9{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.10{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -11739,13 +11739,21 @@ def _ai_refine_analysis(text, analysis_dict, tenant_id="__legacy__"):
         "vacia, devolve {} para ese bloque)."
     )
     try:
-        # max_tokens 800: Gemini 3.5 gasta tokens en razonamiento interno antes
+        # max_tokens 3000: Gemini 3.5 gasta tokens en razonamiento interno antes
         # de emitir el JSON visible; con 300 salia vacio y caia al fallback
         # silencioso (mismo problema que ya vimos en el simulador).
+        # PRESUPUESTO DE TIEMPO ACOTADO: con textos largos (conversaciones
+        # completas) y Gemini lento, retries=2 x timeout=75 podia encadenar
+        # ~150s de espera y, sumado al resto, agotar el timeout de gunicorn
+        # (la request moria y el navegador recibia HTML -> "Unexpected token '<'").
+        # Como el refinado tiene FALLBACK silencioso (si falla, se devuelve el
+        # analisis base intacto), es seguro acotarlo: 1 reintento y 45s por
+        # intento => maximo ~90s. Si la IA no llega a tiempo, el usuario igual
+        # recibe su analisis (sin los apartados refinados) en vez de un error.
         raw = _ai_chat(
             [{"role": "system", "content": system},
              {"role": "user", "content": user}],
-            max_tokens=3000, temperature=0.3, retries=2, timeout=75,
+            max_tokens=3000, temperature=0.3, retries=1, timeout=45,
         )
     except Exception as exc:  # noqa: BLE001
         app.logger.warning(f"_ai_refine_analysis: IA no disponible: {exc}")
