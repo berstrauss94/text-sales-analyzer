@@ -353,7 +353,15 @@ def add_entry(
             _json_add_entry(username, entry, cat_date, users_dir)
             logger.info(f"JSON: entrada guardada para {username}")
     except Exception as exc:
-        logger.error(f"ERROR guardando entrada para {username}: {exc}")
+        # Log DETALLADO: tipo de excepcion + pgcode (si es un error de psycopg2)
+        # para diagnosticar sin adivinar que falla al guardar en PostgreSQL.
+        _pgcode = getattr(exc, "pgcode", None)
+        _diag = getattr(exc, "diag", None)
+        _detail = getattr(_diag, "message_primary", None) if _diag else None
+        logger.error(
+            f"ERROR guardando entrada para {username}: "
+            f"tipo={type(exc).__name__} pgcode={_pgcode} detail={_detail} msg={exc}"
+        )
         raise
 
     # Best-effort automatic backup after a successful save. Never blocks the save.
