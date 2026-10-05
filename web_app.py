@@ -57,7 +57,7 @@ app.secret_key = _SECRET_KEY
 app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # 200 MB
 commercial_analyzer = CommercialAnalyzer()
 user_manager = UserManager()
-audio_transcriber = AudioTranscriber(model_name="base")
+audio_transcriber = AudioTranscriber(model_name="tiny")
 
 
 def _dedup_transcription(text: str) -> str:
@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.8{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.9{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -3397,6 +3397,35 @@ window._lastAnalysisData = {};
 window._manualHighlights = [];
 window._selectedTextForHighlight = '';
 
+// Lee una respuesta fetch de forma SEGURA. Si el servidor devolvio algo que no
+// es JSON (tipicamente una pagina HTML de error 502/504 cuando el proceso supero
+// el timeout, o 413 si el archivo es muy grande), NO intenta parsear como JSON:
+// devuelve un objeto de error con un mensaje claro en vez del cripitco
+// "Unexpected token '<'". Asi el usuario entiende que paso.
+async function _safeJson(response) {
+    var ct = (response.headers.get('content-type') || '').toLowerCase();
+    if (ct.indexOf('application/json') !== -1) {
+        try { return await response.json(); }
+        catch (e) { /* cae al manejo generico de abajo */ }
+    }
+    // No es JSON: leer como texto para decidir el mensaje segun el status.
+    var raw = '';
+    try { raw = await response.text(); } catch (e) { raw = ''; }
+    var msg;
+    if (response.status === 413) {
+        msg = 'El archivo es demasiado grande. Probá con un audio más corto o de menor peso.';
+    } else if (response.status === 502 || response.status === 504 || response.status === 503) {
+        msg = 'El procesamiento tardó demasiado y el servidor cortó la conexión. Suele pasar con audios largos (más de 3-4 minutos). Probá con un audio más corto o dividilo en partes.';
+    } else if (response.status === 401 || /iniciar sesión|login/i.test(raw)) {
+        msg = 'Tu sesión expiró. Volvé a iniciar sesión y reintentá.';
+    } else if (response.status >= 500) {
+        msg = 'El servidor tuvo un problema al procesar el pedido. Si el audio es largo, probá con uno más corto; si persiste, reintentá en unos minutos.';
+    } else {
+        msg = 'La respuesta del servidor no se pudo interpretar (código ' + response.status + '). Reintentá; si el audio es largo, probá con uno más corto.';
+    }
+    return { error: true, error_message: msg, _nonJson: true };
+}
+
 async function analyze() {
     const text = document.getElementById('textInput').value.trim();
     if (!text) return;
@@ -3416,16 +3445,22 @@ async function analyze() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text, year: parseInt(year), month: parseInt(month) })
         });
-        const data = await response.json();
-        _lastCommercialData = data.commercial || null;
-        // Update textarea with cleaned text (deduped)
-        if (!data.error && data.input_text) {
-            document.getElementById('textInput').value = data.input_text;
+        const data = await _safeJson(response);
+        if (data._nonJson) {
+            document.getElementById('results').innerHTML =
+                '<div class="error-card">' + data.error_message + '</div>';
+            document.getElementById('results').style.display = 'block';
+        } else {
+            _lastCommercialData = data.commercial || null;
+            // Update textarea with cleaned text (deduped)
+            if (!data.error && data.input_text) {
+                document.getElementById('textInput').value = data.input_text;
+            }
+            renderResults(data, data.input_text || text);
         }
-        renderResults(data, data.input_text || text);
     } catch (e) {
         document.getElementById('results').innerHTML =
-            '<div class="error-card">Error de conexion: ' + e.message + '</div>';
+            '<div class="error-card">No se pudo conectar con el servidor. Revisá tu conexión y reintentá.</div>';
         document.getElementById('results').style.display = 'block';
     }
 
@@ -3456,7 +3491,14 @@ async function saveEntry() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text, year: parseInt(year), month: parseInt(month), entry_name: entryName, target_user: targetUser, fecha: document.getElementById('selectFecha') ? document.getElementById('selectFecha').value : '', existing_entry_id: window._currentEntryId || '' })
         });
-        const data = await response.json();
+        const data = await _safeJson(response);
+        if (data._nonJson) {
+            document.getElementById('results').innerHTML =
+                '<div class="error-card">' + data.error_message + '</div>';
+            document.getElementById('results').style.display = 'block';
+            document.getElementById('loading').style.display = 'none';
+            return;
+        }
         _lastCommercialData = data.commercial || null;
         if (!data.error && data.input_text) {
             document.getElementById('textInput').value = data.input_text;
@@ -3484,7 +3526,7 @@ async function saveEntry() {
         }
     } catch (e) {
         document.getElementById('results').innerHTML =
-            '<div class="error-card">Error de conexion: ' + e.message + '</div>';
+            '<div class="error-card">No se pudo conectar con el servidor. Revisá tu conexión y reintentá.</div>';
         document.getElementById('results').style.display = 'block';
     }
 
