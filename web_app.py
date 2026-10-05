@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.16{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.17{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -8926,11 +8926,12 @@ function printInforme() {
     // (max-height + overflow) para ahorrar espacio. Al IMPRIMIR eso recortaba la
     // lista: forzamos que se expanda completa con TODOS los vendedores visibles.
     printWindow.document.write('.pie-v-legend { max-height: none !important; overflow: visible !important; }');
-    // UN TEMA POR HOJA: cada seccion principal del informe arranca en su propia
-    // pagina para que el PDF quede ordenado y profesional (grafico de tendencia,
-    // las dos tortas, seguimiento de uso, informe redactado y recomendaciones).
-    // La tabla por vendedor y la comparativa quedan en la primera hoja.
-    printWindow.document.write('#trendChartBlock, #piesRow, #informeReporte, .report-card2 { break-before: page !important; page-break-before: always !important; }');
+    // UN TEMA POR HOJA solo para los DOS ultimos bloques: "Seguimiento de Uso
+    // del Sistema" (.activity-block, ya tiene su page-break-before mas abajo) y
+    // el "Informe redactado" (#informeReporte). El resto (comparativa, tabla por
+    // vendedor, grafico de tendencia y las dos tortas) queda como estaba, fluyendo
+    // en las primeras hojas sin saltos forzados.
+    printWindow.document.write('#informeReporte { break-before: page !important; page-break-before: always !important; }');
     // "Seguimiento de Uso del Sistema": que SIEMPRE empiece en una HOJA NUEVA,
     // desde arriba, para que el titulo y su cuadro queden juntos y prolijos (no
     // el titulo al pie de una pagina y la tabla en la siguiente). La tabla puede
