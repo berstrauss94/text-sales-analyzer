@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.11{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.12{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -10693,27 +10693,27 @@ def analyze():
     if not session.get("username"):
         return jsonify({"error": True, "error_code": "UNAUTHORIZED",
                         "error_message": "Sesion no iniciada"}), 401
-    # Rate limit: analisis llama a la IA (costo). 30 por minuto por usuario es
-    # holgado para uso real y frena abuso/scripts.
-    _rl = _rate_limited("analyze", limit=30, window_seconds=60)
-    if _rl:
-        return _rl
-
-    data = request.get_json()
-    if not data or "text" not in data:
-        return jsonify({"error": True, "error_code": "BAD_REQUEST",
-                        "error_message": "No text provided"}), 400
-
-    # Filter out consecutive repeated words/phrases from transcription artifacts
-    clean_text = _dedup_transcription(data["text"])
-
-    # GUARD GLOBAL: cualquier excepcion inesperada en el pipeline (ML, comercial,
-    # refinado IA, guardado, serializacion) se captura aca. En vez de un 500 con
-    # pagina HTML (que el navegador no puede parsear como JSON -> "Unexpected
-    # token '<'"), se LOGUEA el traceback completo (visible en los logs de
-    # Railway) y se devuelve un JSON de error claro. El analisis NUNCA debe
-    # tumbar la request con un 500 crudo.
+    # GUARD GLOBAL TOTAL: envuelve TODO el handler (rate limit, get_json, dedup,
+    # pipeline, refinado IA, guardado, serializacion). Cualquier excepcion ->
+    # se LOGUEA el traceback completo (visible en logs de Railway) y se devuelve
+    # JSON de error con el NOMBRE de la excepcion, en vez de un 500-HTML que el
+    # navegador no puede parsear ("Unexpected token '<'"). El analisis NUNCA
+    # debe tumbar la request con un 500 crudo.
     try:
+        # Rate limit: analisis llama a la IA (costo). 30 por minuto por usuario
+        # es holgado para uso real y frena abuso/scripts.
+        _rl = _rate_limited("analyze", limit=30, window_seconds=60)
+        if _rl:
+            return _rl
+
+        data = request.get_json()
+        if not data or "text" not in data:
+            return jsonify({"error": True, "error_code": "BAD_REQUEST",
+                            "error_message": "No text provided"}), 400
+
+        # Filter out consecutive repeated words/phrases from transcription artifacts
+        clean_text = _dedup_transcription(data["text"])
+
         return _analyze_core(clean_text, data)
     except Exception as exc:  # noqa: BLE001
         import traceback as _tb
