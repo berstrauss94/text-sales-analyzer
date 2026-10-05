@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.13{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.14{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -8926,13 +8926,15 @@ function printInforme() {
     // (max-height + overflow) para ahorrar espacio. Al IMPRIMIR eso recortaba la
     // lista: forzamos que se expanda completa con TODOS los vendedores visibles.
     printWindow.document.write('.pie-v-legend { max-height: none !important; overflow: visible !important; }');
-    // El titulo "Seguimiento de Uso del Sistema" no debe quedar solo al pie de
-    // una pagina con su tabla saltando a la siguiente (dejaba una hoja casi en
-    // blanco). Permitimos que el bloque se parta y pegamos el titulo a la tabla.
-    printWindow.document.write('.activity-block { break-inside: auto !important; page-break-inside: auto !important; }');
+    // "Seguimiento de Uso del Sistema": que SIEMPRE empiece en una HOJA NUEVA,
+    // desde arriba, para que el titulo y su cuadro queden juntos y prolijos (no
+    // el titulo al pie de una pagina y la tabla en la siguiente). La tabla puede
+    // partirse si es muy larga, repitiendo el encabezado en cada pagina.
+    printWindow.document.write('.activity-block { break-before: page !important; page-break-before: always !important; break-inside: auto !important; page-break-inside: auto !important; }');
     printWindow.document.write('.activity-title { break-after: avoid !important; page-break-after: avoid !important; }');
     printWindow.document.write('.activity-block table { break-inside: auto !important; page-break-inside: auto !important; }');
     printWindow.document.write('.activity-block thead { display: table-header-group; }');
+    printWindow.document.write('.activity-block tr { break-inside: avoid !important; page-break-inside: avoid !important; }');
     // Activity ("Seguimiento de Uso") box: on screen it uses the dark theme.
     // For PAPER we re-skin it to a clean white table with thin, UNIFORM black
     // borders (outer edge same thickness as inner cells) and dark text.
