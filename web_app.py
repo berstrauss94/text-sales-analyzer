@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.14{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.15{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -8954,6 +8954,18 @@ function printInforme() {
     printWindow.document.write('.activity-block table { width:100% !important; table-layout: fixed !important; font-size: 8pt !important; }');
     printWindow.document.write('.activity-block th, .activity-block td { white-space: normal !important; overflow-wrap: anywhere !important; word-break: break-word !important; }');
     printWindow.document.write('.activity-block td span { white-space: normal !important; display: inline-flex !important; margin: 1px 2px 1px 0 !important; }');
+    // COMPACTAR para que TODA la tabla entre en UNA sola hoja: fuente mas chica,
+    // padding e interlineado minimos, celdas y chips ajustados. El objetivo es
+    // que la seccion arranque en su hoja (regla de arriba) y no se derrame a una
+    // segunda pagina salvo que haya una cantidad de vendedores realmente grande.
+    printWindow.document.write('.activity-block { padding: 6px !important; }');
+    printWindow.document.write('.activity-block table { font-size: 6.5pt !important; line-height: 1.15 !important; }');
+    printWindow.document.write('.activity-block th { padding: 2px 3px !important; font-size: 6pt !important; line-height: 1.1 !important; }');
+    printWindow.document.write('.activity-block td { padding: 2px 3px !important; vertical-align: top !important; }');
+    printWindow.document.write('.activity-block td span { font-size: 5.8pt !important; padding: 0 3px !important; margin: 0.5px 1px !important; line-height: 1.25 !important; }');
+    printWindow.document.write('.activity-title { font-size: 11pt !important; margin: 0 0 2px !important; }');
+    // El subtitulo de periodo del bloque, compacto.
+    printWindow.document.write('.activity-block .activity-title + div { font-size: 7pt !important; margin-bottom: 4px !important; }');
     printWindow.document.write('</style></head><body>');
     printWindow.document.write('<div class="header"><h1>Mi Primer Casa S.A.</h1><span class="date">' + dateStr + '</span></div>');
     printWindow.document.write('<div class="auditor">Auditor: Bernardo Strauss.</div>');
