@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.10{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.11{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -10707,6 +10707,32 @@ def analyze():
     # Filter out consecutive repeated words/phrases from transcription artifacts
     clean_text = _dedup_transcription(data["text"])
 
+    # GUARD GLOBAL: cualquier excepcion inesperada en el pipeline (ML, comercial,
+    # refinado IA, guardado, serializacion) se captura aca. En vez de un 500 con
+    # pagina HTML (que el navegador no puede parsear como JSON -> "Unexpected
+    # token '<'"), se LOGUEA el traceback completo (visible en los logs de
+    # Railway) y se devuelve un JSON de error claro. El analisis NUNCA debe
+    # tumbar la request con un 500 crudo.
+    try:
+        return _analyze_core(clean_text, data)
+    except Exception as exc:  # noqa: BLE001
+        import traceback as _tb
+        app.logger.error("[/analyze] excepcion no controlada:\n" + _tb.format_exc())
+        return jsonify({
+            "error": True,
+            "error_code": "ANALYZE_FAILED",
+            "error_message": ("No se pudo completar el análisis de este texto. "
+                              "El equipo quedó notificado. Reintentá; si persiste, "
+                              "probá con un texto más corto. (" + type(exc).__name__ + ")"),
+        }), 200
+
+
+def _analyze_core(clean_text, data):
+    """
+    Nucleo del analisis (extraido de /analyze para poder envolverlo en un guard
+    global de errores). Devuelve el jsonify final. Puede lanzar excepciones: el
+    caller las captura, loguea y traduce a JSON.
+    """
     # The old in-memory dedup cache (_last_save_cache) doesn't work with gunicorn
     # multi-worker mode (each worker has a separate process/memory space).
     # The real guard against duplicates is: entry_name is REQUIRED to save
