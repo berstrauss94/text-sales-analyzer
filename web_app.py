@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1 style="margin:0;">Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.35{% if username == 'Berna.Strauss' %} &middot; bloqueo general o selectivo{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.39{% if username == 'Berna.Strauss' %} &middot; pipeline Kanban (fase 1){% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -10515,6 +10515,7 @@ LOGIN_HTML = """
         @media (prefers-reduced-motion: reduce) {
             #sysLockOverlay, #sysLockOverlay * { animation: none !important; transition: none !important; }
             #sysLockModal { opacity: 1 !important; }
+            #sysLockModal::before { opacity: 1 !important; transform: none !important; }
             #sysLockTitle, #sysLockBody, #sysLockBtn { opacity: 1 !important; transform: none !important; }
             #sysLockBorder { stroke-dashoffset: 0 !important; }
             #sysLockPadlock { opacity: 1 !important; transform: none !important; }
@@ -10593,14 +10594,26 @@ LOGIN_HTML = """
            desvanece hacia transparente en los bordes, mas un glow cian difuso. */
         #sysLockModal {
             position: relative; border-radius: 24px; padding: 42px 40px 38px; text-align: center;
+            background: transparent;
+            box-shadow: 0 0 60px 20px rgba(45,212,255,0.10);
+            transition: box-shadow 0.9s ease;
+            overflow: visible;
+        }
+        /* El FONDO oscuro es una capa propia que se MATERIALIZA (fade + leve
+           escala) desde 0s, ANTES de que empiece a dibujarse el contorno (0.5s). */
+        #sysLockModal::before {
+            content: ""; position: absolute; inset: 0; border-radius: 24px; z-index: 0;
             background: radial-gradient(75% 70% at 50% 42%,
                         rgba(4,18,28,0.86) 0%,
                         rgba(5,20,32,0.55) 55%,
                         rgba(6,22,34,0.12) 80%,
                         rgba(6,22,34,0) 100%);
-            box-shadow: 0 0 60px 20px rgba(45,212,255,0.10);
-            transition: box-shadow 0.9s ease;
-            overflow: visible;
+            transform-origin: 50% 42%;
+            animation: slBgMaterialize 0.6s ease-out both;
+        }
+        @keyframes slBgMaterialize {
+            0%   { opacity: 0; transform: scale(0.86); }
+            100% { opacity: 1; transform: scale(1); }
         }
         /* El borde que se "dibuja" ahora es tenue y difuso (parte del glow),
            no un marco solido. */
@@ -10615,7 +10628,7 @@ LOGIN_HTML = """
            Mascara: se desvanece hacia los lados y arriba/abajo. */
         #sysLockEqSvg {
             position: absolute; left: 0; right: 0; top: 40px; height: 84px;
-            width: 100%; z-index: 0; opacity: 0.75; pointer-events: none;
+            width: 100%; z-index: 1; opacity: 0.75; pointer-events: none;
             transition: opacity 0.6s ease;
             -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
                     mask-image: linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
@@ -10683,12 +10696,37 @@ LOGIN_HTML = """
                         </svg>
                         <div id="sysLockTitle">Sistema bloqueado por falta de pago</div>
                         <div id="sysLockBody" data-fulltext="El acceso al sistema esta temporalmente deshabilitado. Por favor, contacta al administrador para regularizar el pago y reactivar el servicio."><span id="sysLockBodyText"></span><span id="sysLockCaret">|</span></div>
-                        <button type="button" id="sysLockBtn" onclick="var o=document.getElementById('sysLockOverlay'); if(o) o.style.display='none';">Entendido</button>
+                        <button type="button" id="sysLockBtn" onclick="sysLockDismiss()">Entendido</button>
                     </div>
                 </div>
             </div>
         </div>
         <script>
+        // Al cerrar el popup: ocultarlo y REVELAR el login (quitar sys-locked y
+        // mostrar pestanas + formulario) para que el usuario pueda intentar entrar.
+        window.sysLockDismiss = function () {
+            var o = document.getElementById('sysLockOverlay');
+            if (o) o.style.display = 'none';
+            var card = document.querySelector('.auth-card.sys-locked');
+            if (card) {
+                card.classList.remove('sys-locked');
+                // Mostrar la tarjeta AL INSTANTE: sin la animacion de entrada
+                // (authSlideIn con delay 1.4s) que causaba la pausa de ~1s.
+                card.style.animation = 'none';
+                card.style.opacity = '1';
+                card.style.transform = 'none';
+            }
+            // Mostrar pestanas, formularios y el panel de login activo, tambien
+            // sin animacion/retraso para que aparezca de inmediato.
+            document.querySelectorAll('.auth-card .tabs, .auth-card .tab-panel, .auth-card .form-group').forEach(function (el) {
+                el.style.display = '';
+                el.style.animation = 'none';
+                el.style.opacity = '1';
+                el.style.transform = 'none';
+            });
+            var loginPanel = document.getElementById('panel-login');
+            if (loginPanel) loginPanel.classList.add('active');
+        };
         (function () {
             function run() {
                 var body = document.getElementById('sysLockBody');
@@ -13173,6 +13211,81 @@ def lead_list():
     from src.users import lead_store_pg
     fichas = lead_store_pg.list_fichas(tenant_id=_current_tenant())
     return jsonify({"ok": True, "fichas": fichas})
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Tablero Kanban del pipeline inmobiliario (extiende el CRM/Lead actual).
+# Convive con lead_store_pg: al mover una tarjeta se sincroniza lead_estado.
+# ─────────────────────────────────────────────────────────────────────────
+@app.route("/api/kanban/board")
+def kanban_board():
+    """Devuelve el tablero. Un vendedor ve lo suyo; un admin ve todo el tenant."""
+    if not session.get("username"):
+        return jsonify({"success": False, "error": "unauthorized"}), 401
+    from src.users import kanban_pg
+    owner = None if _is_admin() else session["username"]
+    data = kanban_pg.get_board(tenant_id=_current_tenant(), owner_username=owner)
+    return jsonify(data)
+
+
+@app.route("/api/kanban/card", methods=["POST"])
+def kanban_create_card():
+    """Crea una tarjeta nueva (lead) en la columna NEW."""
+    if not session.get("username"):
+        return jsonify({"success": False, "error": "unauthorized"}), 401
+    from src.users import kanban_pg
+    data = request.get_json(silent=True) or {}
+    customer = str(data.get("customer_name", "")).strip()
+    if not customer:
+        return jsonify({"success": False, "error": "Falta el nombre del cliente."}), 400
+    res = kanban_pg.create_card(
+        owner_username=session["username"],
+        customer_name=customer,
+        property_value=data.get("property_value", 0.0),
+        property_id=data.get("property_id"),
+        tenant_id=_current_tenant(),
+        extra=data,
+    )
+    return jsonify(res), (200 if res.get("success") else 422)
+
+
+@app.route("/api/kanban/move", methods=["POST"])
+def kanban_move():
+    """Mueve una tarjeta a otra etapa. El estado actual se lee de la base."""
+    if not session.get("username"):
+        return jsonify({"success": False, "error": "unauthorized"}), 401
+    from src.users import kanban_pg
+    data = request.get_json(silent=True) or {}
+    card_id = data.get("card_id")
+    target_stage = data.get("target_stage")
+    if not card_id or not target_stage:
+        return jsonify({"success": False, "error": "Falta card_id o target_stage."}), 400
+    res = kanban_pg.move_card(
+        card_id=card_id,
+        target_stage_val=target_stage,
+        moved_by=session["username"],
+        tenant_id=_current_tenant(),
+        card_patch=data.get("card_patch") or {},
+    )
+    return jsonify(res), (200 if res.get("success") else 422)
+
+
+@app.route("/admin/kanban/migrate", methods=["POST"])
+def kanban_migrate():
+    """
+    Migra las fichas de lead_fichas al tablero Kanban. Solo superadmin.
+    Por defecto corre en modo dry_run (simula, no escribe). Para ejecutar de
+    verdad hay que mandar {"confirm": true} explicitamente.
+    """
+    from src.users import kanban_pg
+    if session.get("username") != "Berna.Strauss":
+        return jsonify({"success": False, "error": "solo superadmin"}), 403
+    data = request.get_json(silent=True) or {}
+    dry_run = not bool(data.get("confirm", False))
+    res = kanban_pg.migrate_from_lead_fichas(tenant_id=_current_tenant(), dry_run=dry_run)
+    _log_activity("kanban_migrate", username=session.get("username"),
+                  detail=("DRY_RUN" if dry_run else "REAL"))
+    return jsonify(res), (200 if res.get("success") else 422)
 
 
 @app.route("/admin/lead-alertas")
