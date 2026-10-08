@@ -2897,24 +2897,8 @@ HTML = """
 <div class="container">
     <div class="top-bar">
         <div>
-            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-                <h1 style="margin:0;">Analizador de Textos</h1>
-                {% if username == 'Berna.Strauss' %}
-                <!-- Interruptor de bloqueo del sistema (corte por falta de pago). Solo Berna.Strauss. -->
-                <span id="sysLockWrapper" title="Al activarlo, nadie mas puede ingresar al sistema (corte por falta de pago)."
-                      style="display:inline-flex;align-items:center;gap:8px;background:#2a1c0d;border:1px solid #5a3a12;border-radius:10px;padding:5px 10px;">
-                    <span style="font-size:0.68rem;font-weight:700;color:#f5a35b;letter-spacing:0.3px;text-transform:uppercase;">Bloqueo de pago</span>
-                    <button type="button" id="sysLockToggle" role="switch" aria-checked="false"
-                            aria-label="Interruptor de bloqueo del sistema por falta de pago"
-                            onclick="toggleSystemLock()"
-                            style="position:relative;width:46px;height:24px;border-radius:14px;border:none;cursor:pointer;background:#444;transition:background .18s;padding:0;flex:0 0 auto;">
-                        <span id="sysLockKnob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .18s;box-shadow:0 1px 3px rgba(0,0,0,0.4);pointer-events:none;"></span>
-                    </button>
-                    <span id="sysLockStateLabel" style="font-size:0.66rem;font-weight:700;color:#9aa0ac;min-width:52px;">Desactivado</span>
-                </span>
-                {% endif %}
-            </div>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.20{% if username == 'Berna.Strauss' %} &middot; interruptor de bloqueo por pago{% endif %}</span></p>
+            <h1 style="margin:0;">Analizador de Textos</h1>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.21{% if username == 'Berna.Strauss' %} &middot; interruptor de bloqueo por pago{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -3011,6 +2995,21 @@ HTML = """
                 </div>
             </div>
         </div>
+
+        {% if username == 'Berna.Strauss' %}
+        <!-- Interruptor de bloqueo del sistema (corte por falta de pago). Solo Berna.Strauss. Barra de un solo renglon, encima de la casilla de texto. -->
+        <div id="sysLockWrapper" title="Al activarlo, nadie mas puede ingresar al sistema (corte por falta de pago)."
+             style="display:flex;align-items:center;justify-content:center;gap:12px;width:100%;margin-bottom:12px;background:#2a1c0d;border:1px solid #5a3a12;border-radius:8px;padding:10px 16px;box-sizing:border-box;">
+            <span style="font-size:0.82rem;font-weight:700;color:#f5a35b;letter-spacing:0.3px;">&#128274; Bloqueo del sistema por falta de pago</span>
+            <button type="button" id="sysLockToggle" role="switch" aria-checked="false"
+                    aria-label="Interruptor de bloqueo del sistema por falta de pago"
+                    onclick="toggleSystemLock()"
+                    style="position:relative;width:46px;height:24px;border-radius:14px;border:none;cursor:pointer;background:#444;transition:background .18s;padding:0;flex:0 0 auto;">
+                <span id="sysLockKnob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .18s;box-shadow:0 1px 3px rgba(0,0,0,0.4);pointer-events:none;"></span>
+            </button>
+            <span id="sysLockStateLabel" style="font-size:0.78rem;font-weight:700;color:#9aa0ac;min-width:72px;">Desactivado</span>
+        </div>
+        {% endif %}
 
         <div class="textarea-wrapper" id="textareaWrapper">
             <textarea id="textInput"
