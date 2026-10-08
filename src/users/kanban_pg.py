@@ -245,6 +245,21 @@ class KiroKanbanEngine:
         except ValueError:
             return {"success": False, "error": "Etapa destino invalida."}
 
+        # Garantizar que la tabla lead_fichas del CRM exista ANTES de la
+        # transaccion (puede no existir si nadie uso el CRM todavia). Usa la
+        # creacion oficial del modulo del CRM, en su propia transaccion. Si falla,
+        # no corta: la sincronia es best-effort.
+        try:
+            from src.users import lead_store_pg
+            _lf_conn = _conn()
+            if _lf_conn is not None:
+                try:
+                    lead_store_pg._ensure_table(_lf_conn)
+                finally:
+                    _release(_lf_conn)
+        except Exception:
+            pass
+
         conn = _conn()
         if conn is None:
             return {"success": False, "error": "No hay conexion a la base."}
