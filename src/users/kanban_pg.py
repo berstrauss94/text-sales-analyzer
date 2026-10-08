@@ -389,6 +389,25 @@ class _KanbanError(Exception):
     pass
 
 
+# Instancia unica del motor y funciones de modulo que delegan en ella. Asi el
+# resto del codigo (endpoints) usa kanban_pg.move_card(...) de forma uniforme,
+# igual que create_card / get_board / migrate_from_lead_fichas.
+_engine = KiroKanbanEngine()
+
+
+def move_card(card_id: str, target_stage_val: str, moved_by: str,
+              tenant_id: str = "__legacy__",
+              card_patch: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Funcion de modulo: delega en el motor (ver KiroKanbanEngine.move_card)."""
+    return _engine.move_card(card_id, target_stage_val, moved_by,
+                             tenant_id=tenant_id, card_patch=card_patch)
+
+
+def calculate_stage_header(stage: KanbanStage, cards_in_stage: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Funcion de modulo: delega en el motor."""
+    return _engine.calculate_stage_header(stage, cards_in_stage)
+
+
 # =====================================================================
 # 4. CREACION DE TARJETAS NUEVAS
 # =====================================================================
