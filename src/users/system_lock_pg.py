@@ -5,9 +5,13 @@ system_lock_pg.py — Interruptor de bloqueo del sistema persistido en PostgreSQ
 QUE ES
 ------
 Un unico "candado" global de la plataforma que controla el superadmin
-(Berna.Strauss). Cuando esta activado, ningun otro usuario (comun o admin)
-puede ingresar: ven el aviso naranja "Sistema bloqueado por falta de pago".
-Sirve como corte por falta de pago al administrador de la plataforma.
+(Berna.Strauss). Cuando esta activado, bloquea el ingreso: los usuarios ven el
+aviso "Sistema bloqueado por falta de pago". Sirve como corte por falta de pago.
+
+MODOS DE BLOQUEO
+----------------
+- "general":   bloquea a TODOS los usuarios (salvo el superadmin).
+- "selective": bloquea SOLO a los usuarios de la lista blocked_users.
 
 POR QUE PostgreSQL
 ------------------
@@ -23,6 +27,7 @@ DISENO
 """
 from __future__ import annotations
 
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -73,13 +78,38 @@ def _ensure_table(conn) -> None:
             )
             """
         )
+        # Migracion aditiva: columnas para el modo y la lista de usuarios.
+        # IF NOT EXISTS hace que sea seguro ejecutarlo siempre (idempotente).
+        cur.execute(
+            "ALTER TABLE system_lock ADD COLUMN IF NOT EXISTS "
+            "mode TEXT NOT NULL DEFAULT 'general'"
+        )
+        cur.execute(
+            "ALTER TABLE system_lock ADD COLUMN IF NOT EXISTS "
+            "blocked_users TEXT NOT NULL DEFAULT '[]'"
+        )
     conn.commit()
     _table_ready = True
 
 
+def _parse_users(raw) -> list:
+    """Normaliza blocked_users a una lista de strings."""
+    if isinstance(raw, list):
+        return [str(u) for u in raw if str(u).strip()]
+    if isinstance(raw, str) and raw.strip():
+        try:
+            data = json.loads(raw)
+            if isinstance(data, list):
+                return [str(u) for u in data if str(u).strip()]
+        except Exception:
+            pass
+    return []
+
+
 def get_state() -> dict:
-    """Estado del bloqueo global. Si PG no esta, devuelve no-bloqueado."""
-    base = {"locked": False, "updated_at": None, "updated_by": None}
+    """Estado del bloqueo. Si PG no esta, devuelve no-bloqueado (general)."""
+    base = {"locked": False, "mode": "general", "blocked_users": [],
+            "updated_at": None, "updated_by": None}
     if not is_available():
         return base
     conn = _conn()
@@ -89,8 +119,8 @@ def get_state() -> dict:
         _ensure_table(conn)
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT locked, updated_at, updated_by FROM system_lock "
-                "WHERE lock_key = %s LIMIT 1",
+                "SELECT locked, mode, blocked_users, updated_at, updated_by "
+                "FROM system_lock WHERE lock_key = %s LIMIT 1",
                 (_LOCK_KEY,),
             )
             row = cur.fetchone()
@@ -99,8 +129,10 @@ def get_state() -> dict:
             return base
         return {
             "locked": bool(row[0]),
-            "updated_at": row[1].isoformat() if row[1] else None,
-            "updated_by": row[2],
+            "mode": row[1] or "general",
+            "blocked_users": _parse_users(row[2]),
+            "updated_at": row[3].isoformat() if row[3] else None,
+            "updated_by": row[4],
         }
     except Exception as exc:  # noqa: BLE001
         logger.error(f"system_lock get error: {exc}")
@@ -113,30 +145,36 @@ def get_state() -> dict:
 
 
 def is_locked() -> bool:
-    """True si el sistema esta bloqueado por falta de pago."""
+    """True si el bloqueo esta activo (en cualquier modo)."""
     return bool(get_state().get("locked", False))
 
 
-def set_locked(locked: bool, updated_by: str = "") -> bool:
-    """Guarda (upsert) el estado del bloqueo global. Best-effort."""
+def set_state(locked: bool, mode: str, blocked_users: list, updated_by: str = "") -> bool:
+    """Guarda (upsert) el estado completo del bloqueo. Best-effort."""
     if not is_available():
         return False
     conn = _conn()
     if conn is None:
         return False
+    mode = "selective" if str(mode) == "selective" else "general"
+    users_json = json.dumps(_parse_users(blocked_users), ensure_ascii=False)
     try:
         _ensure_table(conn)
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO system_lock (lock_key, locked, updated_by, updated_at)
-                VALUES (%s, %s, %s, now())
+                INSERT INTO system_lock
+                    (lock_key, locked, mode, blocked_users, updated_by, updated_at)
+                VALUES (%s, %s, %s, %s, %s, now())
                 ON CONFLICT (lock_key) DO UPDATE SET
-                    locked     = EXCLUDED.locked,
-                    updated_by = EXCLUDED.updated_by,
-                    updated_at = now()
+                    locked        = EXCLUDED.locked,
+                    mode          = EXCLUDED.mode,
+                    blocked_users = EXCLUDED.blocked_users,
+                    updated_by    = EXCLUDED.updated_by,
+                    updated_at    = now()
                 """,
-                (_LOCK_KEY, bool(locked), str(updated_by or "")[:120]),
+                (_LOCK_KEY, bool(locked), mode, users_json,
+                 str(updated_by or "")[:120]),
             )
         conn.commit()
         _release(conn)

@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1 style="margin:0;">Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.22{% if username == 'Berna.Strauss' %} &middot; interruptor de bloqueo por pago{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.35{% if username == 'Berna.Strauss' %} &middot; bloqueo general o selectivo{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -2997,17 +2997,42 @@ HTML = """
         </div>
 
         {% if username == 'Berna.Strauss' %}
-        <!-- Interruptor de bloqueo del sistema (corte por falta de pago). Solo Berna.Strauss. Barra de un solo renglon, encima de la casilla de texto. -->
-        <div id="sysLockWrapper" title="Al activarlo, nadie mas puede ingresar al sistema (corte por falta de pago)."
-             style="display:flex;align-items:center;justify-content:center;gap:12px;width:100%;margin-bottom:12px;background:#2a1c0d;border:1px solid #5a3a12;border-radius:8px;padding:10px 16px;box-sizing:border-box;">
-            <span style="font-size:0.82rem;font-weight:700;color:#f5a35b;letter-spacing:0.3px;">&#128274; Bloqueo del sistema por falta de pago</span>
-            <button type="button" id="sysLockToggle" role="switch" aria-checked="false"
-                    aria-label="Interruptor de bloqueo del sistema por falta de pago"
-                    onclick="toggleSystemLock()"
-                    style="position:relative;width:46px;height:24px;border-radius:14px;border:none;cursor:pointer;background:#444;transition:background .18s;padding:0;flex:0 0 auto;">
-                <span id="sysLockKnob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .18s;box-shadow:0 1px 3px rgba(0,0,0,0.4);pointer-events:none;"></span>
-            </button>
-            <span id="sysLockStateLabel" style="font-size:0.78rem;font-weight:700;color:#9aa0ac;min-width:72px;">Desactivado</span>
+        <!-- Interruptor de bloqueo del sistema (corte por falta de pago). Solo Berna.Strauss.
+             Chip compacto (tamano similar al badge de version), encima de la casilla de texto.
+             Soporta bloqueo GENERAL (todos) o SELECTIVO (usuarios elegidos). -->
+        <div style="position:relative;display:inline-block;margin-bottom:10px;">
+            <div id="sysLockWrapper" title="Al activarlo elegis si bloquear a todos o a usuarios especificos."
+                 style="display:inline-flex;align-items:center;gap:6px;background:#2a1c0d;border:1px solid #5a3a12;border-radius:8px;padding:2px 8px;box-sizing:border-box;">
+                <span style="font-size:0.66rem;font-weight:700;color:#f5a35b;letter-spacing:0.2px;">&#128274; Bloqueo por pago</span>
+                <button type="button" id="sysLockToggle" role="switch" aria-checked="false"
+                        aria-label="Interruptor de bloqueo del sistema por falta de pago"
+                        onclick="toggleSystemLock()"
+                        style="position:relative;width:30px;height:16px;border-radius:9px;border:none;cursor:pointer;background:#444;transition:background .18s;padding:0;flex:0 0 auto;">
+                    <span id="sysLockKnob" style="position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:left .18s;box-shadow:0 1px 2px rgba(0,0,0,0.4);pointer-events:none;"></span>
+                </button>
+                <span id="sysLockStateLabel" style="font-size:0.62rem;font-weight:700;color:#9aa0ac;min-width:58px;">Desactivado</span>
+                <button type="button" id="sysLockCfgBtn" onclick="openSysLockPanel()" title="Configurar a quien se bloquea"
+                        style="font-size:0.62rem;font-weight:700;color:#f5a35b;background:transparent;border:1px solid #5a3a12;border-radius:6px;padding:1px 6px;cursor:pointer;">&#9881;</button>
+            </div>
+            <!-- Panel de configuracion del bloqueo -->
+            <div id="sysLockPanel" style="display:none;position:absolute;z-index:100000;top:30px;left:0;width:300px;max-width:92vw;background:#12141c;border:1px solid #5a3a12;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,0.6);padding:12px;text-align:left;">
+                <div style="font-size:0.72rem;font-weight:800;color:#f5a35b;margin-bottom:8px;">Bloqueo del sistema</div>
+                <label style="display:flex;align-items:center;gap:7px;font-size:0.72rem;color:#e0e0e0;margin-bottom:6px;cursor:pointer;">
+                    <input type="radio" name="sysLockMode" value="general" id="sysLockModeGeneral"> Bloqueo general (todos los usuarios)
+                </label>
+                <label style="display:flex;align-items:center;gap:7px;font-size:0.72rem;color:#e0e0e0;margin-bottom:6px;cursor:pointer;">
+                    <input type="radio" name="sysLockMode" value="selective" id="sysLockModeSelective"> Bloqueo selectivo (elegir usuarios)
+                </label>
+                <div id="sysLockUsersBox" style="display:none;margin:6px 0 8px;max-height:170px;overflow-y:auto;border:1px solid #2a2d3a;border-radius:7px;padding:6px;background:#0d0f18;">
+                    <input type="text" id="sysLockUserFilter" placeholder="Buscar usuario..." oninput="filterSysLockUsers()"
+                           style="width:100%;margin-bottom:6px;background:#12141c;color:#e0e0e0;border:1px solid #2a2d3a;border-radius:6px;padding:5px 7px;font-size:0.7rem;box-sizing:border-box;">
+                    <div id="sysLockUsersList" style="font-size:0.72rem;color:#cfd3dc;"></div>
+                </div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;">
+                    <button type="button" onclick="closeSysLockPanel()" style="font-size:0.68rem;font-weight:700;color:#9aa0ac;background:transparent;border:1px solid #3a3d4a;border-radius:6px;padding:5px 10px;cursor:pointer;">Cancelar</button>
+                    <button type="button" id="sysLockApplyBtn" onclick="applySysLock()" style="font-size:0.68rem;font-weight:800;color:#1c1206;background:#f5a35b;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;">Aplicar</button>
+                </div>
+            </div>
         </div>
         {% endif %}
 
@@ -9306,10 +9331,22 @@ function _renderSysLock(locked) {
     if (!btn || !knob || !label) return;
     btn.setAttribute('aria-checked', locked ? 'true' : 'false');
     btn.style.background = locked ? '#f5a35b' : '#444';
-    knob.style.left = locked ? '24px' : '2px';
-    label.textContent = locked ? 'Activado' : 'Desactivado';
+    knob.style.left = locked ? '16px' : '2px';
+    var mode = (_sysLockState && _sysLockState.mode) || 'general';
+    if (!locked) {
+        label.textContent = 'Desactivado';
+    } else if (mode === 'selective') {
+        var n = (_sysLockState.blocked_users || []).length;
+        label.textContent = 'Selectivo (' + n + ')';
+    } else {
+        label.textContent = 'General';
+    }
     label.style.color = locked ? '#f5a35b' : '#9aa0ac';
 }
+
+// Estado y lista de usuarios (cacheados del servidor).
+var _sysLockState = { locked: false, mode: 'general', blocked_users: [] };
+var _sysLockUsers = [];
 
 // Carga el estado actual al abrir la pagina.
 function loadSystemLockState() {
@@ -9317,33 +9354,110 @@ function loadSystemLockState() {
     fetch('/admin/system-lock')
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) {
-            if (d && d.ok && d.state) _renderSysLock(!!d.state.locked);
+            if (d && d.ok && d.state) {
+                _sysLockState = d.state;
+                _sysLockUsers = d.available_users || [];
+                _renderSysLock(!!d.state.locked);
+            }
         })
         .catch(function () {});
 }
 
+// --- Panel de configuracion ---
+function openSysLockPanel() {
+    var panel = document.getElementById('sysLockPanel');
+    if (!panel) return;
+    // Prefijar los controles con el estado actual.
+    var isSel = _sysLockState.mode === 'selective';
+    var rg = document.getElementById('sysLockModeGeneral');
+    var rs = document.getElementById('sysLockModeSelective');
+    if (rg) rg.checked = !isSel;
+    if (rs) rs.checked = isSel;
+    _renderSysLockUsers();
+    document.getElementById('sysLockUsersBox').style.display = isSel ? 'block' : 'none';
+    panel.style.display = 'block';
+}
+function closeSysLockPanel() {
+    var panel = document.getElementById('sysLockPanel');
+    if (panel) panel.style.display = 'none';
+}
+function _renderSysLockUsers() {
+    var list = document.getElementById('sysLockUsersList');
+    if (!list) return;
+    var sel = {};
+    (_sysLockState.blocked_users || []).forEach(function (u) { sel[u] = true; });
+    var q = (document.getElementById('sysLockUserFilter') || {}).value || '';
+    q = q.toLowerCase();
+    var html = '';
+    _sysLockUsers.forEach(function (u) {
+        if (q && u.toLowerCase().indexOf(q) === -1) return;
+        var checked = sel[u] ? ' checked' : '';
+        html += '<label style="display:flex;align-items:center;gap:7px;padding:3px 2px;cursor:pointer;">' +
+                '<input type="checkbox" class="sysLockUserChk" value="' + u + '"' + checked + '> ' +
+                u + '</label>';
+    });
+    if (!html) html = '<div style="color:#777;padding:4px;">Sin usuarios</div>';
+    list.innerHTML = html;
+}
+function filterSysLockUsers() { _renderSysLockUsers(); }
+
+// Mostrar/ocultar la lista de usuarios segun el modo elegido.
+document.addEventListener('change', function (e) {
+    if (e.target && e.target.name === 'sysLockMode') {
+        var box = document.getElementById('sysLockUsersBox');
+        if (box) box.style.display = (e.target.value === 'selective') ? 'block' : 'none';
+    }
+    // Mantener _sysLockState.blocked_users sincronizado con los checks visibles.
+    if (e.target && e.target.classList && e.target.classList.contains('sysLockUserChk')) {
+        var set = {};
+        (_sysLockState.blocked_users || []).forEach(function (u) { set[u] = true; });
+        if (e.target.checked) set[e.target.value] = true; else delete set[e.target.value];
+        _sysLockState.blocked_users = Object.keys(set);
+    }
+});
+
 var _sysLockBusy = false;
+function applySysLock() {
+    if (_sysLockBusy) return;
+    var rs = document.getElementById('sysLockModeSelective');
+    var mode = (rs && rs.checked) ? 'selective' : 'general';
+    var users = [];
+    document.querySelectorAll('.sysLockUserChk').forEach(function (c) { if (c.checked) users.push(c.value); });
+    if (mode === 'selective' && users.length === 0) {
+        alert('Elegi al menos un usuario para el bloqueo selectivo, o usa el modo general.');
+        return;
+    }
+    _saveSysLock(true, mode, users);
+    closeSysLockPanel();
+}
+
+// Toggle del switch: si esta OFF -> abre el panel para configurar y activar.
+// Si esta ON -> desactiva directamente (con confirmacion).
 function toggleSystemLock() {
     if (_sysLockBusy) return;
     var btn = document.getElementById('sysLockToggle');
     if (!btn) return;
     var currentlyLocked = btn.getAttribute('aria-checked') === 'true';
-    var next = !currentlyLocked;
-    if (next) {
-        if (!confirm('Vas a BLOQUEAR el sistema por falta de pago.\\n\\nMientras este activado, ningun otro usuario (comun o administrador) podra ingresar. Solo vos podras entrar.\\n\\n\u00bfConfirmas?')) return;
-    } else {
-        if (!confirm('Vas a DESBLOQUEAR el sistema.\\n\\nLos usuarios volveran a poder ingresar normalmente.\\n\\n\u00bfConfirmas?')) return;
+    if (!currentlyLocked) {
+        openSysLockPanel();
+        return;
     }
+    if (!confirm('Vas a DESBLOQUEAR el sistema.\\n\\nLos usuarios volveran a poder ingresar normalmente.\\n\\n\u00bfConfirmas?')) return;
+    _saveSysLock(false, _sysLockState.mode || 'general', _sysLockState.blocked_users || []);
+}
+
+function _saveSysLock(locked, mode, users) {
     _sysLockBusy = true;
     fetch('/admin/system-lock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ locked: next })
+        body: JSON.stringify({ locked: locked, mode: mode, blocked_users: users })
     })
     .then(function (r) { return r.json(); })
     .then(function (d) {
-        if (d && d.ok) {
-            _renderSysLock(!!(d.state && d.state.locked));
+        if (d && d.ok && d.state) {
+            _sysLockState = d.state;
+            _renderSysLock(!!d.state.locked);
         } else {
             alert('No se pudo cambiar el estado del bloqueo. Intenta de nuevo.');
         }
@@ -9354,10 +9468,13 @@ function toggleSystemLock() {
     .finally(function () { _sysLockBusy = false; });
 }
 
-// Exponer explicitamente como global para el onclick inline (por si el <script>
-// corre en un scope no-global en algun navegador/configuracion).
+// Exponer explicitamente como globales para los onclick inline.
 window.toggleSystemLock = toggleSystemLock;
 window.loadSystemLockState = loadSystemLockState;
+window.openSysLockPanel = openSysLockPanel;
+window.closeSysLockPanel = closeSysLockPanel;
+window.applySysLock = applySysLock;
+window.filterSysLockUsers = filterSysLockUsers;
 
 // Enganchar el handler por JS ademas del onclick inline (redundancia robusta) y
 // cargar el estado inicial. Usamos un flag para no disparar dos veces por click.
@@ -10365,18 +10482,35 @@ LOGIN_HTML = """
         <p>Ventas y Bienes Raices &mdash; Analisis con Machine Learning</p>
     </div>
 
-    <div class="auth-card">
+    <div class="auth-card{% if error == 'Sistema bloqueado por falta de pago' %} sys-locked{% endif %}">
+        {% if error != 'Sistema bloqueado por falta de pago' %}
         <div class="tabs">
             <button class="tab-btn active" onclick="switchTab('login')">Iniciar Sesion</button>
             <button class="tab-btn" onclick="switchTab('register')">Registrarse</button>
         </div>
+        {% endif %}
 
         {% if error == 'Sistema bloqueado por falta de pago' %}
         <!-- Ventanilla emergente TECH (cian): sistema bloqueado por falta de pago -->
         <!-- Secuencia animada orquestada (timeline): overlay -> dibujo del recuadro ->
-             materializacion del titulo -> texto typewriter -> candado que viaja y
-             se cierra de golpe con screen-shake + pulso de luz cian. -->
+             materializacion del titulo -> texto typewriter -> candado SVG que viaja
+             abierto y se cierra de golpe con screen-shake + pulso de luz cian.
+             Fondo: ecualizador de ondas de sonido que late suave y se AGITA cuando
+             el candado se mueve y se cierra. -->
         <style>
+        /* Con bloqueo: la tarjeta de login se vuelve invisible (sin fondo, sin
+           borde, sin sombra) y se oculta su contenido. Asi NO queda el recuadro
+           oscuro detras del popup: solo se ve el popup fundido con el fondo. */
+        .auth-card.sys-locked {
+            background: transparent !important; border: none !important;
+            box-shadow: none !important; padding: 0 !important;
+            backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+            animation: none !important; opacity: 1 !important;
+        }
+        .auth-card.sys-locked .tab-panel,
+        .auth-card.sys-locked .tabs,
+        .auth-card.sys-locked .error-msg,
+        .auth-card.sys-locked .success-msg { display: none !important; }
         /* Respeta a quien pide menos movimiento (accesibilidad). */
         @media (prefers-reduced-motion: reduce) {
             #sysLockOverlay, #sysLockOverlay * { animation: none !important; transition: none !important; }
@@ -10384,14 +10518,10 @@ LOGIN_HTML = """
             #sysLockTitle, #sysLockBody, #sysLockBtn { opacity: 1 !important; transform: none !important; }
             #sysLockBorder { stroke-dashoffset: 0 !important; }
             #sysLockPadlock { opacity: 1 !important; transform: none !important; }
+            #sysLockShackle { transform: none !important; }
         }
-        /* Paso 1 - overlay fade_in (0.5s linear) */
+        /* Paso 1 - overlay fade_in (mas lento: 0.9s) */
         @keyframes slOverlayIn { from { opacity: 0; } to { opacity: 1; } }
-        /* fondo "ai wave": gradiente radial que respira sutilmente */
-        @keyframes slBgPulse {
-            0%,100% { opacity: 0.55; transform: scale(1); }
-            50%     { opacity: 0.9;  transform: scale(1.06); }
-        }
         /* Paso 2 - trazado del borde (progressive_stroke_draw) */
         @keyframes slStrokeDraw { to { stroke-dashoffset: 0; } }
         @keyframes slModalFill { from { opacity: 0; } to { opacity: 1; } }
@@ -10407,13 +10537,13 @@ LOGIN_HTML = """
         }
         /* Paso 4 - cursor de terminal parpadeante */
         @keyframes slCaretBlink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
-        /* Paso 5 - candado: viaje descendente (abierto) */
+        /* Paso 5 - candado SVG: viaje descendente (abierto). Timing SIN cambios. */
         @keyframes slPadlockTravel {
             0%   { opacity: 0; transform: translateY(-46px) scale(0.9); }
             18%  { opacity: 1; }
             100% { opacity: 1; transform: translateY(0) scale(1); }
         }
-        /* snap final: micro-temblor del recuadro (screen shake 0.1s... repetido corto) */
+        /* snap final: micro-temblor del recuadro */
         @keyframes slShake {
             0%,100% { transform: translate(0,0); }
             20% { transform: translate(-3px, 1px); }
@@ -10429,59 +10559,128 @@ LOGIN_HTML = """
         }
         @keyframes slFadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
-        #sysLockOverlay { animation: slOverlayIn 0.5s linear both; }
-        #sysLockModalWrap { position: relative; max-width: 420px; width: 100%; }
+        /* === Ecualizador de ondas de sonido (franja a la altura del candado) === */
+        /* Reposo: barras practicamente planas (apenas un hilo). */
+        @keyframes slEqIdle {
+            0%,100% { transform: scaleY(0.08); }
+            50%     { transform: scaleY(0.12); }
+        }
+        /* Viaje del candado: volumen MUY leve (~15-20%), movimiento sinuoso y
+           suave, como si solo captara el deslizamiento del candado. */
+        @keyframes slEqLight {
+            0%   { transform: scaleY(0.12); }
+            25%  { transform: scaleY(0.2); }
+            50%  { transform: scaleY(0.14); }
+            75%  { transform: scaleY(0.19); }
+            100% { transform: scaleY(0.13); }
+        }
+        /* Cierre del candado: frecuencias ALTAS (ondas grandes). */
+        @keyframes slEqStrong {
+            0%   { transform: scaleY(0.3); }
+            25%  { transform: scaleY(1.0); }
+            50%  { transform: scaleY(0.5); }
+            75%  { transform: scaleY(0.92); }
+            100% { transform: scaleY(0.35); }
+        }
+
+        /* El overlay YA esta visible (sin fade de entrada) para evitar el corte a
+           negro y el "reingreso" del cartel. La animacion ocurre en el contenido. */
+        #sysLockOverlay { opacity: 1; }
+        #sysLockModalWrap { position: relative; max-width: 440px; width: 100%; }
+        /* El modal NO es una caja opaca: es una viNeta difusa que se funde con la
+           imagen de fondo. Sin borde duro ni esquinas marcadas: solo un
+           oscurecido radial suave en el centro (para leer el texto) que se
+           desvanece hacia transparente en los bordes, mas un glow cian difuso. */
         #sysLockModal {
-            position: relative; border-radius: 16px; padding: 30px 26px 26px; text-align: center;
-            background: radial-gradient(120% 120% at 50% 0%, #0b2838 0%, #071722 55%, #04101a 100%);
-            overflow: hidden; animation: slModalFill 1s ease-out 0.3s both;
+            position: relative; border-radius: 24px; padding: 42px 40px 38px; text-align: center;
+            background: radial-gradient(75% 70% at 50% 42%,
+                        rgba(4,18,28,0.86) 0%,
+                        rgba(5,20,32,0.55) 55%,
+                        rgba(6,22,34,0.12) 80%,
+                        rgba(6,22,34,0) 100%);
+            box-shadow: 0 0 60px 20px rgba(45,212,255,0.10);
+            transition: box-shadow 0.9s ease;
+            overflow: visible;
         }
-        /* contenedor del borde SVG que se "dibuja" */
-        #sysLockBorderSvg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+        /* El borde que se "dibuja" ahora es tenue y difuso (parte del glow),
+           no un marco solido. */
+        #sysLockBorderSvg { position: absolute; inset: 6px; width: calc(100% - 12px); height: calc(100% - 12px); pointer-events: none; z-index: 3; opacity: 0.5; }
         #sysLockBorder {
-            fill: none; stroke: #2dd4ff; stroke-width: 2;
+            fill: none; stroke: rgba(45,212,255,0.5); stroke-width: 1.2;
             stroke-dasharray: 1000; stroke-dashoffset: 1000;
-            filter: drop-shadow(0 0 6px rgba(45,212,255,0.8));
-            animation: slStrokeDraw 1s ease-out 0.3s both;
+            animation: slStrokeDraw 1.8s ease-out 0.5s both;
         }
-        /* fondo "ai wave" detras del contenido */
-        #sysLockWave {
-            position: absolute; inset: -20% ; z-index: 0;
-            background: radial-gradient(60% 60% at 50% 30%, rgba(45,212,255,0.18) 0%, rgba(45,212,255,0) 70%);
-            animation: slBgPulse 4s ease-in-out infinite;
+        /* Fondo: ecualizador de barras confinado a una FRANJA a la altura del
+           candado. No ocupa todo el modal, por lo que NUNCA cruza el texto.
+           Mascara: se desvanece hacia los lados y arriba/abajo. */
+        #sysLockEqSvg {
+            position: absolute; left: 0; right: 0; top: 40px; height: 84px;
+            width: 100%; z-index: 0; opacity: 0.75; pointer-events: none;
+            transition: opacity 0.6s ease;
+            -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
+                    mask-image: linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
+        }
+        /* Las barras transicionan su escala suavemente al cambiar de modo, para
+           que el paso de 'strong' a reposo no se vea cortado. */
+        #sysLockEqSvg rect { transform-box: fill-box; transform-origin: center; transition: transform 0.5s ease; }
+        #sysLockGlow {
+            position: absolute; inset: -25%; z-index: 1;
+            background: radial-gradient(55% 50% at 50% 36%, rgba(45,212,255,0.18) 0%, rgba(45,212,255,0) 72%);
         }
         #sysLockContent { position: relative; z-index: 2; }
         #sysLockPadlock {
-            font-size: 2.6rem; line-height: 1; margin-bottom: 10px; display: inline-block;
-            animation: slPadlockTravel 2s cubic-bezier(0.5,0,0.2,1) 1.8s both;
-            filter: drop-shadow(0 0 10px rgba(45,212,255,0.7));
+            width: 72px; height: 72px; margin: 0 auto 10px; display: block;
+            animation: slPadlockTravel 1.6s cubic-bezier(0.5,0,0.2,1) 0.6s both;
+            filter: drop-shadow(0 0 10px rgba(45,212,255,0.75));
         }
+        /* El arco del candado arranca "abierto" (abierto hacia arriba/ladeado). */
+        #sysLockShackle { transform-box: fill-box; transform-origin: 50% 70%; transform: translateY(-5px) rotate(-26deg); }
         #sysLockTitle {
             font-size: 1.25rem; font-weight: 800; color: #eaf7ff; margin-bottom: 10px; letter-spacing: 0.3px;
-            opacity: 0; animation: slTitleIn 1s cubic-bezier(0.34,1.56,0.64,1) 0.8s both, slTitleGlow 2.4s ease-in-out 1.8s infinite;
+            opacity: 0; animation: slTitleIn 1.2s cubic-bezier(0.34,1.56,0.64,1) 0.8s both, slTitleGlow 2.8s ease-in-out 2.4s infinite;
         }
         #sysLockBody {
             font-size: 0.86rem; color: #a9cfe0; line-height: 1.6; margin: 0 auto 20px; max-width: 340px; min-height: 3.4em;
+            text-align: left;
         }
         #sysLockCaret { display: inline-block; width: 0.6ch; color: #2dd4ff; font-weight: 700; }
         #sysLockBtn {
             background: linear-gradient(180deg,#2dd4ff,#1aa8d8); color: #04101a; border: none; border-radius: 10px;
             padding: 11px 26px; font-size: 0.9rem; font-weight: 800; cursor: pointer; letter-spacing: 0.3px;
             box-shadow: 0 6px 18px rgba(45,212,255,0.35); opacity: 0;
-            animation: slFadeUp 0.5s ease-out 3.9s both;
+            animation: slFadeUp 0.6s ease-out 3.3s both;
         }
         #sysLockBtn:hover { filter: brightness(1.08); }
         </style>
-        <div id="sysLockOverlay" style="position:fixed;inset:0;z-index:200000;background:rgba(1,8,14,0.86);display:flex;align-items:center;justify-content:center;padding:20px;">
+        <div id="sysLockOverlay" style="position:fixed;inset:0;z-index:200000;background:radial-gradient(60% 60% at 50% 45%, rgba(2,10,18,0.42) 0%, rgba(2,10,18,0.70) 100%);display:flex;align-items:center;justify-content:center;padding:20px;">
             <div id="sysLockModalWrap">
                 <div id="sysLockModal" role="alertdialog" aria-modal="true" aria-labelledby="sysLockTitle">
-                    <div id="sysLockWave"></div>
+                    <!-- Fondo: ecualizador de ondas de sonido, confinado a una franja
+                         a la altura del candado (viewBox 420x84). No cruza el texto. -->
+                    <svg id="sysLockEqSvg" viewBox="0 0 420 84" preserveAspectRatio="none" aria-hidden="true"></svg>
+                    <div id="sysLockGlow"></div>
                     <svg id="sysLockBorderSvg" viewBox="0 0 420 300" preserveAspectRatio="none" aria-hidden="true">
-                        <rect id="sysLockBorder" x="2" y="2" width="416" height="296" rx="16" ry="16"
-                              pathLength="1000"></rect>
+                        <rect id="sysLockBorder" x="2" y="2" width="416" height="296" rx="16" ry="16" pathLength="1000"></rect>
                     </svg>
                     <div id="sysLockContent">
-                        <div id="sysLockPadlock" aria-hidden="true">&#128275;</div>
+                        <!-- Candado SVG estilo tech (cuerpo + arco + ojo de cerradura) -->
+                        <svg id="sysLockPadlock" viewBox="0 0 64 64" aria-hidden="true" fill="none">
+                            <defs>
+                                <linearGradient id="slLockGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0" stop-color="#6fe9ff"/>
+                                    <stop offset="1" stop-color="#17a8d8"/>
+                                </linearGradient>
+                            </defs>
+                            <!-- Arco (shackle) -->
+                            <path id="sysLockShackle" d="M20 30 V22 a12 12 0 0 1 24 0 V30"
+                                  stroke="url(#slLockGrad)" stroke-width="5" stroke-linecap="round"/>
+                            <!-- Cuerpo -->
+                            <rect x="14" y="30" width="36" height="28" rx="7"
+                                  fill="url(#slLockGrad)" stroke="#bff2ff" stroke-width="1.2"/>
+                            <!-- Ojo de cerradura -->
+                            <circle cx="32" cy="42" r="4.2" fill="#04101a"/>
+                            <rect x="30.4" y="44" width="3.2" height="8" rx="1.6" fill="#04101a"/>
+                        </svg>
                         <div id="sysLockTitle">Sistema bloqueado por falta de pago</div>
                         <div id="sysLockBody" data-fulltext="El acceso al sistema esta temporalmente deshabilitado. Por favor, contacta al administrador para regularizar el pago y reactivar el servicio."><span id="sysLockBodyText"></span><span id="sysLockCaret">|</span></div>
                         <button type="button" id="sysLockBtn" onclick="var o=document.getElementById('sysLockOverlay'); if(o) o.style.display='none';">Entendido</button>
@@ -10496,21 +10695,75 @@ LOGIN_HTML = """
                 var out = document.getElementById('sysLockBodyText');
                 var caret = document.getElementById('sysLockCaret');
                 var padlock = document.getElementById('sysLockPadlock');
+                var shackle = document.getElementById('sysLockShackle');
                 var modal = document.getElementById('sysLockModal');
+                var eqSvg = document.getElementById('sysLockEqSvg');
                 if (!body || !out) return;
 
                 var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
                 var full = body.getAttribute('data-fulltext') || '';
 
+                // --- Construir el ecualizador dentro de la franja (viewBox 420x84) ---
+                // Barras simetricas: mas altas al centro (bajo el candado), mas bajas
+                // en los bordes, imitando la onda de la referencia. Las barras se
+                // escalan verticalmente desde su centro (transform-origin: center).
+                if (eqSvg) {
+                    var W = 420, H = 84, bars = 38, gap = 2;
+                    var bw = (W - gap * (bars - 1)) / bars;
+                    var svgns = 'http://www.w3.org/2000/svg';
+                    for (var k = 0; k < bars; k++) {
+                        var centerDist = Math.abs(k - (bars - 1) / 2) / ((bars - 1) / 2); // 0 centro -> 1 borde
+                        var env = Math.pow(1 - centerDist, 1.3);           // envolvente (alto al centro)
+                        var baseH = 8 + env * 30 + (Math.random() * 5);    // altura base a la MITAD (franja mas baja)
+                        var r = document.createElementNS(svgns, 'rect');
+                        r.setAttribute('x', (k * (bw + gap)).toFixed(2));
+                        r.setAttribute('width', bw.toFixed(2));
+                        r.setAttribute('height', baseH.toFixed(1));
+                        r.setAttribute('y', ((H - baseH) / 2).toFixed(1));
+                        r.setAttribute('rx', (bw / 2).toFixed(2));
+                        r.setAttribute('fill', k % 2 ? '#2dd4ff' : '#8be8ff');
+                        // Estado inicial: casi plano (no se ven barras altas antes del candado).
+                        r.style.transform = 'scaleY(0.06)';
+                        eqSvg.appendChild(r);
+                    }
+                    eqSvg.style.opacity = '0';  // oculto hasta que el candado se mueva
+                }
+
+                // Fija el "modo" del ecualizador: 'idle' (quieto), 'light' (viaje del
+                // candado) o 'strong' (cierre). Reparte duraciones/retrasos al azar
+                // para que las barras no se muevan todas iguales.
+                function eqMode(mode) {
+                    if (!eqSvg || reduce) return;
+                    var name = mode === 'strong' ? 'slEqStrong'
+                             : mode === 'light'  ? 'slEqLight'
+                             : 'slEqIdle';
+                    var fast = mode === 'strong', mid = mode === 'light';
+                    eqSvg.style.opacity = fast ? '0.9' : (mid ? '0.5' : '0.35');
+                    var rs = eqSvg.querySelectorAll('rect');
+                    for (var i = 0; i < rs.length; i++) {
+                        var dur = fast ? (0.3 + Math.random() * 0.28)
+                               : mid  ? (1.1 + Math.random() * 0.7)
+                               :        (2.2 + Math.random() * 1.4);
+                        var del = fast ? (Math.random() * 0.12)
+                               : mid  ? (Math.random() * 0.9)
+                               :        (Math.random() * 1.6);
+                        rs[i].style.animation = name + ' ' + dur.toFixed(2) + 's ease-in-out ' + del.toFixed(2) + 's infinite';
+                    }
+                }
+
                 if (reduce) {
                     out.textContent = full;
                     if (caret) caret.style.display = 'none';
-                    if (padlock) padlock.innerHTML = '&#128274;';
+                    if (shackle) shackle.style.transform = 'none'; // candado cerrado
                     return;
                 }
 
-                // Paso 4: typewriter. Arranca a 1.4s (solapado con el titulo).
-                var TYPE_START = 1400, TYPE_DUR = 1000;
+                // NO animar la onda al inicio: queda plana y oculta hasta que el
+                // candado empieza a moverse (eqMode('light') a los 0.6s). Asi no
+                // aparecen barras antes de que surja el candado.
+
+                // Paso 4: typewriter. Arranca a 1.0s (solapado con titulo/candado).
+                var TYPE_START = 1000, TYPE_DUR = 2600;
                 var step = TYPE_DUR / Math.max(1, full.length);
                 setTimeout(function () {
                     var i = 0;
@@ -10519,7 +10772,6 @@ LOGIN_HTML = """
                         out.textContent = full.slice(0, i);
                         if (i >= full.length) {
                             clearInterval(timer);
-                            // Cursor parpadea 3 veces y desaparece.
                             if (caret) {
                                 caret.style.animation = 'slCaretBlink 0.4s steps(1) 0s 3';
                                 setTimeout(function () { caret.style.display = 'none'; }, 1200);
@@ -10528,21 +10780,47 @@ LOGIN_HTML = """
                     }, step);
                 }, TYPE_START);
 
-                // Paso 5: el candado viaja abierto (delay 1.8s + dur 2.0s = termina ~3.8s)
-                // y en el milisegundo final se cierra de golpe: cambia a candado cerrado,
-                // dispara screen-shake del recuadro y pulso de luz cian en los bordes.
-                var SNAP_AT = 1800 + 2000 - 60;
+                // Paso 5: candado. Delay 4.0s + dur 2.0s => aterriza ~6.0s.
+                // La onda sigue el movimiento del candado:
+                //   - mientras VIAJA  -> frecuencias LEVES ('light').
+                //   - al CERRARSE     -> frecuencias ALTAS ('strong'), luego vuelve a reposo.
+                var PAD_DELAY = 600, PAD_DUR = 1600;
+                setTimeout(function () { eqMode('light'); }, PAD_DELAY); // arranca el viaje
+                var SNAP_AT = PAD_DELAY + PAD_DUR - 60;
+                // Deja las barras quietas suavemente (sin corte): quita la
+                // animacion y las lleva a una escala de reposo via transition CSS.
+                function eqRest() {
+                    if (!eqSvg || reduce) return;
+                    var rs = eqSvg.querySelectorAll('rect');
+                    for (var i = 0; i < rs.length; i++) {
+                        rs[i].style.animation = 'none';
+                        rs[i].style.transform = 'scaleY(0.26)';
+                    }
+                    eqSvg.style.opacity = '0.42';
+                }
+
                 setTimeout(function () {
+                    if (shackle) {
+                        // cerrar el arco: baja y se endereza, con un pequeno rebote.
+                        shackle.style.transition = 'transform 0.14s cubic-bezier(0.3,1.6,0.5,1)';
+                        shackle.style.transform = 'translateY(0) rotate(0deg)';
+                    }
                     if (padlock) {
-                        padlock.innerHTML = '&#128274;'; // candado cerrado
-                        padlock.style.transform = 'translateY(0) scale(1.18)';
+                        padlock.style.transform = 'translateY(0) scale(1.16)';
                         setTimeout(function () { padlock.style.transition = 'transform 0.18s ease-out'; padlock.style.transform = 'translateY(0) scale(1)'; }, 90);
                     }
                     if (modal) {
-                        modal.style.animation = 'slShake 0.1s linear 2, slCyanPulse 0.7s ease-out';
-                        // Restaurar el relleno base luego del pulso para no perder el fondo.
-                        setTimeout(function () { modal.style.animation = ''; modal.style.boxShadow = '0 0 14px 2px rgba(45,212,255,0.25), inset 0 0 10px rgba(45,212,255,0.15)'; }, 720);
+                        // Pulso de luz al cerrarse; luego el glow BAJA suave via
+                        // transition CSS (sin corte) a un resplandor de reposo.
+                        modal.style.animation = 'slShake 0.1s linear 2';
+                        modal.style.boxShadow = '0 0 44px 10px rgba(45,212,255,0.6)';
+                        setTimeout(function () {
+                            modal.style.animation = '';
+                            modal.style.boxShadow = '0 0 60px 20px rgba(45,212,255,0.10)';
+                        }, 180);
                     }
+                    eqMode('strong');                                 // golpe de onda fuerte al cerrarse
+                    setTimeout(eqRest, 650);                          // y se aquieta SUAVE (sin salto)
                 }, SNAP_AT);
             }
             if (document.readyState === 'loading') {
@@ -10930,7 +11208,7 @@ def login_page():
                 if error is None:
                     try:
                         from src.users import system_lock
-                        if username != system_lock.SUPERADMIN_USER and system_lock.is_locked():
+                        if system_lock.is_user_blocked(username):
                             error = "Sistema bloqueado por falta de pago"
                             saved_username = username
                     except Exception:
@@ -10981,13 +11259,20 @@ def login_page():
                 else:
                     error = result["error"]
 
-    return render_template_string(
+    html = render_template_string(
         LOGIN_HTML,
         error=error,
         success=success,
         active_tab=active_tab,
         saved_username=saved_username
     )
+    # Evitar que el navegador sirva una version cacheada vieja del login
+    # (asi los cambios de UI se ven sin recarga forzada).
+    resp = app.make_response(html)
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 @app.route("/logout")
@@ -11005,7 +11290,7 @@ def index():
     # que no sea el superadmin (aunque tuviera una sesion abierta de antes).
     try:
         from src.users import system_lock
-        if session.get("username") != system_lock.SUPERADMIN_USER and system_lock.is_locked():
+        if system_lock.is_user_blocked(session.get("username")):
             session.clear()
             return redirect(url_for("login_page", locked="1"))
     except Exception:
@@ -11785,24 +12070,42 @@ def _current_tenant():
 # ─────────────────────────────────────────────────────────────────────────
 @app.route("/admin/system-lock", methods=["GET"])
 def admin_system_lock_get():
-    """Estado del interruptor de bloqueo. Solo el superadmin lo consulta."""
+    """Estado del interruptor de bloqueo + lista de usuarios. Solo superadmin."""
     from src.users import system_lock
     if session.get("username") != system_lock.SUPERADMIN_USER:
         return jsonify({"ok": False, "error": "unauthorized"}), 403
-    return jsonify({"ok": True, "state": system_lock.get_state()})
+    # Lista de usuarios disponibles para el modo selectivo (excluye al superadmin,
+    # que nunca puede bloquearse a si mismo).
+    try:
+        all_users = [u for u in user_manager.list_users()
+                     if u and u != system_lock.SUPERADMIN_USER]
+    except Exception:
+        all_users = []
+    return jsonify({"ok": True, "state": system_lock.get_state(),
+                    "available_users": sorted(all_users, key=str.lower)})
 
 
 @app.route("/admin/system-lock", methods=["POST"])
 def admin_system_lock_set():
-    """Activa/desactiva el bloqueo. Solo el superadmin (Berna.Strauss)."""
+    """Activa/desactiva el bloqueo (general o selectivo). Solo superadmin."""
     from src.users import system_lock
     user = session.get("username")
     if user != system_lock.SUPERADMIN_USER:
         return jsonify({"ok": False, "error": "unauthorized"}), 403
     data = request.get_json(silent=True) or {}
     locked = bool(data.get("locked", False))
-    ok = system_lock.set_locked(locked, updated_by=user)
-    _log_activity("system_lock", username=user, detail=("ON" if locked else "OFF"))
+    mode = "selective" if data.get("mode") == "selective" else "general"
+    raw_users = data.get("blocked_users", [])
+    if not isinstance(raw_users, list):
+        raw_users = []
+    # Nunca permitir bloquear al propio superadmin.
+    blocked_users = [str(u) for u in raw_users
+                     if str(u).strip() and str(u) != system_lock.SUPERADMIN_USER]
+    ok = system_lock.set_state(locked, mode, blocked_users, updated_by=user)
+    detail = ("ON" if locked else "OFF") + "/" + mode
+    if locked and mode == "selective":
+        detail += "/" + ",".join(blocked_users)
+    _log_activity("system_lock", username=user, detail=detail)
     return jsonify({"ok": ok, "state": system_lock.get_state()})
 
 
