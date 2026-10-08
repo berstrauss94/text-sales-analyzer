@@ -2914,7 +2914,7 @@ HTML = """
                 </span>
                 {% endif %}
             </div>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.19{% if username == 'Berna.Strauss' %} &middot; interruptor de bloqueo por pago{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.20{% if username == 'Berna.Strauss' %} &middot; interruptor de bloqueo por pago{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -9331,9 +9331,9 @@ function toggleSystemLock() {
     var currentlyLocked = btn.getAttribute('aria-checked') === 'true';
     var next = !currentlyLocked;
     if (next) {
-        if (!confirm('Vas a BLOQUEAR el sistema por falta de pago.\n\nMientras este activado, ningun otro usuario (comun o administrador) podra ingresar. Solo vos podras entrar.\n\n¿Confirmas?')) return;
+        if (!confirm('Vas a BLOQUEAR el sistema por falta de pago.\\n\\nMientras este activado, ningun otro usuario (comun o administrador) podra ingresar. Solo vos podras entrar.\\n\\n\u00bfConfirmas?')) return;
     } else {
-        if (!confirm('Vas a DESBLOQUEAR el sistema.\n\nLos usuarios volveran a poder ingresar normalmente.\n\n¿Confirmas?')) return;
+        if (!confirm('Vas a DESBLOQUEAR el sistema.\\n\\nLos usuarios volveran a poder ingresar normalmente.\\n\\n\u00bfConfirmas?')) return;
     }
     _sysLockBusy = true;
     fetch('/admin/system-lock', {
