@@ -2897,8 +2897,24 @@ HTML = """
 <div class="container">
     <div class="top-bar">
         <div>
-            <h1>Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.17{% if username == 'Berna.Strauss' %} &middot; paneles CRM y Lead del cliente{% endif %}</span></p>
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                <h1 style="margin:0;">Analizador de Textos</h1>
+                {% if username == 'Berna.Strauss' %}
+                <!-- Interruptor de bloqueo del sistema (corte por falta de pago). Solo Berna.Strauss. -->
+                <span id="sysLockWrapper" title="Al activarlo, nadie mas puede ingresar al sistema (corte por falta de pago)."
+                      style="display:inline-flex;align-items:center;gap:8px;background:#2a1c0d;border:1px solid #5a3a12;border-radius:10px;padding:5px 10px;">
+                    <span style="font-size:0.68rem;font-weight:700;color:#f5a35b;letter-spacing:0.3px;text-transform:uppercase;">Bloqueo de pago</span>
+                    <button type="button" id="sysLockToggle" role="switch" aria-checked="false"
+                            aria-label="Interruptor de bloqueo del sistema por falta de pago"
+                            onclick="toggleSystemLock()"
+                            style="position:relative;width:46px;height:24px;border-radius:14px;border:none;cursor:pointer;background:#444;transition:background .18s;padding:0;flex:0 0 auto;">
+                        <span id="sysLockKnob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .18s;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></span>
+                    </button>
+                    <span id="sysLockStateLabel" style="font-size:0.66rem;font-weight:700;color:#9aa0ac;min-width:52px;">Desactivado</span>
+                </span>
+                {% endif %}
+            </div>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.18{% if username == 'Berna.Strauss' %} &middot; interruptor de bloqueo por pago{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -9280,6 +9296,68 @@ function loadHistory() {}
 function toggleHistory() { toggleSimulator(); }
 
 // ═══════════════════════════════════════════════════════════════════════
+// Interruptor de bloqueo del sistema (solo Berna.Strauss)
+// Al activarlo, ningun otro usuario puede ingresar: ven el aviso naranja
+// "Sistema bloqueado por falta de pago".
+// ═══════════════════════════════════════════════════════════════════════
+function _renderSysLock(locked) {
+    var btn = document.getElementById('sysLockToggle');
+    var knob = document.getElementById('sysLockKnob');
+    var label = document.getElementById('sysLockStateLabel');
+    if (!btn || !knob || !label) return;
+    btn.setAttribute('aria-checked', locked ? 'true' : 'false');
+    btn.style.background = locked ? '#f5a35b' : '#444';
+    knob.style.left = locked ? '24px' : '2px';
+    label.textContent = locked ? 'Activado' : 'Desactivado';
+    label.style.color = locked ? '#f5a35b' : '#9aa0ac';
+}
+
+// Carga el estado actual al abrir la pagina.
+function loadSystemLockState() {
+    if (!document.getElementById('sysLockToggle')) return;
+    fetch('/admin/system-lock')
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+            if (d && d.ok && d.state) _renderSysLock(!!d.state.locked);
+        })
+        .catch(function () {});
+}
+
+var _sysLockBusy = false;
+function toggleSystemLock() {
+    if (_sysLockBusy) return;
+    var btn = document.getElementById('sysLockToggle');
+    if (!btn) return;
+    var currentlyLocked = btn.getAttribute('aria-checked') === 'true';
+    var next = !currentlyLocked;
+    if (next) {
+        if (!confirm('Vas a BLOQUEAR el sistema por falta de pago.\n\nMientras este activado, ningun otro usuario (comun o administrador) podra ingresar. Solo vos podras entrar.\n\n¿Confirmas?')) return;
+    } else {
+        if (!confirm('Vas a DESBLOQUEAR el sistema.\n\nLos usuarios volveran a poder ingresar normalmente.\n\n¿Confirmas?')) return;
+    }
+    _sysLockBusy = true;
+    fetch('/admin/system-lock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locked: next })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+        if (d && d.ok) {
+            _renderSysLock(!!(d.state && d.state.locked));
+        } else {
+            alert('No se pudo cambiar el estado del bloqueo. Intenta de nuevo.');
+        }
+    })
+    .catch(function () {
+        alert('No se pudo cambiar el estado del bloqueo. Revisa tu conexion.');
+    })
+    .finally(function () { _sysLockBusy = false; });
+}
+
+document.addEventListener('DOMContentLoaded', loadSystemLockState);
+
+// ═══════════════════════════════════════════════════════════════════════
 // Paneles CRM / Lead (persistentes por vendedor)
 // ═══════════════════════════════════════════════════════════════════════
 var _crmLeadLoaded = false;
@@ -10275,7 +10353,21 @@ LOGIN_HTML = """
             <button class="tab-btn" onclick="switchTab('register')">Registrarse</button>
         </div>
 
-        {% if error %}
+        {% if error == 'Sistema bloqueado por falta de pago' %}
+        <!-- Ventanilla emergente NARANJA: sistema bloqueado por falta de pago -->
+        <div id="sysLockOverlay" style="position:fixed;inset:0;z-index:200000;background:rgba(0,0,0,0.72);display:flex;align-items:center;justify-content:center;padding:20px;">
+            <div role="alertdialog" aria-modal="true" aria-labelledby="sysLockTitle"
+                 style="max-width:420px;width:100%;background:linear-gradient(180deg,#2a1c0d,#1c1206);border:2px solid #f5a35b;border-radius:16px;padding:28px 26px;box-shadow:0 20px 60px rgba(0,0,0,0.7);text-align:center;">
+                <div style="font-size:2.4rem;line-height:1;margin-bottom:12px;">&#9888;&#65039;</div>
+                <div id="sysLockTitle" style="font-size:1.15rem;font-weight:800;color:#f5a35b;margin-bottom:10px;letter-spacing:0.3px;">Sistema bloqueado por falta de pago</div>
+                <div style="font-size:0.84rem;color:#f3d8bd;line-height:1.6;margin-bottom:20px;">
+                    El acceso al sistema esta temporalmente deshabilitado. Por favor, contacta al administrador para regularizar el pago y reactivar el servicio.
+                </div>
+                <button type="button" onclick="var o=document.getElementById('sysLockOverlay'); if(o) o.style.display='none';"
+                        style="background:#f5a35b;color:#1c1206;border:none;border-radius:10px;padding:10px 22px;font-size:0.85rem;font-weight:800;cursor:pointer;">Entendido</button>
+            </div>
+        </div>
+        {% elif error %}
         <div class="error-msg">{{ error }}</div>
         {% endif %}
         {% if success %}
@@ -10604,6 +10696,11 @@ def login_page():
     active_tab = "login"
     saved_username = ""
 
+    # Si fuimos redirigidos por bloqueo del sistema (sesion previa expulsada),
+    # mostramos el aviso naranja de inmediato.
+    if request.method == "GET" and request.args.get("locked") == "1":
+        error = "Sistema bloqueado por falta de pago"
+
     if request.method == "POST":
         action = request.form.get("action", "login")
 
@@ -10642,6 +10739,17 @@ def login_page():
                     pg_user = None
                 except Exception:
                     pass  # PG no disponible (dev): seguir con defaults
+                # Bloqueo del sistema por falta de pago: si el superadmin activo
+                # el interruptor, ningun usuario puede ingresar salvo el propio
+                # superadmin (Berna.Strauss).
+                if error is None:
+                    try:
+                        from src.users import system_lock
+                        if username != system_lock.SUPERADMIN_USER and system_lock.is_locked():
+                            error = "Sistema bloqueado por falta de pago"
+                            saved_username = username
+                    except Exception:
+                        pass
                 if error is None:
                     # Fallback de rol para admins historicos aun sin rol en PG.
                     if rol == "vendedor" and username in _ADMIN_USERS:
@@ -10708,6 +10816,15 @@ def logout():
 def index():
     if not session.get("username"):
         return redirect(url_for("login_page"))
+    # Si el sistema fue bloqueado por falta de pago, expulsar a cualquier usuario
+    # que no sea el superadmin (aunque tuviera una sesion abierta de antes).
+    try:
+        from src.users import system_lock
+        if session.get("username") != system_lock.SUPERADMIN_USER and system_lock.is_locked():
+            session.clear()
+            return redirect(url_for("login_page", locked="1"))
+    except Exception:
+        pass
     _tenant = _current_tenant()
     _users_for_dropdown = user_manager.list_users(tenant_id=(None if _tenant == "__legacy__" else _tenant))
     html = render_template_string(HTML, username=session["username"], indicador_categorias_json=_INDICADOR_CATEGORIAS_JSON, all_users=[u for u in _users_for_dropdown if u not in ('admin', 'Vanesa.Admin', 'Vanesa_Admin', 'FedericoCeballos', 'MartinianoSosa', 'GarciaTania', 'Berna.Strauss')])
@@ -11473,6 +11590,35 @@ def _current_tenant():
     por defecto mientras la sesion no lo provea (pre Fase 3).
     """
     return session.get("tenant_id") or _DEFAULT_TENANT
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Interruptor de bloqueo del sistema (solo Berna.Strauss).
+# Al activarlo, ningun otro usuario (comun o admin) puede ingresar: ven el
+# aviso naranja "Sistema bloqueado por falta de pago". Sirve como corte por
+# falta de pago al administrador de la plataforma.
+# ─────────────────────────────────────────────────────────────────────────
+@app.route("/admin/system-lock", methods=["GET"])
+def admin_system_lock_get():
+    """Estado del interruptor de bloqueo. Solo el superadmin lo consulta."""
+    from src.users import system_lock
+    if session.get("username") != system_lock.SUPERADMIN_USER:
+        return jsonify({"ok": False, "error": "unauthorized"}), 403
+    return jsonify({"ok": True, "state": system_lock.get_state()})
+
+
+@app.route("/admin/system-lock", methods=["POST"])
+def admin_system_lock_set():
+    """Activa/desactiva el bloqueo. Solo el superadmin (Berna.Strauss)."""
+    from src.users import system_lock
+    user = session.get("username")
+    if user != system_lock.SUPERADMIN_USER:
+        return jsonify({"ok": False, "error": "unauthorized"}), 403
+    data = request.get_json(silent=True) or {}
+    locked = bool(data.get("locked", False))
+    ok = system_lock.set_locked(locked, updated_by=user)
+    _log_activity("system_lock", username=user, detail=("ON" if locked else "OFF"))
+    return jsonify({"ok": ok, "state": system_lock.get_state()})
 
 
 @app.route("/manifest.webmanifest")
