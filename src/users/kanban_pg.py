@@ -409,7 +409,60 @@ def calculate_stage_header(stage: KanbanStage, cards_in_stage: List[Dict[str, An
 
 
 # =====================================================================
-# 4. CREACION DE TARJETAS NUEVAS
+# 4. BORRADO DE TARJETAS
+# =====================================================================
+def delete_card(card_id: str, tenant_id: str = "__legacy__") -> Dict[str, Any]:
+    """
+    Borra una tarjeta y su historial. Si tenia una unidad reservada
+    (TEMPORARILY_LOCKED), la libera (status AVAILABLE). Todo en una transaccion.
+    """
+    if not is_available():
+        return {"success": False, "error": "Persistencia no disponible."}
+    conn = _conn()
+    if conn is None:
+        return {"success": False, "error": "No hay conexion."}
+    should_close = False
+    try:
+        _ensure_tables(conn)
+        with conn:
+            with conn.cursor() as cur:
+                # Buscar la tarjeta y su propiedad vinculada (si tiene).
+                cur.execute(
+                    "SELECT property_id, current_stage FROM kanban_cards "
+                    "WHERE card_id = %s AND tenant_id = %s",
+                    (card_id, tenant_id or "__legacy__"),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return {"success": False, "error": "La tarjeta no existe."}
+                property_id, stage = row[0], row[1]
+                # Si tenia la unidad reservada por esta tarjeta, liberarla.
+                if property_id and stage == KanbanStage.RESERVATION.value:
+                    cur.execute(
+                        "UPDATE units SET status = 'AVAILABLE', lock_until = NULL "
+                        "WHERE unit_id = %s AND tenant_id = %s",
+                        (property_id, tenant_id or "__legacy__"),
+                    )
+                # Borrar historial de la tarjeta y la tarjeta.
+                cur.execute(
+                    "DELETE FROM internal_pipeline_history WHERE card_id = %s AND tenant_id = %s",
+                    (card_id, tenant_id or "__legacy__"),
+                )
+                cur.execute(
+                    "DELETE FROM kanban_cards WHERE card_id = %s AND tenant_id = %s",
+                    (card_id, tenant_id or "__legacy__"),
+                )
+        return {"success": True, "message": "Tarjeta borrada."}
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"kanban delete_card error: {exc}")
+        should_close = True
+        return {"success": False, "error": str(exc)}
+    finally:
+        _release(conn, close=should_close)
+
+
+# =====================================================================
+# 5. CREACION DE TARJETAS NUEVAS
 # =====================================================================
 def create_card(owner_username: str, customer_name: str, property_value: Any = 0.0,
                 property_id: Optional[str] = None, tenant_id: str = "__legacy__",

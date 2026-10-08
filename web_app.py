@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1 style="margin:0;">Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.41{% if username == 'Berna.Strauss' %} &middot; pipeline Kanban (fix 2){% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.42{% if username == 'Berna.Strauss' %} &middot; pipeline Kanban{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -13270,6 +13270,27 @@ def kanban_move():
             tenant_id=_current_tenant(),
             card_patch=data.get("card_patch") or {},
         )
+    except Exception as exc:  # noqa: BLE001
+        import traceback as _tb
+        return jsonify({"success": False, "error": f"{type(exc).__name__}: {exc}",
+                        "trace": _tb.format_exc()[-1500:]}), 500
+    return jsonify(res), (200 if res.get("success") else 422)
+
+
+@app.route("/api/kanban/card/delete", methods=["POST"])
+def kanban_delete_card():
+    """Borra una tarjeta (y su historial). Admin only."""
+    if not session.get("username"):
+        return jsonify({"success": False, "error": "unauthorized"}), 401
+    if not _is_admin():
+        return jsonify({"success": False, "error": "solo admin"}), 403
+    from src.users import kanban_pg
+    data = request.get_json(silent=True) or {}
+    card_id = data.get("card_id")
+    if not card_id:
+        return jsonify({"success": False, "error": "Falta card_id."}), 400
+    try:
+        res = kanban_pg.delete_card(card_id=card_id, tenant_id=_current_tenant())
     except Exception as exc:  # noqa: BLE001
         import traceback as _tb
         return jsonify({"success": False, "error": f"{type(exc).__name__}: {exc}",
