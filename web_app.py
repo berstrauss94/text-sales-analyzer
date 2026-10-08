@@ -2908,13 +2908,13 @@ HTML = """
                             aria-label="Interruptor de bloqueo del sistema por falta de pago"
                             onclick="toggleSystemLock()"
                             style="position:relative;width:46px;height:24px;border-radius:14px;border:none;cursor:pointer;background:#444;transition:background .18s;padding:0;flex:0 0 auto;">
-                        <span id="sysLockKnob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .18s;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></span>
+                        <span id="sysLockKnob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .18s;box-shadow:0 1px 3px rgba(0,0,0,0.4);pointer-events:none;"></span>
                     </button>
                     <span id="sysLockStateLabel" style="font-size:0.66rem;font-weight:700;color:#9aa0ac;min-width:52px;">Desactivado</span>
                 </span>
                 {% endif %}
             </div>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.18{% if username == 'Berna.Strauss' %} &middot; interruptor de bloqueo por pago{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.19{% if username == 'Berna.Strauss' %} &middot; interruptor de bloqueo por pago{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -9355,7 +9355,26 @@ function toggleSystemLock() {
     .finally(function () { _sysLockBusy = false; });
 }
 
-document.addEventListener('DOMContentLoaded', loadSystemLockState);
+// Exponer explicitamente como global para el onclick inline (por si el <script>
+// corre en un scope no-global en algun navegador/configuracion).
+window.toggleSystemLock = toggleSystemLock;
+window.loadSystemLockState = loadSystemLockState;
+
+// Enganchar el handler por JS ademas del onclick inline (redundancia robusta) y
+// cargar el estado inicial. Usamos un flag para no disparar dos veces por click.
+document.addEventListener('DOMContentLoaded', function () {
+    loadSystemLockState();
+    var _b = document.getElementById('sysLockToggle');
+    if (_b && !_b._sysLockBound) {
+        _b._sysLockBound = true;
+        _b.removeAttribute('onclick');
+        _b.addEventListener('click', function (ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            toggleSystemLock();
+        });
+    }
+});
 
 // ═══════════════════════════════════════════════════════════════════════
 // Paneles CRM / Lead (persistentes por vendedor)
