@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1 style="margin:0;">Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.21{% if username == 'Berna.Strauss' %} &middot; interruptor de bloqueo por pago{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.22{% if username == 'Berna.Strauss' %} &middot; interruptor de bloqueo por pago{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -10372,19 +10372,186 @@ LOGIN_HTML = """
         </div>
 
         {% if error == 'Sistema bloqueado por falta de pago' %}
-        <!-- Ventanilla emergente NARANJA: sistema bloqueado por falta de pago -->
-        <div id="sysLockOverlay" style="position:fixed;inset:0;z-index:200000;background:rgba(0,0,0,0.72);display:flex;align-items:center;justify-content:center;padding:20px;">
-            <div role="alertdialog" aria-modal="true" aria-labelledby="sysLockTitle"
-                 style="max-width:420px;width:100%;background:linear-gradient(180deg,#2a1c0d,#1c1206);border:2px solid #f5a35b;border-radius:16px;padding:28px 26px;box-shadow:0 20px 60px rgba(0,0,0,0.7);text-align:center;">
-                <div style="font-size:2.4rem;line-height:1;margin-bottom:12px;">&#9888;&#65039;</div>
-                <div id="sysLockTitle" style="font-size:1.15rem;font-weight:800;color:#f5a35b;margin-bottom:10px;letter-spacing:0.3px;">Sistema bloqueado por falta de pago</div>
-                <div style="font-size:0.84rem;color:#f3d8bd;line-height:1.6;margin-bottom:20px;">
-                    El acceso al sistema esta temporalmente deshabilitado. Por favor, contacta al administrador para regularizar el pago y reactivar el servicio.
+        <!-- Ventanilla emergente TECH (cian): sistema bloqueado por falta de pago -->
+        <!-- Secuencia animada orquestada (timeline): overlay -> dibujo del recuadro ->
+             materializacion del titulo -> texto typewriter -> candado que viaja y
+             se cierra de golpe con screen-shake + pulso de luz cian. -->
+        <style>
+        /* Respeta a quien pide menos movimiento (accesibilidad). */
+        @media (prefers-reduced-motion: reduce) {
+            #sysLockOverlay, #sysLockOverlay * { animation: none !important; transition: none !important; }
+            #sysLockModal { opacity: 1 !important; }
+            #sysLockTitle, #sysLockBody, #sysLockBtn { opacity: 1 !important; transform: none !important; }
+            #sysLockBorder { stroke-dashoffset: 0 !important; }
+            #sysLockPadlock { opacity: 1 !important; transform: none !important; }
+        }
+        /* Paso 1 - overlay fade_in (0.5s linear) */
+        @keyframes slOverlayIn { from { opacity: 0; } to { opacity: 1; } }
+        /* fondo "ai wave": gradiente radial que respira sutilmente */
+        @keyframes slBgPulse {
+            0%,100% { opacity: 0.55; transform: scale(1); }
+            50%     { opacity: 0.9;  transform: scale(1.06); }
+        }
+        /* Paso 2 - trazado del borde (progressive_stroke_draw) */
+        @keyframes slStrokeDraw { to { stroke-dashoffset: 0; } }
+        @keyframes slModalFill { from { opacity: 0; } to { opacity: 1; } }
+        /* Paso 3 - materializacion del titulo (scale 0.8 -> 1, ease-out-back) con glow */
+        @keyframes slTitleIn {
+            0%   { opacity: 0; transform: scale(0.8); }
+            70%  { opacity: 1; transform: scale(1.06); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes slTitleGlow {
+            0%,100% { text-shadow: 0 0 8px rgba(45,212,255,0.45); }
+            50%     { text-shadow: 0 0 18px rgba(45,212,255,0.9); }
+        }
+        /* Paso 4 - cursor de terminal parpadeante */
+        @keyframes slCaretBlink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+        /* Paso 5 - candado: viaje descendente (abierto) */
+        @keyframes slPadlockTravel {
+            0%   { opacity: 0; transform: translateY(-46px) scale(0.9); }
+            18%  { opacity: 1; }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        /* snap final: micro-temblor del recuadro (screen shake 0.1s... repetido corto) */
+        @keyframes slShake {
+            0%,100% { transform: translate(0,0); }
+            20% { transform: translate(-3px, 1px); }
+            40% { transform: translate(3px, -2px); }
+            60% { transform: translate(-2px, 2px); }
+            80% { transform: translate(2px, -1px); }
+        }
+        /* pulso de luz cian en los bordes al cerrarse el candado */
+        @keyframes slCyanPulse {
+            0%   { box-shadow: 0 0 0 rgba(45,212,255,0); }
+            30%  { box-shadow: 0 0 34px 6px rgba(45,212,255,0.85), inset 0 0 24px rgba(45,212,255,0.5); }
+            100% { box-shadow: 0 0 14px 2px rgba(45,212,255,0.25), inset 0 0 10px rgba(45,212,255,0.15); }
+        }
+        @keyframes slFadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        #sysLockOverlay { animation: slOverlayIn 0.5s linear both; }
+        #sysLockModalWrap { position: relative; max-width: 420px; width: 100%; }
+        #sysLockModal {
+            position: relative; border-radius: 16px; padding: 30px 26px 26px; text-align: center;
+            background: radial-gradient(120% 120% at 50% 0%, #0b2838 0%, #071722 55%, #04101a 100%);
+            overflow: hidden; animation: slModalFill 1s ease-out 0.3s both;
+        }
+        /* contenedor del borde SVG que se "dibuja" */
+        #sysLockBorderSvg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+        #sysLockBorder {
+            fill: none; stroke: #2dd4ff; stroke-width: 2;
+            stroke-dasharray: 1000; stroke-dashoffset: 1000;
+            filter: drop-shadow(0 0 6px rgba(45,212,255,0.8));
+            animation: slStrokeDraw 1s ease-out 0.3s both;
+        }
+        /* fondo "ai wave" detras del contenido */
+        #sysLockWave {
+            position: absolute; inset: -20% ; z-index: 0;
+            background: radial-gradient(60% 60% at 50% 30%, rgba(45,212,255,0.18) 0%, rgba(45,212,255,0) 70%);
+            animation: slBgPulse 4s ease-in-out infinite;
+        }
+        #sysLockContent { position: relative; z-index: 2; }
+        #sysLockPadlock {
+            font-size: 2.6rem; line-height: 1; margin-bottom: 10px; display: inline-block;
+            animation: slPadlockTravel 2s cubic-bezier(0.5,0,0.2,1) 1.8s both;
+            filter: drop-shadow(0 0 10px rgba(45,212,255,0.7));
+        }
+        #sysLockTitle {
+            font-size: 1.25rem; font-weight: 800; color: #eaf7ff; margin-bottom: 10px; letter-spacing: 0.3px;
+            opacity: 0; animation: slTitleIn 1s cubic-bezier(0.34,1.56,0.64,1) 0.8s both, slTitleGlow 2.4s ease-in-out 1.8s infinite;
+        }
+        #sysLockBody {
+            font-size: 0.86rem; color: #a9cfe0; line-height: 1.6; margin: 0 auto 20px; max-width: 340px; min-height: 3.4em;
+        }
+        #sysLockCaret { display: inline-block; width: 0.6ch; color: #2dd4ff; font-weight: 700; }
+        #sysLockBtn {
+            background: linear-gradient(180deg,#2dd4ff,#1aa8d8); color: #04101a; border: none; border-radius: 10px;
+            padding: 11px 26px; font-size: 0.9rem; font-weight: 800; cursor: pointer; letter-spacing: 0.3px;
+            box-shadow: 0 6px 18px rgba(45,212,255,0.35); opacity: 0;
+            animation: slFadeUp 0.5s ease-out 3.9s both;
+        }
+        #sysLockBtn:hover { filter: brightness(1.08); }
+        </style>
+        <div id="sysLockOverlay" style="position:fixed;inset:0;z-index:200000;background:rgba(1,8,14,0.86);display:flex;align-items:center;justify-content:center;padding:20px;">
+            <div id="sysLockModalWrap">
+                <div id="sysLockModal" role="alertdialog" aria-modal="true" aria-labelledby="sysLockTitle">
+                    <div id="sysLockWave"></div>
+                    <svg id="sysLockBorderSvg" viewBox="0 0 420 300" preserveAspectRatio="none" aria-hidden="true">
+                        <rect id="sysLockBorder" x="2" y="2" width="416" height="296" rx="16" ry="16"
+                              pathLength="1000"></rect>
+                    </svg>
+                    <div id="sysLockContent">
+                        <div id="sysLockPadlock" aria-hidden="true">&#128275;</div>
+                        <div id="sysLockTitle">Sistema bloqueado por falta de pago</div>
+                        <div id="sysLockBody" data-fulltext="El acceso al sistema esta temporalmente deshabilitado. Por favor, contacta al administrador para regularizar el pago y reactivar el servicio."><span id="sysLockBodyText"></span><span id="sysLockCaret">|</span></div>
+                        <button type="button" id="sysLockBtn" onclick="var o=document.getElementById('sysLockOverlay'); if(o) o.style.display='none';">Entendido</button>
+                    </div>
                 </div>
-                <button type="button" onclick="var o=document.getElementById('sysLockOverlay'); if(o) o.style.display='none';"
-                        style="background:#f5a35b;color:#1c1206;border:none;border-radius:10px;padding:10px 22px;font-size:0.85rem;font-weight:800;cursor:pointer;">Entendido</button>
             </div>
         </div>
+        <script>
+        (function () {
+            function run() {
+                var body = document.getElementById('sysLockBody');
+                var out = document.getElementById('sysLockBodyText');
+                var caret = document.getElementById('sysLockCaret');
+                var padlock = document.getElementById('sysLockPadlock');
+                var modal = document.getElementById('sysLockModal');
+                if (!body || !out) return;
+
+                var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                var full = body.getAttribute('data-fulltext') || '';
+
+                if (reduce) {
+                    out.textContent = full;
+                    if (caret) caret.style.display = 'none';
+                    if (padlock) padlock.innerHTML = '&#128274;';
+                    return;
+                }
+
+                // Paso 4: typewriter. Arranca a 1.4s (solapado con el titulo).
+                var TYPE_START = 1400, TYPE_DUR = 1000;
+                var step = TYPE_DUR / Math.max(1, full.length);
+                setTimeout(function () {
+                    var i = 0;
+                    var timer = setInterval(function () {
+                        i++;
+                        out.textContent = full.slice(0, i);
+                        if (i >= full.length) {
+                            clearInterval(timer);
+                            // Cursor parpadea 3 veces y desaparece.
+                            if (caret) {
+                                caret.style.animation = 'slCaretBlink 0.4s steps(1) 0s 3';
+                                setTimeout(function () { caret.style.display = 'none'; }, 1200);
+                            }
+                        }
+                    }, step);
+                }, TYPE_START);
+
+                // Paso 5: el candado viaja abierto (delay 1.8s + dur 2.0s = termina ~3.8s)
+                // y en el milisegundo final se cierra de golpe: cambia a candado cerrado,
+                // dispara screen-shake del recuadro y pulso de luz cian en los bordes.
+                var SNAP_AT = 1800 + 2000 - 60;
+                setTimeout(function () {
+                    if (padlock) {
+                        padlock.innerHTML = '&#128274;'; // candado cerrado
+                        padlock.style.transform = 'translateY(0) scale(1.18)';
+                        setTimeout(function () { padlock.style.transition = 'transform 0.18s ease-out'; padlock.style.transform = 'translateY(0) scale(1)'; }, 90);
+                    }
+                    if (modal) {
+                        modal.style.animation = 'slShake 0.1s linear 2, slCyanPulse 0.7s ease-out';
+                        // Restaurar el relleno base luego del pulso para no perder el fondo.
+                        setTimeout(function () { modal.style.animation = ''; modal.style.boxShadow = '0 0 14px 2px rgba(45,212,255,0.25), inset 0 0 10px rgba(45,212,255,0.15)'; }, 720);
+                    }
+                }, SNAP_AT);
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', run);
+            } else {
+                run();
+            }
+        })();
+        </script>
         {% elif error %}
         <div class="error-msg">{{ error }}</div>
         {% endif %}
