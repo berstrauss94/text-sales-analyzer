@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1 style="margin:0;">Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.44{% if username == 'Berna.Strauss' %} &middot; tablero Kanban visual{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.45{% if username == 'Berna.Strauss' %} &middot; fix carga de textos (admin){% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -7452,8 +7452,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load on page load
     if (document.getElementById('selectUser')) {
-        // Admin: users already in HTML via Jinja2, just load stats
+        // Admin: users already in HTML via Jinja2.
         loadAdminStats();
+        // Cargar tambien los textos del usuario preseleccionado (si lo hay). El
+        // onchange NO se dispara en una recarga, asi que si el dropdown quedo con
+        // un usuario elegido, los textos no aparecian hasta cambiarlo a mano.
+        loadSavedTexts();
         // Data-protection: check for possible data loss and warn the admin
         checkBackupStatus();
     } else {
