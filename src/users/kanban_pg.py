@@ -190,6 +190,16 @@ def _ensure_tables_cur(cur) -> None:
         )
         """
     )
+    # Configuracion del tablero por tenant (visibilidad global, etc.).
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS kanban_settings (
+            tenant_id          TEXT    PRIMARY KEY,
+            global_visibility  BOOLEAN NOT NULL DEFAULT FALSE,
+            updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+        """
+    )
 
 
 def _ensure_tables(conn) -> None:
@@ -513,9 +523,71 @@ def create_card(owner_username: str, customer_name: str, property_value: Any = 0
 
 
 # =====================================================================
+# CONFIGURACION DEL TABLERO (visibilidad global)
+# =====================================================================
+def get_global_visibility(tenant_id: str = "__legacy__") -> bool:
+    """True si el admin habilito que todos vean el tablero completo del tenant."""
+    if not is_available():
+        return False
+    conn = _conn()
+    if conn is None:
+        return False
+    try:
+        _ensure_tables(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT global_visibility FROM kanban_settings WHERE tenant_id = %s",
+                (tenant_id or "__legacy__",),
+            )
+            row = cur.fetchone()
+        _release(conn)
+        return bool(row[0]) if row else False
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"kanban get_global_visibility error: {exc}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        _release(conn, close=True)
+        return False
+
+
+def set_global_visibility(enabled: bool, tenant_id: str = "__legacy__") -> bool:
+    """Activa/desactiva la visibilidad global del tablero (solo admin). Upsert."""
+    if not is_available():
+        return False
+    conn = _conn()
+    if conn is None:
+        return False
+    should_close = False
+    try:
+        _ensure_tables(conn)
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO kanban_settings (tenant_id, global_visibility, updated_at)
+                    VALUES (%s, %s, now())
+                    ON CONFLICT (tenant_id) DO UPDATE SET
+                        global_visibility = EXCLUDED.global_visibility,
+                        updated_at = now()
+                    """,
+                    (tenant_id or "__legacy__", bool(enabled)),
+                )
+        return True
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"kanban set_global_visibility error: {exc}")
+        should_close = True
+        return False
+    finally:
+        _release(conn, close=should_close)
+
+
+# =====================================================================
 # 5. LECTURA DEL TABLERO
 # =====================================================================
-def get_board(tenant_id: str = "__legacy__", owner_username: Optional[str] = None) -> Dict[str, Any]:
+def get_board(tenant_id: str = "__legacy__", owner_username: Optional[str] = None,
+              is_admin: bool = False) -> Dict[str, Any]:
     """Devuelve las tarjetas agrupadas por etapa (para pintar el tablero)."""
     empty = {s.value: [] for s in KanbanStage}
     if not is_available():
@@ -525,21 +597,30 @@ def get_board(tenant_id: str = "__legacy__", owner_username: Optional[str] = Non
         return {"success": True, "columns": empty, "available": False}
     try:
         _ensure_tables(conn)
+        # Visibilidad: un admin ve todo. Un vendedor ve solo lo suyo, SALVO que
+        # el admin haya activado la visibilidad global del tenant.
         with conn.cursor() as cur:
-            if owner_username:
+            cur.execute(
+                "SELECT global_visibility FROM kanban_settings WHERE tenant_id = %s",
+                (tenant_id or "__legacy__",),
+            )
+            _vrow = cur.fetchone()
+            global_vis = bool(_vrow[0]) if _vrow else False
+            ve_todo = bool(is_admin) or global_vis
+            if ve_todo or not owner_username:
+                cur.execute(
+                    "SELECT card_id, customer_name, property_value, current_stage, "
+                    "property_id, budget_range, interest_zone, owner_username "
+                    "FROM kanban_cards WHERE tenant_id = %s ORDER BY updated_at DESC",
+                    (tenant_id or "__legacy__",),
+                )
+            else:
                 cur.execute(
                     "SELECT card_id, customer_name, property_value, current_stage, "
                     "property_id, budget_range, interest_zone, owner_username "
                     "FROM kanban_cards WHERE tenant_id = %s AND owner_username = %s "
                     "ORDER BY updated_at DESC",
                     (tenant_id or "__legacy__", owner_username),
-                )
-            else:
-                cur.execute(
-                    "SELECT card_id, customer_name, property_value, current_stage, "
-                    "property_id, budget_range, interest_zone, owner_username "
-                    "FROM kanban_cards WHERE tenant_id = %s ORDER BY updated_at DESC",
-                    (tenant_id or "__legacy__",),
                 )
             rows = cur.fetchall()
         _release(conn)
@@ -552,7 +633,8 @@ def get_board(tenant_id: str = "__legacy__", owner_username: Optional[str] = Non
                 "property_id": r[4], "budget_range": r[5] or "",
                 "interest_zone": r[6] or "", "owner_username": r[7] or "",
             })
-        return {"success": True, "columns": cols, "available": True}
+        return {"success": True, "columns": cols, "available": True,
+                "global_visibility": global_vis}
     except Exception as exc:  # noqa: BLE001
         logger.error(f"kanban get_board error: {exc}")
         try:

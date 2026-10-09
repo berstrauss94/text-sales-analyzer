@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1 style="margin:0;">Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.42{% if username == 'Berna.Strauss' %} &middot; pipeline Kanban{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.43{% if username == 'Berna.Strauss' %} &middot; tablero Kanban visual{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -2911,6 +2911,7 @@ HTML = """
             <div class="user-info" style="margin-bottom:4px;">Usuario: <strong>{{ username }}</strong></div>
             <button id="tutorialBtn" type="button" onclick="startTour()" disabled title="El tutorial se habilita cuando el sistema termina de cargar" aria-label="Iniciar tutorial guiado" style="font-size:0.75rem;padding:4px 10px;margin-right:6px;background:#22242e;color:#666;border:1px solid #3a3d4a;border-radius:6px;cursor:not-allowed;opacity:0.7;">&#127891; Cargando...</button>
             <button id="soundToggleBtn" type="button" onclick="toggleUISound()" title="Activar/silenciar sonidos de interfaz" aria-label="Activar o silenciar sonidos de interfaz" style="font-size:0.75rem;padding:4px 10px;margin-right:6px;background:#2a2d3a;color:#888;border:1px solid #3a3d4a;border-radius:6px;cursor:pointer;">&#128266; Sonido</button>
+            <button id="kanbanBtn" type="button" onclick="location.href='/kanban'" title="Abrir el tablero de ventas (pipeline inmobiliario)" aria-label="Abrir el tablero Kanban" style="font-size:0.75rem;padding:4px 10px;margin-right:6px;background:#0b2838;color:#2dd4ff;border:1px solid #1aa8d8;border-radius:6px;cursor:pointer;">&#128203; Tablero</button>
             {% if username != 'Berna.Strauss' %}
             <button id="chatBtn" type="button" onclick="toggleChatWidget()" title="Consultas y sugerencias" aria-label="Abrir chat de consultas y sugerencias" style="font-size:0.75rem;padding:4px 10px;margin-right:6px;background:#1a2a4a;color:#7b9cff;border:1px solid #4a6cf7;border-radius:6px;cursor:pointer;">&#128172; Chat</button>
             {% endif %}
@@ -13219,13 +13220,51 @@ def lead_list():
 # ─────────────────────────────────────────────────────────────────────────
 @app.route("/api/kanban/board")
 def kanban_board():
-    """Devuelve el tablero. Un vendedor ve lo suyo; un admin ve todo el tenant."""
+    """Devuelve el tablero. Un vendedor ve lo suyo; un admin ve todo el tenant.
+    Si el admin activo la visibilidad global, todos ven todo."""
     if not session.get("username"):
         return jsonify({"success": False, "error": "unauthorized"}), 401
     from src.users import kanban_pg
-    owner = None if _is_admin() else session["username"]
-    data = kanban_pg.get_board(tenant_id=_current_tenant(), owner_username=owner)
+    es_admin = _is_admin()
+    data = kanban_pg.get_board(
+        tenant_id=_current_tenant(),
+        owner_username=session["username"],
+        is_admin=es_admin,
+    )
+    data["is_admin"] = es_admin
     return jsonify(data)
+
+
+@app.route("/kanban")
+def kanban_page():
+    """Pagina del tablero Kanban del pipeline inmobiliario."""
+    if not session.get("username"):
+        return redirect(url_for("login_page"))
+    html = render_template_string(
+        KANBAN_HTML,
+        username=session["username"],
+        is_admin=_is_admin(),
+    )
+    resp = app.make_response(html)
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return resp
+
+
+@app.route("/api/kanban/visibility", methods=["GET", "POST"])
+def kanban_visibility():
+    """Lee (GET) o cambia (POST, admin only) la visibilidad global del tablero."""
+    if not session.get("username"):
+        return jsonify({"success": False, "error": "unauthorized"}), 401
+    from src.users import kanban_pg
+    if request.method == "GET":
+        return jsonify({"success": True,
+                        "global_visibility": kanban_pg.get_global_visibility(_current_tenant())})
+    if not _is_admin():
+        return jsonify({"success": False, "error": "solo admin"}), 403
+    data = request.get_json(silent=True) or {}
+    ok = kanban_pg.set_global_visibility(bool(data.get("enabled", False)), _current_tenant())
+    return jsonify({"success": ok,
+                    "global_visibility": kanban_pg.get_global_visibility(_current_tenant())})
 
 
 @app.route("/api/kanban/card", methods=["POST"])
@@ -13270,10 +13309,11 @@ def kanban_move():
             tenant_id=_current_tenant(),
             card_patch=data.get("card_patch") or {},
         )
-    except Exception as exc:  # noqa: BLE001
-        import traceback as _tb
-        return jsonify({"success": False, "error": f"{type(exc).__name__}: {exc}",
-                        "trace": _tb.format_exc()[-1500:]}), 500
+    except Exception:  # noqa: BLE001
+        # El detalle del error se loguea del lado del servidor (visible en los
+        # logs de Railway), nunca se expone al cliente.
+        app.logger.exception("kanban move error")
+        return jsonify({"success": False, "error": "Error interno al mover la tarjeta."}), 500
     return jsonify(res), (200 if res.get("success") else 422)
 
 
@@ -13291,10 +13331,9 @@ def kanban_delete_card():
         return jsonify({"success": False, "error": "Falta card_id."}), 400
     try:
         res = kanban_pg.delete_card(card_id=card_id, tenant_id=_current_tenant())
-    except Exception as exc:  # noqa: BLE001
-        import traceback as _tb
-        return jsonify({"success": False, "error": f"{type(exc).__name__}: {exc}",
-                        "trace": _tb.format_exc()[-1500:]}), 500
+    except Exception:  # noqa: BLE001
+        app.logger.exception("kanban delete error")
+        return jsonify({"success": False, "error": "Error interno al borrar la tarjeta."}), 500
     return jsonify(res), (200 if res.get("success") else 422)
 
 
@@ -15144,6 +15183,324 @@ def admin_actividad():
 
     summary["filter_seller"] = filter_seller
     return jsonify(summary)
+
+
+# =====================================================================
+# PAGINA DEL TABLERO KANBAN (pipeline inmobiliario)
+# Drag & drop nativo HTML5, sin librerias externas. Se conecta a los
+# endpoints /api/kanban/*. Permisos: cada vendedor ve lo suyo; el admin
+# ve todo; con visibilidad global activada, todos ven todo.
+# =====================================================================
+KANBAN_HTML = r"""<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tablero Kanban - Analizador de Textos</title>
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: #0a0c14; color: #e0e0e0; min-height: 100vh;
+    }
+    .kb-top {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 12px; padding: 14px 20px; background: #12141c;
+        border-bottom: 1px solid #2a2d3a; flex-wrap: wrap;
+    }
+    .kb-top h1 { font-size: 1.15rem; font-weight: 800; color: #eaf7ff; }
+    .kb-top .sub { font-size: 0.72rem; color: #7b8699; margin-top: 2px; }
+    .kb-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .kb-btn {
+        font-size: 0.78rem; font-weight: 700; padding: 7px 14px; border-radius: 8px;
+        border: none; cursor: pointer; background: linear-gradient(180deg,#2dd4ff,#1aa8d8);
+        color: #04101a;
+    }
+    .kb-btn:hover { filter: brightness(1.08); }
+    .kb-btn.ghost { background: transparent; border: 1px solid #3a3d4a; color: #9aa0ac; }
+    .kb-vis {
+        display: inline-flex; align-items: center; gap: 7px; font-size: 0.72rem;
+        color: #9aa0ac; background: #1a1d28; border: 1px solid #2a2d3a;
+        border-radius: 8px; padding: 4px 10px;
+    }
+    .kb-switch {
+        position: relative; width: 34px; height: 18px; border-radius: 10px;
+        border: none; cursor: pointer; background: #444; flex: 0 0 auto; padding: 0;
+        transition: background .18s;
+    }
+    .kb-switch .knob {
+        position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
+        border-radius: 50%; background: #fff; transition: left .18s;
+    }
+    .kb-board {
+        display: flex; gap: 12px; padding: 18px 20px; overflow-x: auto;
+        align-items: flex-start; min-height: calc(100vh - 64px);
+    }
+    .kb-col {
+        flex: 0 0 240px; width: 240px; background: #11131b; border: 1px solid #22252f;
+        border-radius: 12px; display: flex; flex-direction: column; max-height: calc(100vh - 100px);
+    }
+    .kb-col-head {
+        padding: 10px 12px; border-bottom: 1px solid #22252f; border-radius: 12px 12px 0 0;
+    }
+    .kb-col-head .name { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.3px; }
+    .kb-col-head .meta { font-size: 0.66rem; color: #7b8699; margin-top: 3px; }
+    .kb-col-body {
+        padding: 10px; display: flex; flex-direction: column; gap: 9px;
+        overflow-y: auto; flex: 1; min-height: 60px;
+    }
+    .kb-col-body.drag-over { background: rgba(45,212,255,0.06); outline: 2px dashed #2dd4ff; outline-offset: -6px; }
+    .kb-card {
+        background: #1a1d28; border: 1px solid #2a2d3a; border-radius: 9px;
+        padding: 10px 11px; cursor: grab; position: relative; transition: box-shadow .15s;
+    }
+    .kb-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.4); border-color: #3a4a6a; }
+    .kb-card.dragging { opacity: 0.45; }
+    .kb-card .cust { font-size: 0.8rem; font-weight: 700; color: #eaf7ff; padding-right: 16px; }
+    .kb-card .val { font-size: 0.72rem; color: #5bf5a3; margin-top: 4px; }
+    .kb-card .meta { font-size: 0.64rem; color: #7b8699; margin-top: 4px; }
+    .kb-card .owner { font-size: 0.6rem; color: #6a7488; margin-top: 4px; font-style: italic; }
+    .kb-card .del {
+        position: absolute; top: 6px; right: 7px; font-size: 0.7rem; color: #f55b5b;
+        background: transparent; border: none; cursor: pointer; opacity: 0.6;
+    }
+    .kb-card .del:hover { opacity: 1; }
+    .kb-empty { font-size: 0.68rem; color: #4a5468; text-align: center; padding: 14px 0; }
+    /* Colores de etapas finales */
+    .stage-CLOSED_WON .kb-col-head { background: rgba(27,160,88,0.14); }
+    .stage-CLOSED_WON .name { color: #5bf5a3; }
+    .stage-CLOSED_LOST .kb-col-head { background: rgba(200,70,70,0.12); }
+    .stage-CLOSED_LOST .name { color: #f58b8b; }
+    .stage-RESERVATION .name { color: #f5a35b; }
+    /* Toast de mensajes */
+    #kbToast {
+        position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+        background: #12141c; border: 1px solid #3a3d4a; border-radius: 10px;
+        padding: 11px 18px; font-size: 0.8rem; color: #e0e0e0; z-index: 10000;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.6); display: none; max-width: 90vw;
+    }
+    #kbToast.err { border-color: #5a2a2a; color: #f5a3a3; }
+    #kbToast.ok { border-color: #2a5a3a; color: #a3f5c3; }
+    /* Modal nueva tarjeta */
+    #kbModal {
+        position: fixed; inset: 0; background: rgba(1,8,14,0.7); z-index: 10001;
+        display: none; align-items: center; justify-content: center; padding: 20px;
+    }
+    #kbModal .box {
+        background: #12141c; border: 1px solid #2a2d3a; border-radius: 14px;
+        padding: 22px; width: 100%; max-width: 400px;
+    }
+    #kbModal h2 { font-size: 1rem; color: #eaf7ff; margin-bottom: 14px; }
+    #kbModal label { display: block; font-size: 0.7rem; color: #9aa0ac; margin: 10px 0 4px; }
+    #kbModal input {
+        width: 100%; background: #0d0f18; color: #e0e0e0; border: 1px solid #2a2d3a;
+        border-radius: 7px; padding: 8px 10px; font-size: 0.82rem;
+    }
+    #kbModal .row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+</style>
+</head>
+<body data-is-admin="{{ '1' if is_admin else '0' }}">
+<div class="kb-top">
+    <div>
+        <h1>Tablero de Ventas &mdash; Pipeline Inmobiliario</h1>
+        <div class="sub">Usuario: {{ username }}{% if is_admin %} &middot; Admin{% endif %}</div>
+    </div>
+    <div class="kb-actions">
+        {% if is_admin %}
+        <span class="kb-vis" title="Si se activa, TODOS los vendedores ven el tablero completo del equipo.">
+            Ver todos
+            <button type="button" id="kbVisToggle" class="kb-switch" onclick="kbToggleVis()"><span class="knob"></span></button>
+        </span>
+        {% endif %}
+        <button type="button" class="kb-btn" onclick="kbOpenNew()">+ Nueva tarjeta</button>
+        <button type="button" class="kb-btn ghost" onclick="location.href='/'">&larr; Volver</button>
+    </div>
+</div>
+
+<div class="kb-board" id="kbBoard"></div>
+
+<div id="kbToast"></div>
+
+<div id="kbModal">
+    <div class="box">
+        <h2>Nueva tarjeta</h2>
+        <label>Nombre del cliente *</label>
+        <input type="text" id="kbNewName" placeholder="Ej: Juan Perez">
+        <label>Valor de la propiedad (USD)</label>
+        <input type="number" id="kbNewValue" placeholder="0" min="0">
+        <label>Zona de interes</label>
+        <input type="text" id="kbNewZone" placeholder="Ej: Centro">
+        <label>Rango de presupuesto</label>
+        <input type="text" id="kbNewBudget" placeholder="Ej: 100k-150k">
+        <div class="row">
+            <button type="button" class="kb-btn ghost" onclick="kbCloseNew()">Cancelar</button>
+            <button type="button" class="kb-btn" onclick="kbCreate()">Crear</button>
+        </div>
+    </div>
+</div>
+
+<script>
+var KB_STAGES = [
+    {k:'NEW', label:'Nuevo'}, {k:'CONTACTED', label:'Contactado'},
+    {k:'QUALIFIED', label:'Calificado'}, {k:'PROPERTY_TOUR', label:'Visita'},
+    {k:'RESERVATION', label:'Reserva'}, {k:'CLOSED_WON', label:'Ganado'},
+    {k:'CLOSED_LOST', label:'Perdido'}
+];
+var KB_IS_ADMIN = document.body.getAttribute('data-is-admin') === '1';
+var _kbDragId = null;
+
+function kbToast(msg, kind) {
+    var t = document.getElementById('kbToast');
+    t.textContent = msg; t.className = kind || '';
+    t.style.display = 'block';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(function(){ t.style.display = 'none'; }, 3200);
+}
+
+function kbFmtMoney(v) {
+    v = Number(v) || 0;
+    return v > 0 ? ('USD ' + v.toLocaleString('es-AR')) : '';
+}
+
+function kbLoad() {
+    fetch('/api/kanban/board').then(function(r){ return r.json(); }).then(function(d){
+        if (!d || !d.success) { kbToast('No se pudo cargar el tablero.', 'err'); return; }
+        kbRender(d.columns || {});
+        if (KB_IS_ADMIN) kbRenderVis(!!d.global_visibility);
+    }).catch(function(){ kbToast('Error de conexion al cargar.', 'err'); });
+}
+
+function kbRenderVis(on) {
+    var b = document.getElementById('kbVisToggle');
+    if (!b) return;
+    b.style.background = on ? '#2dd4ff' : '#444';
+    b.querySelector('.knob').style.left = on ? '18px' : '2px';
+    b.setAttribute('data-on', on ? '1' : '0');
+}
+
+function kbRender(columns) {
+    var board = document.getElementById('kbBoard');
+    board.innerHTML = '';
+    KB_STAGES.forEach(function(st){
+        var cards = columns[st.k] || [];
+        var total = 0; cards.forEach(function(c){ total += Number(c.property_value) || 0; });
+        var col = document.createElement('div');
+        col.className = 'kb-col stage-' + st.k;
+        var head = '<div class="kb-col-head"><div class="name">' + st.label + '</div>' +
+                   '<div class="meta">' + cards.length + ' tarjeta(s)' +
+                   (total > 0 ? ' &middot; ' + kbFmtMoney(total) : '') + '</div></div>';
+        var body = '<div class="kb-col-body" data-stage="' + st.k + '"></div>';
+        col.innerHTML = head + body;
+        board.appendChild(col);
+        var bodyEl = col.querySelector('.kb-col-body');
+        if (cards.length === 0) {
+            bodyEl.innerHTML = '<div class="kb-empty">Sin tarjetas</div>';
+        } else {
+            cards.forEach(function(c){ bodyEl.appendChild(kbCardEl(c)); });
+        }
+        kbWireDrop(bodyEl);
+    });
+}
+
+function kbCardEl(c) {
+    var el = document.createElement('div');
+    el.className = 'kb-card';
+    el.setAttribute('draggable', 'true');
+    el.setAttribute('data-card-id', c.card_id);
+    var del = KB_IS_ADMIN ? '<button class="del" title="Borrar" onclick="kbDelete(event,\'' + c.card_id + '\')">&#10005;</button>' : '';
+    var meta = [];
+    if (c.interest_zone) meta.push(c.interest_zone);
+    if (c.budget_range) meta.push(c.budget_range);
+    el.innerHTML = del +
+        '<div class="cust">' + kbEsc(c.customer_name || 'Sin nombre') + '</div>' +
+        (kbFmtMoney(c.property_value) ? '<div class="val">' + kbFmtMoney(c.property_value) + '</div>' : '') +
+        (meta.length ? '<div class="meta">' + kbEsc(meta.join(' &middot; ')) + '</div>' : '') +
+        (KB_IS_ADMIN && c.owner_username ? '<div class="owner">' + kbEsc(c.owner_username) + '</div>' : '');
+    el.addEventListener('dragstart', function(){ _kbDragId = c.card_id; el.classList.add('dragging'); });
+    el.addEventListener('dragend', function(){ _kbDragId = null; el.classList.remove('dragging'); });
+    return el;
+}
+
+function kbEsc(s) {
+    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function kbWireDrop(bodyEl) {
+    bodyEl.addEventListener('dragover', function(e){ e.preventDefault(); bodyEl.classList.add('drag-over'); });
+    bodyEl.addEventListener('dragleave', function(){ bodyEl.classList.remove('drag-over'); });
+    bodyEl.addEventListener('drop', function(e){
+        e.preventDefault();
+        bodyEl.classList.remove('drag-over');
+        var target = bodyEl.getAttribute('data-stage');
+        if (!_kbDragId || !target) return;
+        kbMove(_kbDragId, target);
+    });
+}
+
+function kbMove(cardId, targetStage) {
+    fetch('/api/kanban/move', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ card_id: cardId, target_stage: targetStage })
+    }).then(function(r){ return r.json(); }).then(function(d){
+        if (d && d.success) { kbToast('Movida a ' + targetStage + '.', 'ok'); kbLoad(); }
+        else { kbToast((d && d.error) ? d.error : 'No se pudo mover.', 'err'); kbLoad(); }
+    }).catch(function(){ kbToast('Error al mover.', 'err'); kbLoad(); });
+}
+
+function kbDelete(ev, cardId) {
+    ev.stopPropagation();
+    if (!confirm('Borrar esta tarjeta? Esta accion no se puede deshacer.')) return;
+    fetch('/api/kanban/card/delete', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ card_id: cardId })
+    }).then(function(r){ return r.json(); }).then(function(d){
+        if (d && d.success) { kbToast('Tarjeta borrada.', 'ok'); kbLoad(); }
+        else { kbToast((d && d.error) ? d.error : 'No se pudo borrar.', 'err'); }
+    }).catch(function(){ kbToast('Error al borrar.', 'err'); });
+}
+
+function kbOpenNew() { document.getElementById('kbModal').style.display = 'flex'; document.getElementById('kbNewName').focus(); }
+function kbCloseNew() {
+    document.getElementById('kbModal').style.display = 'none';
+    ['kbNewName','kbNewValue','kbNewZone','kbNewBudget'].forEach(function(id){ document.getElementById(id).value = ''; });
+}
+function kbCreate() {
+    var name = document.getElementById('kbNewName').value.trim();
+    if (!name) { kbToast('El nombre del cliente es obligatorio.', 'err'); return; }
+    var body = {
+        customer_name: name,
+        property_value: Number(document.getElementById('kbNewValue').value) || 0,
+        interest_zone: document.getElementById('kbNewZone').value.trim(),
+        budget_range: document.getElementById('kbNewBudget').value.trim()
+    };
+    fetch('/api/kanban/card', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+    }).then(function(r){ return r.json(); }).then(function(d){
+        if (d && d.success) { kbToast('Tarjeta creada.', 'ok'); kbCloseNew(); kbLoad(); }
+        else { kbToast((d && d.error) ? d.error : 'No se pudo crear.', 'err'); }
+    }).catch(function(){ kbToast('Error al crear.', 'err'); });
+}
+
+function kbToggleVis() {
+    var b = document.getElementById('kbVisToggle');
+    var next = b.getAttribute('data-on') !== '1';
+    fetch('/api/kanban/visibility', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ enabled: next })
+    }).then(function(r){ return r.json(); }).then(function(d){
+        if (d && d.success) {
+            kbRenderVis(!!d.global_visibility);
+            kbToast(d.global_visibility ? 'Ahora todos ven el tablero completo.' : 'Cada vendedor ve solo lo suyo.', 'ok');
+            kbLoad();
+        } else { kbToast('No se pudo cambiar la visibilidad.', 'err'); }
+    }).catch(function(){ kbToast('Error.', 'err'); });
+}
+
+document.addEventListener('DOMContentLoaded', kbLoad);
+</script>
+</body>
+</html>"""
 
 
 if __name__ == "__main__":
