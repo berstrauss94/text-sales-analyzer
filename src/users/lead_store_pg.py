@@ -173,6 +173,15 @@ def save_ficha(username: str, ficha: dict, tenant_id: str = "__legacy__") -> boo
             )
         conn.commit()
         _release(conn)
+        # Sincronia CRM -> Kanban (punto 3): reflejar el estado/datos de la ficha
+        # en la tarjeta del tablero. Best-effort: NUNCA rompe el guardado del CRM.
+        try:
+            from src.users import kanban_pg
+            _ficha_sync = dict(f)
+            _ficha_sync["lead_estado"] = estado
+            kanban_pg.sync_from_crm_ficha(username, _ficha_sync, tenant_id=tenant_id or "__legacy__")
+        except Exception as _sync_exc:  # noqa: BLE001
+            logger.error(f"kanban sync (desde save_ficha) fallo: {_sync_exc}")
         return True
     except Exception as exc:
         logger.error(f"lead_fichas save error: {exc}")

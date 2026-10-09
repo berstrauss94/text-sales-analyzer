@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1 style="margin:0;">Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.45{% if username == 'Berna.Strauss' %} &middot; fix carga de textos (admin){% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.46{% if username == 'Berna.Strauss' %} &middot; Kanban: permisos + sincronia CRM{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -13312,6 +13312,7 @@ def kanban_move():
             moved_by=session["username"],
             tenant_id=_current_tenant(),
             card_patch=data.get("card_patch") or {},
+            is_admin=_is_admin(),
         )
     except Exception:  # noqa: BLE001
         # El detalle del error se loguea del lado del servidor (visible en los
@@ -13323,18 +13324,21 @@ def kanban_move():
 
 @app.route("/api/kanban/card/delete", methods=["POST"])
 def kanban_delete_card():
-    """Borra una tarjeta (y su historial). Admin only."""
+    """Borra una tarjeta (y su historial). Un vendedor solo las suyas; admin, todas."""
     if not session.get("username"):
         return jsonify({"success": False, "error": "unauthorized"}), 401
-    if not _is_admin():
-        return jsonify({"success": False, "error": "solo admin"}), 403
     from src.users import kanban_pg
     data = request.get_json(silent=True) or {}
     card_id = data.get("card_id")
     if not card_id:
         return jsonify({"success": False, "error": "Falta card_id."}), 400
     try:
-        res = kanban_pg.delete_card(card_id=card_id, tenant_id=_current_tenant())
+        res = kanban_pg.delete_card(
+            card_id=card_id,
+            tenant_id=_current_tenant(),
+            requested_by=session["username"],
+            is_admin=_is_admin(),
+        )
     except Exception:  # noqa: BLE001
         app.logger.exception("kanban delete error")
         return jsonify({"success": False, "error": "Error interno al borrar la tarjeta."}), 500
@@ -15303,7 +15307,7 @@ KANBAN_HTML = r"""<!DOCTYPE html>
     #kbModal .row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
 </style>
 </head>
-<body data-is-admin="{{ '1' if is_admin else '0' }}">
+<body data-is-admin="{{ '1' if is_admin else '0' }}" data-username="{{ username }}">
 <div class="kb-top">
     <div>
         <h1>Tablero de Ventas &mdash; Pipeline Inmobiliario</h1>
@@ -15351,6 +15355,7 @@ var KB_STAGES = [
     {k:'CLOSED_LOST', label:'Perdido'}
 ];
 var KB_IS_ADMIN = document.body.getAttribute('data-is-admin') === '1';
+var KB_USER = document.body.getAttribute('data-username') || '';
 var _kbDragId = null;
 
 function kbToast(msg, kind) {
@@ -15411,7 +15416,8 @@ function kbCardEl(c) {
     el.className = 'kb-card';
     el.setAttribute('draggable', 'true');
     el.setAttribute('data-card-id', c.card_id);
-    var del = KB_IS_ADMIN ? '<button class="del" title="Borrar" onclick="kbDelete(event,\'' + c.card_id + '\')">&#10005;</button>' : '';
+    var puedeBorrar = KB_IS_ADMIN || (c.owner_username && c.owner_username === KB_USER);
+    var del = puedeBorrar ? '<button class="del" title="Borrar" onclick="kbDelete(event,\'' + c.card_id + '\')">&#10005;</button>' : '';
     var meta = [];
     if (c.interest_zone) meta.push(c.interest_zone);
     if (c.budget_range) meta.push(c.budget_range);

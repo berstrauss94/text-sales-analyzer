@@ -91,6 +91,25 @@ KANBAN_TO_CRM = {
     KanbanStage.CLOSED_LOST: "perdido",
 }
 
+# Para la sincronia CRM->Kanban (bidireccional): que etapas del Kanban
+# corresponden a cada estado del CRM. Clave para NO degradar el progreso:
+# si el CRM dice 'seguimiento' y la tarjeta ya esta en CUALQUIERA de las etapas
+# de trabajo, se respeta la etapa (mas especifica) del Kanban.
+CRM_ESTADO_A_ETAPAS = {
+    "nuevo": {KanbanStage.NEW},
+    "seguimiento": {KanbanStage.CONTACTED, KanbanStage.QUALIFIED,
+                    KanbanStage.PROPERTY_TOUR, KanbanStage.RESERVATION},
+    "cerrado": {KanbanStage.CLOSED_WON},
+    "perdido": {KanbanStage.CLOSED_LOST},
+}
+# Etapa por defecto al traer un estado del CRM que no coincide con la actual.
+CRM_ESTADO_DEFAULT_ETAPA = {
+    "nuevo": KanbanStage.NEW,
+    "seguimiento": KanbanStage.CONTACTED,
+    "cerrado": KanbanStage.CLOSED_WON,
+    "perdido": KanbanStage.CLOSED_LOST,
+}
+
 
 # =====================================================================
 # 2. CONEXION (mismo patron que lead_store_pg / system_lock_pg)
@@ -240,7 +259,8 @@ class KiroKanbanEngine:
 
     def move_card(self, card_id: str, target_stage_val: str,
                   moved_by: str, tenant_id: str = "__legacy__",
-                  card_patch: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                  card_patch: Optional[Dict[str, Any]] = None,
+                  is_admin: bool = False) -> Dict[str, Any]:
         """
         Mueve una tarjeta a target_stage leyendo su estado ACTUAL de la base
         (no se confia en el frontend). Valida la transicion, aplica compuertas de
@@ -296,6 +316,11 @@ class KiroKanbanEngine:
                     budget_range = (card_patch or {}).get("budget_range", row[3])
                     interest_zone = (card_patch or {}).get("interest_zone", row[4])
                     loss_reason = (card_patch or {}).get("loss_reason_code")
+
+                    # 1.b Permisos (punto 2): un vendedor solo mueve SUS tarjetas.
+                    #     El admin puede mover cualquiera.
+                    if not is_admin and owner_username and moved_by != owner_username:
+                        raise _KanbanError("No podes mover una tarjeta de otro vendedor.")
 
                     # 2. Validar la transicion contra la maquina de estados.
                     if target_stage not in VALID_TRANSITIONS[current_stage]:
@@ -407,10 +432,12 @@ _engine = KiroKanbanEngine()
 
 def move_card(card_id: str, target_stage_val: str, moved_by: str,
               tenant_id: str = "__legacy__",
-              card_patch: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+              card_patch: Optional[Dict[str, Any]] = None,
+              is_admin: bool = False) -> Dict[str, Any]:
     """Funcion de modulo: delega en el motor (ver KiroKanbanEngine.move_card)."""
     return _engine.move_card(card_id, target_stage_val, moved_by,
-                             tenant_id=tenant_id, card_patch=card_patch)
+                             tenant_id=tenant_id, card_patch=card_patch,
+                             is_admin=is_admin)
 
 
 def calculate_stage_header(stage: KanbanStage, cards_in_stage: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -421,10 +448,12 @@ def calculate_stage_header(stage: KanbanStage, cards_in_stage: List[Dict[str, An
 # =====================================================================
 # 4. BORRADO DE TARJETAS
 # =====================================================================
-def delete_card(card_id: str, tenant_id: str = "__legacy__") -> Dict[str, Any]:
+def delete_card(card_id: str, tenant_id: str = "__legacy__",
+                requested_by: str = "", is_admin: bool = False) -> Dict[str, Any]:
     """
     Borra una tarjeta y su historial. Si tenia una unidad reservada
     (TEMPORARILY_LOCKED), la libera (status AVAILABLE). Todo en una transaccion.
+    Permisos (punto 2): un vendedor solo borra SUS tarjetas; el admin, cualquiera.
     """
     if not is_available():
         return {"success": False, "error": "Persistencia no disponible."}
@@ -436,9 +465,9 @@ def delete_card(card_id: str, tenant_id: str = "__legacy__") -> Dict[str, Any]:
         _ensure_tables(conn)
         with conn:
             with conn.cursor() as cur:
-                # Buscar la tarjeta y su propiedad vinculada (si tiene).
+                # Buscar la tarjeta, su propiedad vinculada y su dueno.
                 cur.execute(
-                    "SELECT property_id, current_stage FROM kanban_cards "
+                    "SELECT property_id, current_stage, owner_username FROM kanban_cards "
                     "WHERE card_id = %s AND tenant_id = %s",
                     (card_id, tenant_id or "__legacy__"),
                 )
@@ -446,7 +475,10 @@ def delete_card(card_id: str, tenant_id: str = "__legacy__") -> Dict[str, Any]:
                 if not row:
                     # raise (no return) para que el 'with conn' haga ROLLBACK, no COMMIT.
                     raise _KanbanError("La tarjeta no existe.")
-                property_id, stage = row[0], row[1]
+                property_id, stage, owner_username = row[0], row[1], row[2]
+                # Permisos: un vendedor solo borra lo suyo.
+                if not is_admin and owner_username and requested_by != owner_username:
+                    raise _KanbanError("No podes borrar una tarjeta de otro vendedor.")
                 # Si tenia la unidad reservada por esta tarjeta, liberarla.
                 if property_id and stage == KanbanStage.RESERVATION.value:
                     cur.execute(
@@ -750,3 +782,106 @@ def migrate_from_lead_fichas(tenant_id: str = "__legacy__", dry_run: bool = True
             pass
         _release(conn, close=True)
         return {"success": False, "error": str(exc)}
+
+
+# =====================================================================
+# 7. SINCRONIA CRM -> KANBAN (bidireccional, disparada al guardar la ficha)
+# =====================================================================
+def sync_from_crm_ficha(username: str, ficha: dict, tenant_id: str = "__legacy__") -> dict:
+    """
+    Refleja en el Kanban una ficha del CRM recien guardada (lead_store_pg).
+    Se llama automaticamente desde save_ficha. Best-effort: NUNCA rompe el
+    guardado del CRM (si falla, se ignora).
+
+    Comportamiento (una tarjeta por vendedor, igual que el CRM):
+      - Si el vendedor no tiene tarjeta: crea una con los datos de la ficha, en
+        la etapa que corresponde al estado del CRM.
+      - Si ya tiene tarjeta: actualiza SIEMPRE los datos (nombre, zona, etc.) y
+        ajusta la etapa SOLO si el estado del CRM cambio de categoria. Regla
+        anti-retroceso: si el CRM dice 'seguimiento' y la tarjeta ya esta en
+        cualquiera de las etapas de trabajo (CONTACTED..RESERVATION), se respeta
+        la etapa (mas especifica) del Kanban y NO se degrada el progreso.
+    """
+    if not username or not is_available():
+        return {"success": False, "error": "no disponible"}
+    f = ficha or {}
+    estado_crm = str(f.get("lead_estado", "nuevo")).strip().lower()
+    if estado_crm not in CRM_ESTADO_A_ETAPAS:
+        estado_crm = "nuevo"
+
+    conn = _conn()
+    if conn is None:
+        return {"success": False, "error": "sin conexion"}
+    should_close = False
+    try:
+        _ensure_tables(conn)
+        with conn:
+            with conn.cursor() as cur:
+                # Buscar la tarjeta del vendedor (la mas reciente si hubiera varias).
+                cur.execute(
+                    "SELECT card_id, current_stage FROM kanban_cards "
+                    "WHERE tenant_id = %s AND owner_username = %s "
+                    "ORDER BY updated_at DESC LIMIT 1",
+                    (tenant_id or "__legacy__", username),
+                )
+                row = cur.fetchone()
+
+                nombre = str(f.get("lead_nombre", "") or "")[:200]
+                contacto = str(f.get("lead_contacto", "") or "")[:200]
+                operacion = str(f.get("lead_operacion", "") or "")[:60]
+                presupuesto = str(f.get("lead_presupuesto", "") or "")[:100]
+                zona = str(f.get("lead_zona", "") or "")[:200]
+                notas = str(f.get("lead_notas", "") or "")[:4000]
+                tags = str(f.get("lead_tags", "") or "")[:300]
+                crm_text = str(f.get("crm_text", "") or "")[:8000]
+                now = datetime.now(timezone.utc)
+
+                if not row:
+                    # No existe tarjeta: crearla en la etapa del estado del CRM.
+                    stage = CRM_ESTADO_DEFAULT_ETAPA.get(estado_crm, KanbanStage.NEW)
+                    cur.execute(
+                        """
+                        INSERT INTO kanban_cards
+                            (card_id, tenant_id, owner_username, customer_name, contacto,
+                             operacion, budget_range, interest_zone, notas, tags, crm_text,
+                             property_id, property_value, current_stage, created_at, updated_at)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, NULL, 0, %s, %s, %s)
+                        """,
+                        (str(uuid.uuid4()), tenant_id or "__legacy__", username, nombre,
+                         contacto, operacion, presupuesto, zona, notas, tags, crm_text,
+                         stage.value, now, now),
+                    )
+                    return {"success": True, "action": "created", "stage": stage.value}
+
+                # Existe: actualizar datos siempre; etapa solo si cambio de categoria.
+                card_id, cur_stage_val = row[0], row[1]
+                try:
+                    cur_stage = KanbanStage(cur_stage_val)
+                except ValueError:
+                    cur_stage = KanbanStage.NEW
+                # Anti-retroceso: si la etapa actual YA corresponde al estado del
+                # CRM, no se toca. Si no, se lleva a la etapa por defecto del estado.
+                etapas_validas = CRM_ESTADO_A_ETAPAS.get(estado_crm, {KanbanStage.NEW})
+                if cur_stage in etapas_validas:
+                    nueva_stage = cur_stage  # respetar progreso del Kanban
+                else:
+                    nueva_stage = CRM_ESTADO_DEFAULT_ETAPA.get(estado_crm, KanbanStage.NEW)
+
+                cur.execute(
+                    """
+                    UPDATE kanban_cards SET customer_name = %s, contacto = %s,
+                        operacion = %s, budget_range = %s, interest_zone = %s,
+                        notas = %s, tags = %s, crm_text = %s, current_stage = %s,
+                        updated_at = %s
+                    WHERE card_id = %s AND tenant_id = %s
+                    """,
+                    (nombre, contacto, operacion, presupuesto, zona, notas, tags,
+                     crm_text, nueva_stage.value, now, card_id, tenant_id or "__legacy__"),
+                )
+                return {"success": True, "action": "updated", "stage": nueva_stage.value}
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"kanban sync_from_crm_ficha error: {exc}")
+        should_close = True
+        return {"success": False, "error": str(exc)}
+    finally:
+        _release(conn, close=should_close)
