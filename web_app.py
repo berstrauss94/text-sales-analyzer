@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1 style="margin:0;">Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.43{% if username == 'Berna.Strauss' %} &middot; tablero Kanban visual{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.44{% if username == 'Berna.Strauss' %} &middot; tablero Kanban visual{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -13299,8 +13299,8 @@ def kanban_move():
     target_stage = data.get("target_stage")
     if not card_id or not target_stage:
         return jsonify({"success": False, "error": "Falta card_id o target_stage."}), 400
-    # Guard total: cualquier excepcion se devuelve como JSON con el traceback
-    # (nunca un 500-HTML), para poder diagnosticar en produccion.
+    # Guard: cualquier excepcion se loguea del lado del servidor y se devuelve
+    # como JSON de error generico (nunca un 500-HTML ni detalles internos).
     try:
         res = kanban_pg.move_card(
             card_id=card_id,

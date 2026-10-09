@@ -444,7 +444,8 @@ def delete_card(card_id: str, tenant_id: str = "__legacy__") -> Dict[str, Any]:
                 )
                 row = cur.fetchone()
                 if not row:
-                    return {"success": False, "error": "La tarjeta no existe."}
+                    # raise (no return) para que el 'with conn' haga ROLLBACK, no COMMIT.
+                    raise _KanbanError("La tarjeta no existe.")
                 property_id, stage = row[0], row[1]
                 # Si tenia la unidad reservada por esta tarjeta, liberarla.
                 if property_id and stage == KanbanStage.RESERVATION.value:
@@ -463,6 +464,9 @@ def delete_card(card_id: str, tenant_id: str = "__legacy__") -> Dict[str, Any]:
                     (card_id, tenant_id or "__legacy__"),
                 )
         return {"success": True, "message": "Tarjeta borrada."}
+    except _KanbanError as ke:
+        # Error de negocio (tarjeta inexistente): ROLLBACK ya ocurrio al salir del 'with'.
+        return {"success": False, "error": str(ke)}
     except Exception as exc:  # noqa: BLE001
         logger.error(f"kanban delete_card error: {exc}")
         should_close = True
@@ -540,6 +544,7 @@ def get_global_visibility(tenant_id: str = "__legacy__") -> bool:
                 (tenant_id or "__legacy__",),
             )
             row = cur.fetchone()
+        conn.rollback()  # cerrar la transaccion de solo-lectura (no dejar idle-in-transaction)
         _release(conn)
         return bool(row[0]) if row else False
     except Exception as exc:  # noqa: BLE001
@@ -623,6 +628,7 @@ def get_board(tenant_id: str = "__legacy__", owner_username: Optional[str] = Non
                     (tenant_id or "__legacy__", owner_username),
                 )
             rows = cur.fetchall()
+        conn.rollback()  # cerrar la transaccion de solo-lectura (no dejar idle-in-transaction)
         _release(conn)
         cols = {s.value: [] for s in KanbanStage}
         for r in rows:
