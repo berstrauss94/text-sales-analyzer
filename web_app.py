@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1 style="margin:0;">Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.47{% if username == 'Berna.Strauss' %} &middot; Kanban: permisos + sincronia CRM{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.48{% if username == 'Berna.Strauss' %} &middot; Kanban: resumen + editar tarjetas{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -13322,6 +13322,30 @@ def kanban_move():
     return jsonify(res), (200 if res.get("success") else 422)
 
 
+@app.route("/api/kanban/card/update", methods=["POST"])
+def kanban_update_card():
+    """Edita los datos de una tarjeta. Un vendedor solo las suyas; admin, todas."""
+    if not session.get("username"):
+        return jsonify({"success": False, "error": "unauthorized"}), 401
+    from src.users import kanban_pg
+    data = request.get_json(silent=True) or {}
+    card_id = data.get("card_id")
+    if not card_id:
+        return jsonify({"success": False, "error": "Falta card_id."}), 400
+    try:
+        res = kanban_pg.update_card(
+            card_id=card_id,
+            fields=data,
+            tenant_id=_current_tenant(),
+            requested_by=session["username"],
+            is_admin=_is_admin(),
+        )
+    except Exception:  # noqa: BLE001
+        app.logger.exception("kanban update error")
+        return jsonify({"success": False, "error": "Error interno al editar la tarjeta."}), 500
+    return jsonify(res), (200 if res.get("success") else 422)
+
+
 @app.route("/api/kanban/card/delete", methods=["POST"])
 def kanban_delete_card():
     """Borra una tarjeta (y su historial). Un vendedor solo las suyas; admin, todas."""
@@ -15240,9 +15264,18 @@ KANBAN_HTML = r"""<!DOCTYPE html>
         position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
         border-radius: 50%; background: #fff; transition: left .18s;
     }
+    .kb-summary {
+        display: flex; gap: 22px; flex-wrap: wrap; padding: 12px 20px;
+        border-bottom: 1px solid #1a1d28; background: #0d0f16;
+    }
+    .kb-summary .item { display: flex; flex-direction: column; }
+    .kb-summary .lbl { font-size: 0.62rem; color: #7b8699; text-transform: uppercase; letter-spacing: 0.4px; }
+    .kb-summary .num { font-size: 1.05rem; font-weight: 800; color: #eaf7ff; margin-top: 2px; }
+    .kb-summary .num.cyan { color: #2dd4ff; }
+    .kb-summary .num.green { color: #5bf5a3; }
     .kb-board {
         display: flex; gap: 12px; padding: 18px 20px; overflow-x: auto;
-        align-items: flex-start; min-height: calc(100vh - 64px);
+        align-items: flex-start; min-height: calc(100vh - 110px);
     }
     .kb-col {
         flex: 0 0 240px; width: 240px; background: #11131b; border: 1px solid #22252f;
@@ -15273,6 +15306,11 @@ KANBAN_HTML = r"""<!DOCTYPE html>
         background: transparent; border: none; cursor: pointer; opacity: 0.6;
     }
     .kb-card .del:hover { opacity: 1; }
+    .kb-card .edit {
+        position: absolute; top: 6px; right: 26px; font-size: 0.72rem; color: #7b9cff;
+        background: transparent; border: none; cursor: pointer; opacity: 0.6;
+    }
+    .kb-card .edit:hover { opacity: 1; }
     .kb-empty { font-size: 0.68rem; color: #4a5468; text-align: center; padding: 14px 0; }
     /* Colores de etapas finales */
     .stage-CLOSED_WON .kb-col-head { background: rgba(27,160,88,0.14); }
@@ -15325,13 +15363,16 @@ KANBAN_HTML = r"""<!DOCTYPE html>
     </div>
 </div>
 
+<div id="kbSummary" class="kb-summary"></div>
+
 <div class="kb-board" id="kbBoard"></div>
 
 <div id="kbToast"></div>
 
 <div id="kbModal">
     <div class="box">
-        <h2>Nueva tarjeta</h2>
+        <h2 id="kbModalTitle">Nueva tarjeta</h2>
+        <input type="hidden" id="kbEditId" value="">
         <label>Nombre del cliente *</label>
         <input type="text" id="kbNewName" placeholder="Ej: Juan Perez">
         <label>Valor de la propiedad (USD)</label>
@@ -15342,7 +15383,7 @@ KANBAN_HTML = r"""<!DOCTYPE html>
         <input type="text" id="kbNewBudget" placeholder="Ej: 100k-150k">
         <div class="row">
             <button type="button" class="kb-btn ghost" onclick="kbCloseNew()">Cancelar</button>
-            <button type="button" class="kb-btn" onclick="kbCreate()">Crear</button>
+            <button type="button" class="kb-btn" id="kbSaveBtn" onclick="kbSave()">Crear</button>
         </div>
     </div>
 </div>
@@ -15356,6 +15397,10 @@ var KB_STAGES = [
 ];
 var KB_IS_ADMIN = document.body.getAttribute('data-is-admin') === '1';
 var KB_USER = document.body.getAttribute('data-username') || '';
+// Probabilidad de cierre por etapa (mismo criterio que el backend) para el
+// calculo del valor ponderado del pipeline en el resumen.
+var KB_PROB = {NEW:0.10, CONTACTED:0.30, QUALIFIED:0.50, PROPERTY_TOUR:0.70,
+               RESERVATION:0.95, CLOSED_WON:1.00, CLOSED_LOST:0.00};
 var _kbDragId = null;
 
 function kbToast(msg, kind) {
@@ -15375,8 +15420,39 @@ function kbLoad() {
     fetch('/api/kanban/board').then(function(r){ return r.json(); }).then(function(d){
         if (!d || !d.success) { kbToast('No se pudo cargar el tablero.', 'err'); return; }
         kbRender(d.columns || {});
+        kbRenderSummary(d.columns || {});
         if (KB_IS_ADMIN) kbRenderVis(!!d.global_visibility);
     }).catch(function(){ kbToast('Error de conexion al cargar.', 'err'); });
+}
+
+// Resumen del pipeline: total de leads, valor bruto, valor ponderado (por
+// probabilidad de cierre) y cuantos estan ganados/perdidos. Excluye los
+// cerrados del "pipeline activo" para el ponderado.
+function kbRenderSummary(columns) {
+    var cont = document.getElementById('kbSummary');
+    if (!cont) return;
+    var totalLeads = 0, valorBruto = 0, ponderado = 0, ganados = 0, perdidos = 0;
+    KB_STAGES.forEach(function(st){
+        var cards = columns[st.k] || [];
+        totalLeads += cards.length;
+        if (st.k === 'CLOSED_WON') ganados += cards.length;
+        if (st.k === 'CLOSED_LOST') perdidos += cards.length;
+        var prob = KB_PROB[st.k] != null ? KB_PROB[st.k] : 0;
+        cards.forEach(function(c){
+            var v = Number(c.property_value) || 0;
+            valorBruto += v;
+            // El ponderado del pipeline activo no cuenta los perdidos (prob 0)
+            // y cuenta los ganados al 100%.
+            ponderado += v * prob;
+        });
+    });
+    function money(v){ return 'USD ' + (Math.round(v)).toLocaleString('es-AR'); }
+    cont.innerHTML =
+        '<div class="item"><span class="lbl">Leads totales</span><span class="num">' + totalLeads + '</span></div>' +
+        '<div class="item"><span class="lbl">Valor del pipeline</span><span class="num">' + money(valorBruto) + '</span></div>' +
+        '<div class="item"><span class="lbl">Valor ponderado</span><span class="num cyan">' + money(ponderado) + '</span></div>' +
+        '<div class="item"><span class="lbl">Ganados</span><span class="num green">' + ganados + '</span></div>' +
+        '<div class="item"><span class="lbl">Perdidos</span><span class="num">' + perdidos + '</span></div>';
 }
 
 function kbRenderVis(on) {
@@ -15395,7 +15471,8 @@ function kbRender(columns) {
         var total = 0; cards.forEach(function(c){ total += Number(c.property_value) || 0; });
         var col = document.createElement('div');
         col.className = 'kb-col stage-' + st.k;
-        var head = '<div class="kb-col-head"><div class="name">' + st.label + '</div>' +
+        var icon = st.k === 'CLOSED_WON' ? '&#10003; ' : (st.k === 'CLOSED_LOST' ? '&#10007; ' : '');
+        var head = '<div class="kb-col-head"><div class="name">' + icon + st.label + '</div>' +
                    '<div class="meta">' + cards.length + ' tarjeta(s)' +
                    (total > 0 ? ' &middot; ' + kbFmtMoney(total) : '') + '</div></div>';
         var body = '<div class="kb-col-body" data-stage="' + st.k + '"></div>';
@@ -15416,14 +15493,15 @@ function kbCardEl(c) {
     el.className = 'kb-card';
     el.setAttribute('draggable', 'true');
     el.setAttribute('data-card-id', c.card_id);
-    var puedeBorrar = KB_IS_ADMIN || (c.owner_username && c.owner_username === KB_USER);
-    var del = puedeBorrar ? '<button class="del" title="Borrar" onclick="kbDelete(event,\'' + c.card_id + '\')">&#10005;</button>' : '';
+    var puedeEditar = KB_IS_ADMIN || (c.owner_username && c.owner_username === KB_USER);
+    var del = puedeEditar ? '<button class="del" title="Borrar" onclick="kbDelete(event,\'' + c.card_id + '\')">&#10005;</button>' : '';
+    var edit = puedeEditar ? '<button class="edit" title="Editar" onclick=\'kbOpenEdit(event,' + JSON.stringify(c).replace(/'/g, "&#39;") + ')\'>&#9998;</button>' : '';
     var meta = [];
     if (c.interest_zone) meta.push(kbEsc(c.interest_zone));
     if (c.budget_range) meta.push(kbEsc(c.budget_range));
     // Cada parte ya viene escapada; unimos con el separador HTML sin re-escapar
     // (si no, el '&middot;' se mostraria como texto literal).
-    el.innerHTML = del +
+    el.innerHTML = del + edit +
         '<div class="cust">' + kbEsc(c.customer_name || 'Sin nombre') + '</div>' +
         (kbFmtMoney(c.property_value) ? '<div class="val">' + kbFmtMoney(c.property_value) + '</div>' : '') +
         (meta.length ? '<div class="meta">' + meta.join(' &middot; ') + '</div>' : '') +
@@ -15471,27 +15549,51 @@ function kbDelete(ev, cardId) {
     }).catch(function(){ kbToast('Error al borrar.', 'err'); });
 }
 
-function kbOpenNew() { document.getElementById('kbModal').style.display = 'flex'; document.getElementById('kbNewName').focus(); }
+function kbOpenNew() {
+    document.getElementById('kbEditId').value = '';
+    document.getElementById('kbModalTitle').textContent = 'Nueva tarjeta';
+    document.getElementById('kbSaveBtn').textContent = 'Crear';
+    ['kbNewName','kbNewValue','kbNewZone','kbNewBudget'].forEach(function(id){ document.getElementById(id).value = ''; });
+    document.getElementById('kbModal').style.display = 'flex';
+    document.getElementById('kbNewName').focus();
+}
+function kbOpenEdit(ev, c) {
+    ev.stopPropagation();
+    document.getElementById('kbEditId').value = c.card_id;
+    document.getElementById('kbModalTitle').textContent = 'Editar tarjeta';
+    document.getElementById('kbSaveBtn').textContent = 'Guardar';
+    document.getElementById('kbNewName').value = c.customer_name || '';
+    document.getElementById('kbNewValue').value = c.property_value || '';
+    document.getElementById('kbNewZone').value = c.interest_zone || '';
+    document.getElementById('kbNewBudget').value = c.budget_range || '';
+    document.getElementById('kbModal').style.display = 'flex';
+    document.getElementById('kbNewName').focus();
+}
 function kbCloseNew() {
     document.getElementById('kbModal').style.display = 'none';
+    document.getElementById('kbEditId').value = '';
     ['kbNewName','kbNewValue','kbNewZone','kbNewBudget'].forEach(function(id){ document.getElementById(id).value = ''; });
 }
-function kbCreate() {
+function kbSave() {
     var name = document.getElementById('kbNewName').value.trim();
     if (!name) { kbToast('El nombre del cliente es obligatorio.', 'err'); return; }
+    var editId = document.getElementById('kbEditId').value;
     var body = {
         customer_name: name,
         property_value: Number(document.getElementById('kbNewValue').value) || 0,
         interest_zone: document.getElementById('kbNewZone').value.trim(),
         budget_range: document.getElementById('kbNewBudget').value.trim()
     };
-    fetch('/api/kanban/card', {
+    var url, okMsg;
+    if (editId) { body.card_id = editId; url = '/api/kanban/card/update'; okMsg = 'Tarjeta actualizada.'; }
+    else { url = '/api/kanban/card'; okMsg = 'Tarjeta creada.'; }
+    fetch(url, {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify(body)
     }).then(function(r){ return r.json(); }).then(function(d){
-        if (d && d.success) { kbToast('Tarjeta creada.', 'ok'); kbCloseNew(); kbLoad(); }
-        else { kbToast((d && d.error) ? d.error : 'No se pudo crear.', 'err'); }
-    }).catch(function(){ kbToast('Error al crear.', 'err'); });
+        if (d && d.success) { kbToast(okMsg, 'ok'); kbCloseNew(); kbLoad(); }
+        else { kbToast((d && d.error) ? d.error : 'No se pudo guardar.', 'err'); }
+    }).catch(function(){ kbToast('Error al guardar.', 'err'); });
 }
 
 function kbToggleVis() {

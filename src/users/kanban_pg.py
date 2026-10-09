@@ -558,6 +558,67 @@ def create_card(owner_username: str, customer_name: str, property_value: Any = 0
         _release(conn, close=should_close)
 
 
+def update_card(card_id: str, fields: Dict[str, Any], tenant_id: str = "__legacy__",
+                requested_by: str = "", is_admin: bool = False) -> Dict[str, Any]:
+    """
+    Edita los DATOS de una tarjeta (nombre, valor, zona, etc.) sin cambiar su
+    etapa (eso es move_card). Permisos: dueno o admin. Best-effort transaccional.
+    """
+    if not is_available():
+        return {"success": False, "error": "Persistencia no disponible."}
+    conn = _conn()
+    if conn is None:
+        return {"success": False, "error": "No hay conexion."}
+    f = fields or {}
+    try:
+        pv = float(f.get("property_value", 0) or 0)
+        if pv < 0:
+            pv = 0.0
+    except (ValueError, TypeError):
+        pv = 0.0
+    should_close = False
+    try:
+        _ensure_tables(conn)
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT owner_username FROM kanban_cards "
+                    "WHERE card_id = %s AND tenant_id = %s",
+                    (card_id, tenant_id or "__legacy__"),
+                )
+                row = cur.fetchone()
+                if not row:
+                    raise _KanbanError("La tarjeta no existe.")
+                owner_username = row[0]
+                if not is_admin and owner_username and requested_by != owner_username:
+                    raise _KanbanError("No podes editar una tarjeta de otro vendedor.")
+                cur.execute(
+                    """
+                    UPDATE kanban_cards SET customer_name = %s, contacto = %s,
+                        operacion = %s, budget_range = %s, interest_zone = %s,
+                        notas = %s, property_value = %s, updated_at = %s
+                    WHERE card_id = %s AND tenant_id = %s
+                    """,
+                    (str(f.get("customer_name", "") or "").strip()[:200],
+                     str(f.get("contacto", "") or "")[:200],
+                     str(f.get("operacion", "") or "")[:60],
+                     str(f.get("budget_range", "") or "")[:100],
+                     str(f.get("interest_zone", "") or "")[:200],
+                     str(f.get("notas", "") or "")[:4000],
+                     pv, datetime.now(timezone.utc),
+                     card_id, tenant_id or "__legacy__"),
+                )
+        return {"success": True, "message": "Tarjeta actualizada."}
+    except _KanbanError as ke:
+        return {"success": False, "error": str(ke)}
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"kanban update_card error: {exc}")
+        should_close = True
+        return {"success": False, "error": str(exc)}
+    finally:
+        _release(conn, close=should_close)
+
+
 # =====================================================================
 # CONFIGURACION DEL TABLERO (visibilidad global)
 # =====================================================================
