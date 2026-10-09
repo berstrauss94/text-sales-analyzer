@@ -2898,7 +2898,7 @@ HTML = """
     <div class="top-bar">
         <div>
             <h1 style="margin:0;">Analizador de Textos</h1>
-            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.46{% if username == 'Berna.Strauss' %} &middot; Kanban: permisos + sincronia CRM{% endif %}</span></p>
+            <p class="subtitle">Ventas y Bienes Raices &mdash; Analisis con Machine Learning <span id="versionBadge" onclick="toggleVersionInfo(event)" title="Toca para ver que trae esta actualizacion" style="font-size:0.7rem;font-weight:700;color:#4da3ff;background:rgba(77,163,255,0.12);padding:1px 7px;border-radius:8px;cursor:pointer;position:relative;">v32.47{% if username == 'Berna.Strauss' %} &middot; Kanban: permisos + sincronia CRM{% endif %}</span></p>
             <div id="versionInfoPopover" style="display:none;position:absolute;z-index:100000;margin-top:6px;max-width:340px;background:#12141c;border:1px solid #4a6cf7;border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.6);text-align:left;">
                 <div style="font-size:0.8rem;font-weight:700;color:#fff;margin-bottom:6px;">Novedad de esta version (v32.0)</div>
                 <div style="font-size:0.74rem;color:#cfd3dc;line-height:1.65;">
@@ -15419,12 +15419,14 @@ function kbCardEl(c) {
     var puedeBorrar = KB_IS_ADMIN || (c.owner_username && c.owner_username === KB_USER);
     var del = puedeBorrar ? '<button class="del" title="Borrar" onclick="kbDelete(event,\'' + c.card_id + '\')">&#10005;</button>' : '';
     var meta = [];
-    if (c.interest_zone) meta.push(c.interest_zone);
-    if (c.budget_range) meta.push(c.budget_range);
+    if (c.interest_zone) meta.push(kbEsc(c.interest_zone));
+    if (c.budget_range) meta.push(kbEsc(c.budget_range));
+    // Cada parte ya viene escapada; unimos con el separador HTML sin re-escapar
+    // (si no, el '&middot;' se mostraria como texto literal).
     el.innerHTML = del +
         '<div class="cust">' + kbEsc(c.customer_name || 'Sin nombre') + '</div>' +
         (kbFmtMoney(c.property_value) ? '<div class="val">' + kbFmtMoney(c.property_value) + '</div>' : '') +
-        (meta.length ? '<div class="meta">' + kbEsc(meta.join(' &middot; ')) + '</div>' : '') +
+        (meta.length ? '<div class="meta">' + meta.join(' &middot; ') + '</div>' : '') +
         (KB_IS_ADMIN && c.owner_username ? '<div class="owner">' + kbEsc(c.owner_username) + '</div>' : '');
     el.addEventListener('dragstart', function(){ _kbDragId = c.card_id; el.classList.add('dragging'); });
     el.addEventListener('dragend', function(){ _kbDragId = null; el.classList.remove('dragging'); });
