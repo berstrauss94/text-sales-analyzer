@@ -40,10 +40,27 @@ versión visible). Nunca inventar ni estimar un conteo: siempre del script.
 15. **Seguridad** — login/sesión, hash de contraseñas, rate limiting, credenciales en env, aislamiento por tenant, errores no expuestos al cliente.
 16. **Estado y honestidad técnica** — versión en producción; nota explícita de que "cero bugs garantizado" no existe; los conteos salen del código a la fecha.
 
-## Paso 3 — Generar el Word
-Generar `Analisis_General_Completo.docx` en la raíz del proyecto con `python-docx`
-(ya instalado): portada, títulos, tablas para los inventarios, viñetas para los
-detalles. Borrar cualquier versión anterior del documento para no duplicar.
+## Paso 3 — Generar el Word (DOS estilos posibles)
+Generar con `python-docx` (ya instalado) en la raíz del proyecto. Preguntar o
+deducir cuál de los dos estilos quiere el usuario:
+
+- **Estilo TÉCNICO** → `Analisis_General_Completo.docx`: inventario con conteos
+  exactos (los 16 puntos de arriba, tablas de endpoints/tablas/modelos). Para
+  saber qué hay dentro del sistema. Comando típico: "análisis técnico" / "inventario".
+
+- **Estilo NARRATIVO** → `Sistema_Descripcion_Narrativa.docx`: descripción
+  funcional orientada al VALOR, por rol (vendedor / admin-auditor / impresiones /
+  capacidades que lo hacen sólido / "en una frase"). Comunica qué resuelve y qué
+  aporta, no cuántas tablas tiene. Es el estilo para VALORIZAR el trabajo o
+  presentarlo a un cliente/jefe. Comando típico: "descripción narrativa" /
+  "resumen del sistema" / "para presentar".
+
+En ambos: usar los conteos del script, borrar la versión anterior del mismo
+documento para no duplicar, y verificar contra el código.
+
+IMPORTANTE sobre valorización: si el usuario quiere "sacar el valor monetario",
+describir honestamente el alcance real para que ÉL fundamente el precio. NUNCA
+inventar una cifra de dinero ni inflar capacidades que no existen.
 
 ## Reglas de honestidad (obligatorias)
 - Verificar SIEMPRE contra el código real antes de afirmar algo. No describir de memoria.
